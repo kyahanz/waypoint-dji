@@ -1,0 +1,12 @@
+{
+  "name": "waypoint-dji",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Fase 0 spike: generator & inspector file KMZ/WPML untuk DJI Fly waypoint (Mini 5 Pro)",
+  "scripts": {
+    "gen": "node src/cli.js",
+    "inspect": "node src/inspect.js"
+  },
+  "engines": { "node": ">=14" }
+}

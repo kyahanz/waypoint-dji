@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>waypoint-dji — prototipe perencana survei</title>
+    <link rel="stylesheet" href="vendor/maplibre-gl.css" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#0d1117" />
+  </head>
+  <body>
+    <div id="app">
+      <aside id="panel">
+        <button id="sheet-handle" class="sheet-handle" aria-expanded="true">
+          <span class="grabber"></span>
+          <span class="sheet-summary" id="sheet-summary">Perencana survei</span>
+        </button>
+
+        <div id="panel-scroll">
+          <header class="panel-head">
+            <div class="brand">
+              <span class="dot"></span>
+              <div>
+                <h1>waypoint-dji</h1>
+                <p>Prototipe perencana survei · Mini 5 Pro</p>
+              </div>
+            </div>
+
+            <div class="search">
+              <input
+                id="search"
+                type="search"
+                placeholder="Cari lokasi, atau tempel koordinat"
+                autocomplete="off"
+              />
+              <button id="btn-locate" class="icon-btn" title="Lokasi saya">◎</button>
+            </div>
+            <div id="search-results" class="results" hidden></div>
+          </header>
+
+          <section class="step">
+            <div class="step-head">
+              <span class="num" id="num-1">1</span>
+              <h2>Area survei</h2>
+            </div>
+            <p class="hint" id="draw-hint">
+              Klik di peta untuk menaruh titik sudut lahan. Minimal 3 titik.
+            </p>
+            <div class="row">
+              <button id="btn-draw" class="btn primary">Mulai gambar</button>
+              <button id="btn-undo" class="btn ghost" disabled title="Ctrl+Z">↶</button>
+              <button id="btn-redo" class="btn ghost" disabled title="Ctrl+Shift+Z">↷</button>
+              <button id="btn-clear" class="btn ghost" disabled>Hapus</button>
+            </div>
+            <div class="row">
+              <button id="btn-demo" class="btn link">Pakai area contoh</button>
+            </div>
+            <div class="readout" id="area-readout" hidden>
+              <span>Luas area</span><strong id="area-val">—</strong>
+            </div>
+            <div class="readout" id="flown-readout" hidden>
+              <span>Area diterbangi</span><strong id="flown-val">—</strong>
+            </div>
+            <div class="readout" id="home-readout" hidden>
+              <span>Titik lepas landas</span>
+              <strong id="home-val">Tengah lahan</strong>
+            </div>
+            <div class="row tight wrap">
+              <button id="btn-reset-home" class="btn link" hidden>
+                Kembalikan ke tengah lahan
+              </button>
+              <button id="btn-toggle-home" class="btn link" hidden>
+                Sembunyikan penanda
+              </button>
+            </div>
+          </section>
+
+          <section class="step">
+            <div class="step-head">
+              <span class="num" id="num-2">2</span>
+              <h2>Parameter survei</h2>
+            </div>
+
+            <div class="field">
+              <div class="field-head">
+                <label for="gsd">Ketelitian (GSD)</label>
+                <output id="gsd-out">2.0 cm/px</output>
+              </div>
+              <input id="gsd" type="range" min="0.5" max="6" step="0.1" value="2" />
+              <p class="sub">
+                Ketinggian terbang <strong id="alt-derived">—</strong> · makin rendah
+                makin detail, tapi makin lama
+              </p>
+            </div>
+
+            <div class="grid-2">
+              <div class="field">
+                <div class="field-head">
+                  <label for="front">Overlap depan</label>
+                  <output id="front-out">80%</output>
+                </div>
+                <input id="front" type="range" min="60" max="90" step="5" value="80" />
+              </div>
+              <div class="field">
+                <div class="field-head">
+                  <label for="side">Overlap samping</label>
+                  <output id="side-out">70%</output>
+                </div>
+                <input id="side" type="range" min="50" max="85" step="5" value="70" />
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="field-head">
+                <label for="angle">Arah jalur</label>
+                <output id="angle-out">0°</output>
+              </div>
+              <input id="angle" type="range" min="0" max="179" step="1" value="0" />
+              <div class="row tight">
+                <button class="btn link" id="btn-auto-angle">Ikuti sisi terpanjang</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="field-head">
+                <label for="buffer">Buffer tepi</label>
+                <output id="buffer-out">1.0× jalur</output>
+              </div>
+              <input id="buffer" type="range" min="0" max="3" step="0.5" value="1" />
+              <p class="sub">
+                Terbang <strong id="buffer-m">—</strong> melewati batas lahan.
+                Tanpa ini, pinggiran ortofoto melengkung karena cuma terpotret
+                dari satu sisi.
+              </p>
+            </div>
+
+            <div class="field">
+              <label class="switch-row" for="terrain">
+                <input id="terrain" type="checkbox" />
+                <span class="switch-body">
+                  <span class="switch-label">Ikuti kontur tanah</span>
+                  <span class="switch-note" id="terrain-note">
+                    Jaga ketinggian tetap sama di atas permukaan, bukan di atas
+                    titik lepas landas.
+                  </span>
+                </span>
+              </label>
+              <div class="readout" id="terrain-readout" hidden>
+                <span id="terrain-status">—</span><strong id="terrain-relief">—</strong>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="block-label">Mode pemotretan</label>
+              <div class="seg">
+                <button class="seg-btn active" data-mode="continuous">Jalan terus</button>
+                <button class="seg-btn" data-mode="stopAndShoot">Stop &amp; shoot</button>
+              </div>
+              <p class="sub" id="mode-hint">
+                Drone menjepret tiap sekian meter tanpa berhenti. Lebih cepat.
+              </p>
+            </div>
+          </section>
+
+          <section class="step">
+            <div class="step-head">
+              <span class="num" id="num-3">3</span>
+              <h2>Hasil</h2>
+            </div>
+
+            <div id="stats" class="stats empty">
+              <p class="placeholder">Gambar area dulu untuk melihat rencana terbang.</p>
+            </div>
+
+            <div id="sorties"></div>
+            <div id="warnings"></div>
+
+            <button id="btn-export" class="btn primary wide" disabled>Export KMZ</button>
+            <div class="row tight split">
+              <button id="btn-handoff" class="btn" disabled>Buka di HP</button>
+              <button id="btn-geojson" class="btn" disabled>GeoJSON</button>
+            </div>
+            <p class="sub center">
+              Format KMZ belum teruji di DJI Fly — lihat TEST-CHECKLIST.md
+            </p>
+          </section>
+
+          <section class="step">
+            <div class="step-head">
+              <span class="num">⬇</span>
+              <h2>Peta offline</h2>
+            </div>
+            <p class="hint">
+              Unduh tile area ini selagi ada sinyal, supaya peta tetap muncul
+              di lapangan.
+            </p>
+            <div id="offline-unsupported" class="note warn" hidden>
+              <span class="ic">!</span><span id="offline-why"></span>
+            </div>
+            <div id="offline-body" hidden>
+              <div class="readout">
+                <span>Perlu diunduh</span><strong id="tile-count">—</strong>
+              </div>
+              <div class="readout">
+                <span>Sudah tersimpan</span><strong id="tile-cached">—</strong>
+              </div>
+              <div class="progress" id="dl-progress" hidden>
+                <div class="bar" id="dl-bar"></div>
+              </div>
+              <div class="row tight split">
+                <button id="btn-download" class="btn" disabled>Unduh area</button>
+                <button id="btn-clear-tiles" class="btn ghost">Hapus cache</button>
+              </div>
+              <p class="sub">
+                Zoom 13–19. Penyedia tile gratis melarang unduhan massal, jadi
+                ambil seperlunya saja.
+              </p>
+            </div>
+          </section>
+
+          <section class="step">
+            <div class="step-head">
+              <span class="num">★</span>
+              <h2>Project tersimpan</h2>
+            </div>
+            <div class="row">
+              <input id="proj-name" type="text" placeholder="Nama project" />
+              <button id="btn-save" class="btn" disabled>Simpan</button>
+            </div>
+            <div id="proj-list" class="proj-list">
+              <p class="placeholder small">Belum ada project tersimpan.</p>
+            </div>
+            <p class="sub">
+              Tersimpan di browser ini saja. Fase 2 akan memindahkannya ke cloud.
+            </p>
+          </section>
+
+          <footer class="panel-foot">
+            <p>
+              Prototipe. Hitungan fotogrametri nyata, format KMZ masih perlu
+              divalidasi di perangkat.
+            </p>
+          </footer>
+        </div>
+      </aside>
+
+      <main id="map-wrap">
+        <div id="map"></div>
+
+        <div id="map-badge"><span id="badge-text">Mode lihat</span></div>
+        <div id="offline-badge" class="floating offline-badge" hidden>Tanpa sinyal</div>
+
+        <div id="basemap-switch" class="floating">
+          <button class="chip active" data-base="sat">Satelit</button>
+          <button class="chip" data-base="street">Jalan</button>
+          <button class="chip" id="chip-labels">Label</button>
+          <button class="chip" id="chip-imagery" title="Sumber citra">⚙</button>
+        </div>
+
+        <div id="legend" class="floating legend" hidden></div>
+
+        <div id="map-help" class="floating help">
+          <span><b>Geser</b> titik biru untuk ubah bentuk</span>
+          <span><b>Klik</b> titik kecil di sisi untuk menyisipkan</span>
+          <span><b>Klik kanan</b> atau <b>Shift+klik</b> titik untuk menghapus</span>
+          <span id="help-home"
+            ><b>Geser</b> penanda H kalau lepas landas bukan dari tengah lahan</span
+          >
+        </div>
+      </main>
+    </div>
+
+    <div id="toasts" class="toasts"></div>
+
+    <div id="imagery" class="modal" hidden>
+      <div class="modal-card">
+        <h3>Sumber citra satelit</h3>
+        <p class="sub">
+          Esri tidak perlu kunci tapi resolusinya mentok di zoom 19. Sumber lain
+          bisa lebih tajam dan lebih baru, tapi butuh akun gratis masing-masing.
+        </p>
+        <div id="imagery-list" class="imagery-list"></div>
+        <button id="btn-close-imagery" class="btn wide">Tutup</button>
+      </div>
+    </div>
+
+    <div id="handoff" class="modal" hidden>
+      <div class="modal-card">
+        <h3>Buka rencana ini di HP</h3>
+        <p class="sub">
+          Scan kode ini dari HP yang terhubung ke jaringan WiFi yang sama. Rencana
+          akan terbuka persis seperti di layar ini, lalu tinggal export KMZ dari
+          HP-nya.
+        </p>
+        <div id="qr" class="qr"></div>
+        <div class="url-row">
+          <input id="handoff-url" type="text" readonly />
+          <button id="btn-copy-url" class="btn">Salin</button>
+        </div>
+        <p class="sub" id="handoff-note"></p>
+        <button id="btn-close-handoff" class="btn wide">Tutup</button>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

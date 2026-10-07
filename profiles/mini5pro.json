@@ -1,0 +1,37 @@
+{
+  "name": "DJI Mini 5 Pro",
+  "_catatan": "Semua nilai bertanda [?] masih TEBAKAN. Enum drone/payload resmi DJI hanya dipublikasikan untuk lini Enterprise; lini Mini (consumer) tidak ada di dokumentasi. Validasi dengan cara: bikin 1 waypoint mission manual di DJI Fly, ambil file .kmz hasilnya dari HP, lalu jalankan `npm run inspect -- <file.kmz>` dan salin nilai aslinya ke sini.",
+
+  "droneEnumValue": 68,
+  "droneSubEnumValue": 0,
+  "payloadEnumValue": 68,
+  "payloadSubEnumValue": 0,
+  "_enumStatus": "[?] belum terverifikasi",
+
+  "camera": {
+    "_catatan": "Spesifikasi di bawah dipakai untuk hitung GSD & footprint. Cek ulang di spec sheet resmi sebelum dipakai untuk perencanaan mapping serius.",
+    "sensorWidthMm": 13.2,
+    "sensorHeightMm": 8.8,
+    "imageWidthPx": 8192,
+    "imageHeightPx": 6144,
+    "focalLengthMm": 8.8,
+    "focalLength35mmEq": 24,
+    "mechanicalShutter": false,
+    "_shutterCatatan": "Rolling shutter: untuk fotogrametri, batasi kecepatan atau pakai mode stop-and-shoot biar tidak motion blur."
+  },
+
+  "limits": {
+    "maxWaypoints": 200,
+    "_maxWaypointsCatatan": "[?] batas DJI Fly belum dikonfirmasi",
+    "maxAltitudeM": 120,
+    "takeOffSecurityHeightM": 20,
+    "_takeOffCatatan": "Ketinggian perintah di bawah ini dianggap tidak aman saat mengikuti kontur",
+    "_maxAltitudeCatatan": "Batas regulasi Indonesia (DGCA), bukan batas teknis drone",
+    "maxSpeedMs": 15,
+    "accelMs2": 2.5,
+    "_accelCatatan": "Percepatan efektif mode waypoint; dipakai untuk estimasi waktu ruas pendek",
+    "nominalFlightMin": 36,
+    "usableFlightMin": 22,
+    "_usableCatatan": "Realistis untuk misi mapping (sudah potong cadangan RTH + margin angin)"
+  }
+}
