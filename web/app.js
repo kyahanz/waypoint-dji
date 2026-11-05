@@ -164,6 +164,32 @@ const LABELS = {
 let settings = getSettings();
 let baseKind = 'sat'; // 'sat' | 'street'
 
+// ---------- Tema ----------
+//
+// Bawaannya ikut sistem, dan sistem di HP biasanya terang di siang hari —
+// yang memang keadaan alat ini dipakai. Pilihan manual tetap ada karena
+// orang punya alasan sendiri, dan pilihannya diingat antar sesi.
+
+const THEMES = [
+  { id: 'auto', label: 'Tema: ikut sistem' },
+  { id: 'light', label: 'Tema: terang' },
+  { id: 'dark', label: 'Tema: gelap' },
+];
+
+function applyTheme(id) {
+  const theme = THEMES.find((t) => t.id === id) ?? THEMES[0];
+
+  if (theme.id === 'auto') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme.id;
+
+  const btn = document.getElementById('btn-theme');
+  if (btn) btn.textContent = theme.label;
+  return theme.id;
+}
+
+// Dipasang sebelum apa pun digambar, supaya tidak ada kedipan putih-ke-gelap.
+let themeId = applyTheme(settings.theme ?? 'auto');
+
 const activeImagery = () => (IMAGERY[settings.imagery] ? settings.imagery : 'esri');
 
 const map = new maplibregl.Map({
@@ -595,6 +621,12 @@ $('btn-copy-url').onclick = async () => {
     toast('Tidak bisa menyalin otomatis — tekan Ctrl+C.', 'err');
   }
 };
+$('btn-theme').onclick = () => {
+  const next = THEMES[(THEMES.findIndex((t) => t.id === themeId) + 1) % THEMES.length];
+  themeId = applyTheme(next.id);
+  settings = setSettings({ theme: themeId });
+};
+
 els.sheetHandle.onclick = () => {
   const collapsed = els.sheet.classList.toggle('collapsed');
   els.sheetHandle.setAttribute('aria-expanded', String(!collapsed));
@@ -1858,17 +1890,24 @@ function renderEnumBadge() {
 
 function renderStats(plan) {
   els.stats.className = 'stats';
+  // Urutannya mengikuti keputusan di lapangan, bukan urutan hitungannya:
+  // yang pertama ditanya orang sebelum berangkat adalah "berapa lama" dan
+  // "cukup berapa baterai". Sisanya pendukung.
   els.stats.innerHTML = `
+    <div class="stat hero">
+      <span class="k">Total waktu</span>
+      <span class="v">${fmtDur(plan.duration)}</span>
+    </div>
+    <div class="stat hero">
+      <span class="k">Baterai</span>
+      <span class="v">${plan.sorties.length}<small>×</small></span>
+    </div>
     <div class="stat">
       <span class="k">Ketinggian</span>
       <span class="v">${plan.altitude.toFixed(0)}<small>m</small></span>
     </div>
     <div class="stat">
-      <span class="k">Kecepatan</span>
-      <span class="v">${plan.speed.toFixed(1)}<small>m/s</small></span>
-    </div>
-    <div class="stat">
-      <span class="k">GSD</span>
+      <span class="k">Ketelitian</span>
       <span class="v">${plan.params.gsd.toFixed(2)}<small>cm/px</small></span>
     </div>
     <div class="stat">
@@ -1876,12 +1915,12 @@ function renderStats(plan) {
       <span class="v">${plan.grid.photos}</span>
     </div>
     <div class="stat">
-      <span class="k">Waypoint</span>
-      <span class="v">${plan.grid.waypoints.length}</span>
+      <span class="k">Kecepatan</span>
+      <span class="v">${plan.speed.toFixed(1)}<small>m/s</small></span>
     </div>
     <div class="stat">
-      <span class="k">Total waktu</span>
-      <span class="v">${fmtDur(plan.duration)}</span>
+      <span class="k">Waypoint</span>
+      <span class="v">${plan.grid.waypoints.length}</span>
     </div>
     <div class="stat">
       <span class="k">Titik terjauh</span>

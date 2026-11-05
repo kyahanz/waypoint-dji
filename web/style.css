@@ -1,16 +1,159 @@
+/* Tema.
+ *
+ * Terang jadi bawaan, dan itu keputusan berdasarkan tempat alat ini dipakai:
+ * di lapangan, siang, di bawah matahari. Layar gelap nyaris tak terbaca di
+ * situ. Yang suka gelap tinggal menggantinya, dan pilihannya diingat.
+ *
+ * Netralnya sengaja hangat, bukan abu-abu kebiruan, supaya terbaca sebagai
+ * alat kerja — bukan dasbor. Permukaannya rata: tidak ada bayangan tebal,
+ * tidak ada kaca buram, tidak ada gradien. Kalau ada yang menonjol, itu
+ * karena memang penting, bukan karena dekorasi.
+ */
 :root {
-  --bg: #0d1117;
-  --panel: #151b23;
-  --panel-2: #1c242e;
-  --line: #2a3441;
-  --text: #e6edf3;
-  --muted: #8b98a8;
-  --accent: #4da3ff;
-  --accent-dim: #1e3a5f;
-  --warn: #f0b429;
-  --danger: #f27272;
-  --ok: #55c57a;
-  --radius: 10px;
+  color-scheme: light;
+
+  --bg: #efece6;
+  --panel: #ffffff;
+  --panel-2: #f5f3ee;
+  --panel-3: #e9e5dc;
+  --line: #d8d3c8;
+  --line-strong: #b6b0a2;
+
+  --text: #1b1915;
+  --muted: #6d6659;
+
+  --accent: #1b5fa8;
+  --accent-hover: #164e8b;
+  --accent-dim: #d7e6f6;
+  --accent-soft: #e8f1fa;
+  --on-accent: #ffffff;
+
+  --warn: #7d5205;
+  --warn-bg: #fdf3dc;
+  --warn-line: #e2c178;
+  --warn-text: #6f4905;
+  --on-warn: #2a1d02;
+
+  --danger: #b3261e;
+  --danger-bg: #fdecea;
+  --danger-line: #eeb4ae;
+  --danger-text: #8c1d17;
+  --on-danger: #ffffff;
+
+  --ok: #1e7a46;
+  --ok-bg: #e7f5ec;
+  --ok-line: #a9d9bd;
+
+  --info-bg: #eaf1f8;
+  --info-line: #bcd4ea;
+  --info-text: #1d4f7c;
+
+  --overlay: rgba(255, 255, 255, 0.94);
+  --toast-bg: rgba(255, 255, 255, 0.98);
+  --scrim: rgba(28, 26, 22, 0.45);
+  --shadow-sm: 0 1px 2px rgba(28, 26, 22, 0.12), 0 2px 6px rgba(28, 26, 22, 0.08);
+  --shadow-lg: 0 8px 28px rgba(28, 26, 22, 0.18);
+
+  --radius: 8px;
+  --radius-sm: 6px;
+
+  /* Target sentuh minimum. Alat ini dipakai sambil berdiri di lahan, sering
+     dengan tangan berkeringat atau sarung tangan — bukan dengan tetikus. */
+  --touch: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --bg: #16151a;
+    --panel: #1d1c22;
+    --panel-2: #26252c;
+    --panel-3: #302e37;
+    --line: #38363f;
+    --line-strong: #514e59;
+
+    --text: #ecebe8;
+    --muted: #9c978e;
+
+    --accent: #6aa9e9;
+    --accent-hover: #87bbf0;
+    --accent-dim: #22384f;
+    --accent-soft: #1b2c3d;
+    --on-accent: #0a1420;
+
+    --warn: #e6b556;
+    --warn-bg: #3a2e13;
+    --warn-line: #6b5520;
+    --warn-text: #f0d79b;
+    --on-warn: #241a05;
+
+    --danger: #ef8279;
+    --danger-bg: #3a1f1d;
+    --danger-line: #6d3833;
+    --danger-text: #f6b5af;
+    --on-danger: #2a0f0c;
+
+    --ok: #6cc98f;
+    --ok-bg: #1b3326;
+    --ok-line: #2f6244;
+
+    --info-bg: #1b2c3d;
+    --info-line: #2f4c68;
+    --info-text: #a9ccea;
+
+    --overlay: rgba(22, 21, 26, 0.92);
+    --toast-bg: rgba(29, 28, 34, 0.98);
+    --scrim: rgba(8, 8, 10, 0.68);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.55);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #16151a;
+  --panel: #1d1c22;
+  --panel-2: #26252c;
+  --panel-3: #302e37;
+  --line: #38363f;
+  --line-strong: #514e59;
+
+  --text: #ecebe8;
+  --muted: #9c978e;
+
+  --accent: #6aa9e9;
+  --accent-hover: #87bbf0;
+  --accent-dim: #22384f;
+  --accent-soft: #1b2c3d;
+  --on-accent: #0a1420;
+
+  --warn: #e6b556;
+  --warn-bg: #3a2e13;
+  --warn-line: #6b5520;
+  --warn-text: #f0d79b;
+  --on-warn: #241a05;
+
+  --danger: #ef8279;
+  --danger-bg: #3a1f1d;
+  --danger-line: #6d3833;
+  --danger-text: #f6b5af;
+  --on-danger: #2a0f0c;
+
+  --ok: #6cc98f;
+  --ok-bg: #1b3326;
+  --ok-line: #2f6244;
+
+  --info-bg: #1b2c3d;
+  --info-line: #2f4c68;
+  --info-text: #a9ccea;
+
+  --overlay: rgba(22, 21, 26, 0.92);
+  --toast-bg: rgba(29, 28, 34, 0.98);
+  --scrim: rgba(8, 8, 10, 0.68);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -120,7 +263,7 @@ body {
 .num.done {
   background: var(--accent);
   border-color: var(--accent);
-  color: #06121f;
+  color: var(--on-accent);
 }
 
 .hint,
@@ -166,8 +309,8 @@ body {
 }
 
 .btn:hover:not(:disabled) {
-  border-color: #3d4a5c;
-  background: #222c38;
+  border-color: var(--line-strong);
+  background: var(--panel-3);
 }
 
 .btn:disabled {
@@ -178,18 +321,18 @@ body {
 .btn.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #06121f;
+  color: var(--on-accent);
 }
 
 .btn.primary:hover:not(:disabled) {
-  background: #6cb4ff;
-  border-color: #6cb4ff;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .btn.primary.active {
   background: var(--danger);
   border-color: var(--danger);
-  color: #1a0808;
+  color: var(--on-danger);
 }
 
 .btn.ghost {
@@ -295,7 +438,7 @@ input[type="range"]::-moz-range-thumb {
 
 .seg-btn.active {
   background: var(--accent);
-  color: #06121f;
+  color: var(--on-accent);
 }
 
 /* ---------- Pembacaan ---------- */
@@ -383,21 +526,21 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .note.warn {
-  background: #2a2208;
-  border-color: #5c4a12;
-  color: #f5d98a;
+  background: var(--warn-bg);
+  border-color: var(--warn-line);
+  color: var(--warn-text);
 }
 
 .note.bad {
-  background: #2d1414;
-  border-color: #5e2626;
-  color: #f5a5a5;
+  background: var(--danger-bg);
+  border-color: var(--danger-line);
+  color: var(--danger-text);
 }
 
 .note.info {
-  background: #10243a;
-  border-color: #1e4066;
-  color: #a8ccf0;
+  background: var(--info-bg);
+  border-color: var(--info-line);
+  color: var(--info-text);
 }
 
 .note .ic {
@@ -433,7 +576,7 @@ input[type="range"]::-moz-range-thumb {
   top: 12px;
   left: 12px;
   z-index: 2;
-  background: rgba(13, 17, 23, 0.9);
+  background: var(--overlay);
   backdrop-filter: blur(8px);
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -552,7 +695,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .result:hover {
-  background: #222c38;
+  background: var(--panel-3);
   color: var(--accent);
 }
 
@@ -644,7 +787,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .proj.current {
-  background: #19283a;
+  background: var(--accent-soft);
 }
 
 .proj-open {
@@ -694,7 +837,7 @@ input[type="range"]::-moz-range-thumb {
 
 .proj-del:hover {
   color: var(--danger);
-  background: #2d1414;
+  background: var(--danger-bg);
 }
 
 .placeholder.small {
@@ -716,7 +859,7 @@ input[type="range"]::-moz-range-thumb {
 .floating {
   position: absolute;
   z-index: 2;
-  background: rgba(13, 17, 23, 0.9);
+  background: var(--overlay);
   backdrop-filter: blur(8px);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -748,7 +891,7 @@ input[type="range"]::-moz-range-thumb {
 
 .chip.active {
   background: var(--accent);
-  color: #06121f;
+  color: var(--on-accent);
 }
 
 .legend {
@@ -790,14 +933,14 @@ input[type="range"]::-moz-range-thumb {
   height: 26px;
   border-radius: 50%;
   background: #f0b429;
-  border: 2px solid #0d1117;
-  color: #1a1203;
+  border: 2px solid var(--bg);
+  color: var(--on-warn);
   font-size: 12px;
   font-weight: 800;
   display: grid;
   place-items: center;
   cursor: grab;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-sm);
 }
 
 .home-marker:active {
@@ -837,17 +980,17 @@ input[type="range"]::-moz-range-thumb {
   font-size: 12.5px;
   line-height: 1.45;
   border: 1px solid var(--line);
-  background: rgba(21, 27, 35, 0.97);
+  background: var(--toast-bg);
   backdrop-filter: blur(10px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-lg);
   animation: toast-in 0.18s ease-out;
 }
 
 .toast.ok {
-  border-color: #2d6b45;
+  border-color: var(--ok-line);
 }
 .toast.err {
-  border-color: #5e2626;
+  border-color: var(--danger-line);
 }
 
 .toast .ic {
@@ -877,7 +1020,7 @@ input[type="range"]::-moz-range-thumb {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(5, 8, 12, 0.72);
+  background: var(--scrim);
   backdrop-filter: blur(3px);
   display: grid;
   place-items: center;
@@ -970,7 +1113,7 @@ input[type="range"]::-moz-range-thumb {
     border: none;
     border-top: 1px solid var(--line);
     border-radius: 16px 16px 0 0;
-    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-lg);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -1050,7 +1193,7 @@ input[type="range"]::-moz-range-thumb {
 
 .imagery.current {
   border-color: var(--accent);
-  background: #19283a;
+  background: var(--accent-soft);
 }
 
 .imagery input[type="radio"] {
@@ -1170,7 +1313,7 @@ input[type="range"]::-moz-range-thumb {
   font-size: 12px;
   font-weight: 600;
   color: var(--warn);
-  border-color: #5c4a12;
+  border-color: var(--warn-line);
 }
 
 /* ---------- Pemilih drone, lensa, mode foto ---------- */
@@ -1219,14 +1362,14 @@ select.pick:disabled {
 
 .enum-badge.ok {
   color: var(--ok);
-  border-color: rgba(85, 197, 122, 0.4);
-  background: rgba(85, 197, 122, 0.1);
+  border-color: var(--ok-line);
+  background: var(--ok-bg);
 }
 
 .enum-badge.warn {
   color: var(--warn);
-  border-color: rgba(240, 180, 41, 0.4);
-  background: rgba(240, 180, 41, 0.1);
+  border-color: var(--warn-line);
+  background: var(--warn-bg);
 }
 
 /* ---------- Preset ---------- */
@@ -1316,7 +1459,7 @@ select.pick:disabled {
   padding: 11px 12px;
   border-radius: var(--radius);
   border: 1px solid var(--danger);
-  background: rgba(242, 114, 114, 0.09);
+  background: var(--danger-bg);
 }
 
 .gate-head {
@@ -1335,7 +1478,7 @@ select.pick:disabled {
   height: 18px;
   border-radius: 50%;
   background: var(--danger);
-  color: #1b1f27;
+  color: var(--on-danger);
   font-size: 12px;
   font-weight: 700;
   flex: none;
@@ -1373,4 +1516,234 @@ select.pick:disabled {
   font-size: 11px;
   padding-left: 4px;
   padding-right: 4px;
+}
+
+/* =========================================================================
+   Perapian tampilan
+   ========================================================================= */
+
+/* Angka dibaca sambil berdiri di lahan, sering sambil membandingkan dua
+   rencana. Digit dengan lebar tetap membuat angka tidak "bergoyang" waktu
+   nilainya berubah — sama seperti instrumen, bukan seperti teks biasa. */
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Kepala panel ---------- */
+
+.panel-head {
+  padding: 16px 18px 14px;
+}
+
+.brand {
+  align-items: flex-start;
+}
+
+/* Titik menyala itu dekorasi khas dasbor. Diganti penanda rata yang
+   sekurangnya menunjukkan sesuatu: warna status koneksi tidak ada di sini,
+   jadi cukup bentuk yang tenang. */
+.brand .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--accent);
+  box-shadow: none;
+  margin-top: 5px;
+}
+
+.brand h1 {
+  letter-spacing: -0.01em;
+}
+
+.theme-btn {
+  margin-left: auto;
+  flex: none;
+}
+
+/* ---------- Target sentuh ---------- */
+
+.btn,
+select.pick,
+.preset,
+.seg-btn,
+.chip,
+.icon-btn {
+  min-height: var(--touch);
+}
+
+.btn.link {
+  min-height: 0;
+  padding: 4px 0;
+}
+
+.row.tight .btn.link {
+  min-height: 32px;
+}
+
+.chip {
+  min-height: 34px; /* chip di atas peta kecil dengan sengaja: bukan kontrol utama */
+}
+
+input[type='range'] {
+  height: 34px;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  width: 22px;
+  height: 22px;
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+}
+
+/* ---------- Langkah ---------- */
+
+.step {
+  padding: 18px;
+  border-bottom: 8px solid var(--bg);
+}
+
+.step-head {
+  margin-bottom: 12px;
+}
+
+.step-head h2 {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.step-head .num {
+  background: var(--panel-3);
+  color: var(--muted);
+  border: none;
+  font-weight: 700;
+}
+
+.step-head .num.done {
+  background: var(--ok);
+  color: var(--on-accent);
+}
+
+/* ---------- Hasil: yang penting dibesarkan ---------- */
+
+/* Dari sembilan angka yang ditampilkan, dua yang benar-benar menentukan
+   keputusan di lapangan: berapa lama, dan berapa baterai. Sisanya pendukung.
+   Hierarki ini yang dulu tidak ada — semuanya sama besar, jadi tidak ada
+   yang menonjol. */
+.stats {
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.stats .stat {
+  background: var(--panel);
+  border: none;
+  border-radius: 0;
+  padding: 11px 12px;
+}
+
+.stat.hero {
+  grid-column: span 1;
+  background: var(--accent-soft);
+}
+
+.stat.hero .v {
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.stat.hero .k {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.stats.empty {
+  background: var(--panel);
+  border-style: dashed;
+}
+
+/* ---------- Peringatan ---------- */
+
+/* Dulu tiap peringatan sebuah kotak penuh warna. Sepuluh peringatan jadi
+   sepuluh kotak, dan yang merah tenggelam di antara yang biru. Sekarang
+   tingkatnya dibaca dari batang di tepi kiri, bukan dari seluruh bidang. */
+.note {
+  border-width: 1px 1px 1px 3px;
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  gap: 9px;
+  align-items: flex-start;
+}
+
+.note + .note {
+  margin-top: 6px;
+}
+
+.note.bad {
+  border-left-color: var(--danger);
+}
+
+.note.warn {
+  border-left-color: var(--warn);
+}
+
+.note.info {
+  border-left-color: var(--info-line);
+}
+
+.note.ok {
+  border-left-color: var(--ok);
+}
+
+.note .ic {
+  margin-top: 1px;
+}
+
+/* ---------- Tombol ---------- */
+
+.btn {
+  border-radius: var(--radius);
+  font-weight: 600;
+}
+
+.btn.primary {
+  box-shadow: none;
+}
+
+.btn:focus-visible,
+select.pick:focus-visible,
+input:focus-visible,
+.preset:focus-visible,
+.seg-btn:focus-visible,
+.chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- Elemen di atas peta ---------- */
+
+.floating {
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(6px);
+}
+
+#map-help {
+  opacity: 0.92;
+}
+
+/* ---------- Gerakan ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

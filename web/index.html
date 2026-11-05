@@ -7,7 +7,8 @@
     <link rel="stylesheet" href="vendor/maplibre-gl.css" />
     <link rel="stylesheet" href="style.css" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <meta name="theme-color" content="#0d1117" />
+    <meta name="theme-color" content="#efece6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#16151a" media="(prefers-color-scheme: dark)" />
   </head>
   <body>
     <div id="app">
@@ -25,6 +26,9 @@
                 <h1>waypoint-dji</h1>
                 <p>Prototipe perencana survei</p>
               </div>
+              <button id="btn-theme" class="btn ghost theme-btn" type="button">
+                Tema: ikut sistem
+              </button>
             </div>
 
             <div class="drone-bar">
