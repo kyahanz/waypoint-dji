@@ -466,6 +466,45 @@
           membaca kode asli dari dalam file dan memakainya seterusnya.
         </p>
         <input id="di-file" type="file" accept=".kmz,.kml,.wpml" />
+
+        <details class="adv" id="di-manual">
+          <summary>Atau isi sendiri kodenya</summary>
+          <p class="sub">
+            Kalau kamu menemukan nilai yang benar dari forum atau dari file
+            orang lain, isi di sini. Nilai yang kamu isi sendiri diperlakukan
+            sama dengan hasil impor.
+          </p>
+          <div class="grid-2">
+            <div class="field">
+              <label class="block-label" for="di-drone-enum">droneEnumValue</label>
+              <input id="di-drone-enum" type="number" min="0" max="65535" step="1" />
+            </div>
+            <div class="field">
+              <label class="block-label" for="di-drone-sub">droneSubEnumValue</label>
+              <input id="di-drone-sub" type="number" min="0" max="65535" step="1" />
+            </div>
+            <div class="field">
+              <label class="block-label" for="di-payload-enum">payloadEnumValue</label>
+              <input id="di-payload-enum" type="number" min="0" max="65535" step="1" />
+            </div>
+            <div class="field">
+              <label class="block-label" for="di-payload-sub">payloadSubEnumValue</label>
+              <input id="di-payload-sub" type="number" min="0" max="65535" step="1" />
+            </div>
+          </div>
+          <div class="field">
+            <label class="block-label" for="di-namespace">Namespace WPML</label>
+            <select id="di-namespace" class="pick">
+              <option value="http://www.uav.com/wpmz/1.0.2">
+                uav.com/wpmz/1.0.2 — dipakai DJI Fly (consumer)
+              </option>
+              <option value="http://www.dji.com/wpmz/1.0.6">
+                dji.com/wpmz/1.0.6 — dokumentasi Cloud API (Enterprise)
+              </option>
+            </select>
+          </div>
+          <button id="btn-di-save" class="btn primary wide">Pakai kode ini</button>
+        </details>
         <div id="di-import" class="note info" hidden>
           <span class="ic">i</span><span id="di-import-text"></span>
         </div>

@@ -12,7 +12,13 @@
 // (pakai `npm run inspect -- <file.kmz>`).
 import { pathLength } from './geo.js';
 
-const NS = 'http://www.dji.com/wpmz/1.0.6';
+// Namespace WPML. Yang dipakai DJI Fly consumer (teramati pada KMZ buatan
+// DJI Fly sendiri di Mini 4 Pro) adalah uav.com/wpmz/1.0.2; angka 1.0.6 yang
+// beredar di dokumentasi Cloud API itu untuk lini Enterprise. Karena file
+// ditolak tanpa pesan yang berguna, bagian ini kemungkinan lebih menentukan
+// daripada nilai enum mana pun — jadi ikut profil, bukan dipaku di sini.
+const NS_DEFAULT = 'http://www.uav.com/wpmz/1.0.2';
+const nsOf = (profile) => profile?.wpmlNamespace ?? NS_DEFAULT;
 
 const esc = (s) =>
   String(s).replace(
@@ -200,7 +206,7 @@ export function buildTemplateKml(mission, profile) {
   const wps = mission.waypoints.map((wp, i) => templatePlacemark(wp, i, mission, mission.waypoints.length)).join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:wpml="${NS}">
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:wpml="${nsOf(profile)}">
   <Document>
     <wpml:author>${esc(mission.author)}</wpml:author>
     <wpml:createTime>${now}</wpml:createTime>
@@ -245,7 +251,7 @@ export function buildWaylinesWpml(mission, profile) {
   const wps = mission.waypoints.map((wp, i) => waylinePlacemark(wp, i, mission, mission.waypoints.length)).join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:wpml="${NS}">
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:wpml="${nsOf(profile)}">
   <Document>
 ${missionConfig(mission, profile)}
     <Folder>

@@ -7,58 +7,129 @@
       "id": "mini3pro",
       "name": "DJI Mini 3 Pro",
       "series": "Mini",
-      "waypoint": { "supported": true, "note": "Waypoint ditambahkan lewat pembaruan firmware." },
-      "enums": null,
-      "lenses": [
-        {
-          "id": "wide",
-          "name": "Wide",
-          "eq35mm": 24,
-          "sensor": "1/1.3 inci",
-          "aperture": "f/1.7",
-          "mechanicalShutter": false,
-          "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
-            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
-          ]
-        }
-      ],
-      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 5, "accelMs2": 2.5, "nominalFlightMin": 34, "usableFlightMin": 20 }
-    },
-    {
-      "id": "mini4pro",
-      "name": "DJI Mini 4 Pro",
-      "series": "Mini",
-      "waypoint": { "supported": true },
-      "enums": null,
-      "lenses": [
-        {
-          "id": "wide",
-          "name": "Wide",
-          "eq35mm": 24,
-          "sensor": "1/1.3 inci",
-          "aperture": "f/1.7",
-          "mechanicalShutter": false,
-          "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
-            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
-          ]
-        }
-      ],
-      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 5, "accelMs2": 2.5, "nominalFlightMin": 34, "usableFlightMin": 20 }
-    },
-    {
-      "id": "mini5pro",
-      "name": "DJI Mini 5 Pro",
-      "series": "Mini",
-      "waypoint": { "supported": true },
+      "waypoint": {
+        "supported": true,
+        "note": "Waypoint ditambahkan lewat pembaruan firmware."
+      },
       "enums": {
         "droneEnumValue": 68,
         "droneSubEnumValue": 0,
         "payloadEnumValue": 68,
         "payloadSubEnumValue": 0,
-        "verified": false,
-        "note": "Tebakan dari lini Enterprise (M3E). Belum pernah dicocokkan dengan file asli DJI Fly."
+        "confidence": "observed-family",
+        "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
+      },
+      "lenses": [
+        {
+          "id": "wide",
+          "name": "Wide",
+          "eq35mm": 24,
+          "sensor": "1/1.3 inci",
+          "aperture": "f/1.7",
+          "mechanicalShutter": false,
+          "modes": [
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4032,
+              "imageHeightPx": 3024,
+              "minIntervalSec": 2,
+              "binned": true
+            },
+            {
+              "id": "48mp",
+              "label": "48 MP",
+              "imageWidthPx": 8064,
+              "imageHeightPx": 6048,
+              "minIntervalSec": 3
+            }
+          ]
+        }
+      ],
+      "limits": {
+        "maxWaypoints": 200,
+        "maxAltitudeM": 120,
+        "takeOffSecurityHeightM": 20,
+        "maxSpeedMs": 15,
+        "climbRateMs": 5,
+        "accelMs2": 2.5,
+        "nominalFlightMin": 34,
+        "usableFlightMin": 20
+      },
+      "wpml": {
+        "namespace": "http://www.uav.com/wpmz/1.0.2"
+      }
+    },
+    {
+      "id": "mini4pro",
+      "name": "DJI Mini 4 Pro",
+      "series": "Mini",
+      "waypoint": {
+        "supported": true
+      },
+      "enums": {
+        "droneEnumValue": 68,
+        "droneSubEnumValue": 0,
+        "payloadEnumValue": 68,
+        "payloadSubEnumValue": 0,
+        "confidence": "observed-model",
+        "note": "Dibaca dari KMZ buatan DJI Fly di Mini 4 Pro itu sendiri (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Ini satu-satunya model yang nilainya pernah terlihat langsung."
+      },
+      "lenses": [
+        {
+          "id": "wide",
+          "name": "Wide",
+          "eq35mm": 24,
+          "sensor": "1/1.3 inci",
+          "aperture": "f/1.7",
+          "mechanicalShutter": false,
+          "modes": [
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4032,
+              "imageHeightPx": 3024,
+              "minIntervalSec": 2,
+              "binned": true
+            },
+            {
+              "id": "48mp",
+              "label": "48 MP",
+              "imageWidthPx": 8064,
+              "imageHeightPx": 6048,
+              "minIntervalSec": 3
+            }
+          ]
+        }
+      ],
+      "limits": {
+        "maxWaypoints": 200,
+        "maxAltitudeM": 120,
+        "takeOffSecurityHeightM": 20,
+        "maxSpeedMs": 15,
+        "climbRateMs": 5,
+        "accelMs2": 2.5,
+        "nominalFlightMin": 34,
+        "usableFlightMin": 20
+      },
+      "wpml": {
+        "namespace": "http://www.uav.com/wpmz/1.0.2"
+      }
+    },
+    {
+      "id": "mini5pro",
+      "name": "DJI Mini 5 Pro",
+      "series": "Mini",
+      "waypoint": {
+        "supported": true
+      },
+      "enums": {
+        "droneEnumValue": 68,
+        "droneSubEnumValue": 0,
+        "payloadEnumValue": 68,
+        "payloadSubEnumValue": 0,
+        "confidence": "observed-family",
+        "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
       },
       "lenses": [
         {
@@ -69,8 +140,21 @@
           "aperture": "f/1.8",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4096, "imageHeightPx": 3072, "minIntervalSec": 2, "binned": true },
-            { "id": "50mp", "label": "50 MP", "imageWidthPx": 8192, "imageHeightPx": 6144, "minIntervalSec": 3 }
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4096,
+              "imageHeightPx": 3072,
+              "minIntervalSec": 2,
+              "binned": true
+            },
+            {
+              "id": "50mp",
+              "label": "50 MP",
+              "imageWidthPx": 8192,
+              "imageHeightPx": 6144,
+              "minIntervalSec": 3
+            }
           ]
         },
         {
@@ -82,18 +166,46 @@
           "mechanicalShutter": false,
           "digitalZoom": true,
           "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4096, "imageHeightPx": 3072, "minIntervalSec": 2 }
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4096,
+              "imageHeightPx": 3072,
+              "minIntervalSec": 2
+            }
           ]
         }
       ],
-      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 5, "accelMs2": 2.5, "nominalFlightMin": 36, "usableFlightMin": 22 }
+      "limits": {
+        "maxWaypoints": 200,
+        "maxAltitudeM": 120,
+        "takeOffSecurityHeightM": 20,
+        "maxSpeedMs": 15,
+        "climbRateMs": 5,
+        "accelMs2": 2.5,
+        "nominalFlightMin": 36,
+        "usableFlightMin": 22
+      },
+      "wpml": {
+        "namespace": "http://www.uav.com/wpmz/1.0.2"
+      }
     },
     {
       "id": "litox1",
       "name": "DJI Lito X1",
       "series": "Lito",
-      "waypoint": { "supported": true, "note": "Didukung menurut basis data pihak ketiga, belum dicek di app resmi." },
-      "enums": null,
+      "waypoint": {
+        "supported": true,
+        "note": "Didukung menurut basis data pihak ketiga, belum dicek di app resmi."
+      },
+      "enums": {
+        "droneEnumValue": 68,
+        "droneSubEnumValue": 0,
+        "payloadEnumValue": 68,
+        "payloadSubEnumValue": 0,
+        "confidence": "observed-family",
+        "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
+      },
       "lenses": [
         {
           "id": "wide",
@@ -103,8 +215,21 @@
           "aperture": "f/1.7",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
-            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4032,
+              "imageHeightPx": 3024,
+              "minIntervalSec": 2,
+              "binned": true
+            },
+            {
+              "id": "48mp",
+              "label": "48 MP",
+              "imageWidthPx": 8064,
+              "imageHeightPx": 6048,
+              "minIntervalSec": 3
+            }
           ]
         }
       ],
@@ -118,14 +243,27 @@
         "nominalFlightMin": 36,
         "usableFlightMin": 21,
         "_status": "Daya tahan baterai belum dikonfirmasi dari spec resmi."
+      },
+      "wpml": {
+        "namespace": "http://www.uav.com/wpmz/1.0.2"
       }
     },
     {
       "id": "lito1",
       "name": "DJI Lito 1",
       "series": "Lito",
-      "waypoint": { "supported": true, "note": "Disebut mendukung Waypoint Flight oleh listing retail, belum dikonfirmasi DJI." },
-      "enums": null,
+      "waypoint": {
+        "supported": true,
+        "note": "Disebut mendukung Waypoint Flight oleh listing retail, belum dikonfirmasi DJI."
+      },
+      "enums": {
+        "droneEnumValue": 68,
+        "droneSubEnumValue": 0,
+        "payloadEnumValue": 68,
+        "payloadSubEnumValue": 0,
+        "confidence": "observed-family",
+        "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
+      },
       "lenses": [
         {
           "id": "wide",
@@ -136,19 +274,53 @@
           "aperture": "f/1.8",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4000, "imageHeightPx": 3000, "minIntervalSec": 2, "binned": true },
-            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8000, "imageHeightPx": 6000, "minIntervalSec": 3 }
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4000,
+              "imageHeightPx": 3000,
+              "minIntervalSec": 2,
+              "binned": true
+            },
+            {
+              "id": "48mp",
+              "label": "48 MP",
+              "imageWidthPx": 8000,
+              "imageHeightPx": 6000,
+              "minIntervalSec": 3
+            }
           ]
         }
       ],
-      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 5, "accelMs2": 2.5, "nominalFlightMin": 36, "usableFlightMin": 21 }
+      "limits": {
+        "maxWaypoints": 200,
+        "maxAltitudeM": 120,
+        "takeOffSecurityHeightM": 20,
+        "maxSpeedMs": 15,
+        "climbRateMs": 5,
+        "accelMs2": 2.5,
+        "nominalFlightMin": 36,
+        "usableFlightMin": 21
+      },
+      "wpml": {
+        "namespace": "http://www.uav.com/wpmz/1.0.2"
+      }
     },
     {
       "id": "air3",
       "name": "DJI Air 3",
       "series": "Air",
-      "waypoint": { "supported": true },
-      "enums": null,
+      "waypoint": {
+        "supported": true
+      },
+      "enums": {
+        "droneEnumValue": 68,
+        "droneSubEnumValue": 0,
+        "payloadEnumValue": 68,
+        "payloadSubEnumValue": 0,
+        "confidence": "observed-family",
+        "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
+      },
       "lenses": [
         {
           "id": "wide",
@@ -158,8 +330,21 @@
           "aperture": "f/1.7",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
-            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4032,
+              "imageHeightPx": 3024,
+              "minIntervalSec": 2,
+              "binned": true
+            },
+            {
+              "id": "48mp",
+              "label": "48 MP",
+              "imageWidthPx": 8064,
+              "imageHeightPx": 6048,
+              "minIntervalSec": 3
+            }
           ]
         },
         {
@@ -170,19 +355,53 @@
           "aperture": "f/2.8",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
-            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4032,
+              "imageHeightPx": 3024,
+              "minIntervalSec": 2,
+              "binned": true
+            },
+            {
+              "id": "48mp",
+              "label": "48 MP",
+              "imageWidthPx": 8064,
+              "imageHeightPx": 6048,
+              "minIntervalSec": 3
+            }
           ]
         }
       ],
-      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 10, "accelMs2": 3, "nominalFlightMin": 46, "usableFlightMin": 28 }
+      "limits": {
+        "maxWaypoints": 200,
+        "maxAltitudeM": 120,
+        "takeOffSecurityHeightM": 20,
+        "maxSpeedMs": 15,
+        "climbRateMs": 10,
+        "accelMs2": 3,
+        "nominalFlightMin": 46,
+        "usableFlightMin": 28
+      },
+      "wpml": {
+        "namespace": "http://www.uav.com/wpmz/1.0.2"
+      }
     },
     {
       "id": "air3s",
       "name": "DJI Air 3S",
       "series": "Air",
-      "waypoint": { "supported": true },
-      "enums": null,
+      "waypoint": {
+        "supported": true
+      },
+      "enums": {
+        "droneEnumValue": 68,
+        "droneSubEnumValue": 0,
+        "payloadEnumValue": 68,
+        "payloadSubEnumValue": 0,
+        "confidence": "observed-family",
+        "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
+      },
       "lenses": [
         {
           "id": "wide",
@@ -192,8 +411,21 @@
           "aperture": "f/1.8",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4096, "imageHeightPx": 3072, "minIntervalSec": 2, "binned": true },
-            { "id": "50mp", "label": "50 MP", "imageWidthPx": 8192, "imageHeightPx": 6144, "minIntervalSec": 3 }
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4096,
+              "imageHeightPx": 3072,
+              "minIntervalSec": 2,
+              "binned": true
+            },
+            {
+              "id": "50mp",
+              "label": "50 MP",
+              "imageWidthPx": 8192,
+              "imageHeightPx": 6144,
+              "minIntervalSec": 3
+            }
           ]
         },
         {
@@ -204,19 +436,53 @@
           "aperture": "f/2.8",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
-            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4032,
+              "imageHeightPx": 3024,
+              "minIntervalSec": 2,
+              "binned": true
+            },
+            {
+              "id": "48mp",
+              "label": "48 MP",
+              "imageWidthPx": 8064,
+              "imageHeightPx": 6048,
+              "minIntervalSec": 3
+            }
           ]
         }
       ],
-      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 10, "accelMs2": 3, "nominalFlightMin": 45, "usableFlightMin": 27 }
+      "limits": {
+        "maxWaypoints": 200,
+        "maxAltitudeM": 120,
+        "takeOffSecurityHeightM": 20,
+        "maxSpeedMs": 15,
+        "climbRateMs": 10,
+        "accelMs2": 3,
+        "nominalFlightMin": 45,
+        "usableFlightMin": 27
+      },
+      "wpml": {
+        "namespace": "http://www.uav.com/wpmz/1.0.2"
+      }
     },
     {
       "id": "mavic3classic",
       "name": "DJI Mavic 3 Classic",
       "series": "Mavic",
-      "waypoint": { "supported": true },
-      "enums": null,
+      "waypoint": {
+        "supported": true
+      },
+      "enums": {
+        "droneEnumValue": 68,
+        "droneSubEnumValue": 0,
+        "payloadEnumValue": 68,
+        "payloadSubEnumValue": 0,
+        "confidence": "observed-family",
+        "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
+      },
       "lenses": [
         {
           "id": "hasselblad",
@@ -226,18 +492,45 @@
           "aperture": "f/2.8 - f/11",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "20mp", "label": "20 MP", "imageWidthPx": 5280, "imageHeightPx": 3956, "minIntervalSec": 2 }
+            {
+              "id": "20mp",
+              "label": "20 MP",
+              "imageWidthPx": 5280,
+              "imageHeightPx": 3956,
+              "minIntervalSec": 2
+            }
           ]
         }
       ],
-      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 8, "accelMs2": 3, "nominalFlightMin": 46, "usableFlightMin": 28 }
+      "limits": {
+        "maxWaypoints": 200,
+        "maxAltitudeM": 120,
+        "takeOffSecurityHeightM": 20,
+        "maxSpeedMs": 15,
+        "climbRateMs": 8,
+        "accelMs2": 3,
+        "nominalFlightMin": 46,
+        "usableFlightMin": 28
+      },
+      "wpml": {
+        "namespace": "http://www.uav.com/wpmz/1.0.2"
+      }
     },
     {
       "id": "mavic3",
       "name": "DJI Mavic 3",
       "series": "Mavic",
-      "waypoint": { "supported": true },
-      "enums": null,
+      "waypoint": {
+        "supported": true
+      },
+      "enums": {
+        "droneEnumValue": 68,
+        "droneSubEnumValue": 0,
+        "payloadEnumValue": 68,
+        "payloadSubEnumValue": 0,
+        "confidence": "observed-family",
+        "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
+      },
       "lenses": [
         {
           "id": "hasselblad",
@@ -247,7 +540,13 @@
           "aperture": "f/2.8 - f/11",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "20mp", "label": "20 MP", "imageWidthPx": 5280, "imageHeightPx": 3956, "minIntervalSec": 2 }
+            {
+              "id": "20mp",
+              "label": "20 MP",
+              "imageWidthPx": 5280,
+              "imageHeightPx": 3956,
+              "minIntervalSec": 2
+            }
           ]
         },
         {
@@ -258,18 +557,45 @@
           "aperture": "f/4.4",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4000, "imageHeightPx": 3000, "minIntervalSec": 2 }
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4000,
+              "imageHeightPx": 3000,
+              "minIntervalSec": 2
+            }
           ]
         }
       ],
-      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 8, "accelMs2": 3, "nominalFlightMin": 46, "usableFlightMin": 28 }
+      "limits": {
+        "maxWaypoints": 200,
+        "maxAltitudeM": 120,
+        "takeOffSecurityHeightM": 20,
+        "maxSpeedMs": 15,
+        "climbRateMs": 8,
+        "accelMs2": 3,
+        "nominalFlightMin": 46,
+        "usableFlightMin": 28
+      },
+      "wpml": {
+        "namespace": "http://www.uav.com/wpmz/1.0.2"
+      }
     },
     {
       "id": "mavic3pro",
       "name": "DJI Mavic 3 Pro",
       "series": "Mavic",
-      "waypoint": { "supported": true },
-      "enums": null,
+      "waypoint": {
+        "supported": true
+      },
+      "enums": {
+        "droneEnumValue": 68,
+        "droneSubEnumValue": 0,
+        "payloadEnumValue": 68,
+        "payloadSubEnumValue": 0,
+        "confidence": "observed-family",
+        "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
+      },
       "lenses": [
         {
           "id": "hasselblad",
@@ -279,7 +605,13 @@
           "aperture": "f/2.8 - f/11",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "20mp", "label": "20 MP", "imageWidthPx": 5280, "imageHeightPx": 3956, "minIntervalSec": 2 }
+            {
+              "id": "20mp",
+              "label": "20 MP",
+              "imageWidthPx": 5280,
+              "imageHeightPx": 3956,
+              "minIntervalSec": 2
+            }
           ]
         },
         {
@@ -290,8 +622,21 @@
           "aperture": "f/2.8",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
-            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4032,
+              "imageHeightPx": 3024,
+              "minIntervalSec": 2,
+              "binned": true
+            },
+            {
+              "id": "48mp",
+              "label": "48 MP",
+              "imageWidthPx": 8064,
+              "imageHeightPx": 6048,
+              "minIntervalSec": 3
+            }
           ]
         },
         {
@@ -302,18 +647,45 @@
           "aperture": "f/3.4",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4000, "imageHeightPx": 3000, "minIntervalSec": 2 }
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4000,
+              "imageHeightPx": 3000,
+              "minIntervalSec": 2
+            }
           ]
         }
       ],
-      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 8, "accelMs2": 3, "nominalFlightMin": 43, "usableFlightMin": 26 }
+      "limits": {
+        "maxWaypoints": 200,
+        "maxAltitudeM": 120,
+        "takeOffSecurityHeightM": 20,
+        "maxSpeedMs": 15,
+        "climbRateMs": 8,
+        "accelMs2": 3,
+        "nominalFlightMin": 43,
+        "usableFlightMin": 26
+      },
+      "wpml": {
+        "namespace": "http://www.uav.com/wpmz/1.0.2"
+      }
     },
     {
       "id": "mavic4pro",
       "name": "DJI Mavic 4 Pro",
       "series": "Mavic",
-      "waypoint": { "supported": true },
-      "enums": null,
+      "waypoint": {
+        "supported": true
+      },
+      "enums": {
+        "droneEnumValue": 68,
+        "droneSubEnumValue": 0,
+        "payloadEnumValue": 68,
+        "payloadSubEnumValue": 0,
+        "confidence": "observed-family",
+        "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
+      },
       "lenses": [
         {
           "id": "hasselblad",
@@ -323,7 +695,14 @@
           "aperture": "f/2.0 - f/11",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "25mp", "label": "25 MP", "imageWidthPx": 5760, "imageHeightPx": 4320, "minIntervalSec": 2, "binned": true },
+            {
+              "id": "25mp",
+              "label": "25 MP",
+              "imageWidthPx": 5760,
+              "imageHeightPx": 4320,
+              "minIntervalSec": 2,
+              "binned": true
+            },
             {
               "id": "100mp",
               "label": "100 MP",
@@ -342,8 +721,21 @@
           "aperture": "f/2.8",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
-            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4032,
+              "imageHeightPx": 3024,
+              "minIntervalSec": 2,
+              "binned": true
+            },
+            {
+              "id": "48mp",
+              "label": "48 MP",
+              "imageWidthPx": 8064,
+              "imageHeightPx": 6048,
+              "minIntervalSec": 3
+            }
           ]
         },
         {
@@ -354,12 +746,39 @@
           "aperture": "f/2.8",
           "mechanicalShutter": false,
           "modes": [
-            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4096, "imageHeightPx": 3072, "minIntervalSec": 2, "binned": true },
-            { "id": "50mp", "label": "50 MP", "imageWidthPx": 8192, "imageHeightPx": 6144, "minIntervalSec": 3 }
+            {
+              "id": "12mp",
+              "label": "12 MP",
+              "imageWidthPx": 4096,
+              "imageHeightPx": 3072,
+              "minIntervalSec": 2,
+              "binned": true
+            },
+            {
+              "id": "50mp",
+              "label": "50 MP",
+              "imageWidthPx": 8192,
+              "imageHeightPx": 6144,
+              "minIntervalSec": 3
+            }
           ]
         }
       ],
-      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 10, "accelMs2": 3, "nominalFlightMin": 51, "usableFlightMin": 31 }
+      "limits": {
+        "maxWaypoints": 200,
+        "maxAltitudeM": 120,
+        "takeOffSecurityHeightM": 20,
+        "maxSpeedMs": 15,
+        "climbRateMs": 10,
+        "accelMs2": 3,
+        "nominalFlightMin": 51,
+        "usableFlightMin": 31
+      },
+      "wpml": {
+        "namespace": "http://www.uav.com/wpmz/1.0.2"
+      }
     }
-  ]
+  ],
+  "_catatanEnum": "Semua drone memakai 68/0. Itu BUKAN tebakan acak: itu satu-satunya nilai yang pernah terlihat keluar dari DJI Fly sendiri (di Mini 4 Pro), dan nilai yang sama dilaporkan memperbaiki impor di Mavic 3 Pro. Tingkat kepercayaan dibedakan lewat confidence: observed-model berarti pernah dilihat di model itu sendiri; observed-family berarti dipinjam dari model lain selini. Keduanya tetap kalah dari verified, yang hanya didapat dengan mengimpor KMZ asli dari drone kamu sendiri.",
+  "_catatanNamespace": "DJI Fly consumer memakai namespace http://www.uav.com/wpmz/1.0.2, bukan http://www.dji.com/wpmz/1.0.6 yang dipakai dokumentasi Cloud API lini Enterprise. Ini kemungkinan lebih menentukan diterima-tidaknya file daripada nilai enum itu sendiri."
 }

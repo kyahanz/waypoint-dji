@@ -102,6 +102,7 @@ export async function readEnumsFromKmz(fileOrBuffer) {
     payloadEnumValue: Number(tag(xml, 'payloadEnumValue') ?? drone),
     payloadSubEnumValue: Number(tag(xml, 'payloadSubEnumValue') ?? 0),
     verified: true,
+    confidence: 'verified',
     note: 'Dibaca dari file asli DJI Fly.',
     namespace: (xml.match(/xmlns:wpml="([^"]+)"/) ?? [])[1] ?? null,
   };

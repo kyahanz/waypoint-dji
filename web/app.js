@@ -907,16 +907,23 @@ function openDroneInfo() {
   const drone = findDrone(state.registry, state.droneId);
 
   $('di-name').textContent = p.name;
+  const tone = p.enumConfidenceInfo.tone;
   $('di-body').innerHTML = `
-    <div class="note ${p.enumVerified ? 'ok' : 'bad'}">
-      <span class="ic">${p.enumVerified ? '✓' : '!'}</span>
-      <span>${
-        p.enumVerified
-          ? `Kode drone ${p.droneEnumValue}/${p.droneSubEnumValue}, payload ${p.payloadEnumValue}/${p.payloadSubEnumValue} — dibaca dari file asli DJI Fly.`
-          : p.enumKnown
-            ? `Kode drone yang dipakai sekarang (${p.droneEnumValue}) masih tebakan. ${esc(p.enumNote ?? '')}`
-            : 'Belum ada kode drone untuk model ini. File tetap bisa dibuat, tapi besar kemungkinan ditolak DJI Fly.'
-      }</span>
+    <div class="note ${tone}">
+      <span class="ic">${tone === 'ok' ? '✓' : '!'}</span>
+      <span><b>${esc(p.enumConfidenceInfo.label)}.</b>
+        Kode drone ${p.droneEnumValue}/${p.droneSubEnumValue}, payload
+        ${p.payloadEnumValue}/${p.payloadSubEnumValue}.
+        ${esc(p.enumNote ?? '')}</span>
+    </div>
+    <div class="note ${p.namespaceSource === 'impor' ? 'ok' : 'info'}">
+      <span class="ic">i</span>
+      <span>Namespace <code>${esc(p.wpmlNamespace)}</code>${
+        p.namespaceSource === 'impor' ? ' — dari file asli.' : '.'
+      }
+      DJI Fly consumer memakai uav.com/wpmz/1.0.2; angka 1.0.6 yang beredar di
+      dokumentasi DJI itu untuk lini Enterprise. Kalau file ditolak tanpa pesan
+      jelas, bagian ini tersangka yang sama kuatnya dengan kode drone.</span>
     </div>
     <div class="note info">
       <span class="ic">i</span>
@@ -938,10 +945,49 @@ function openDroneInfo() {
         : ''
     }`;
 
+  // Kolom manual diisi nilai yang berlaku sekarang, supaya mengubah satu
+  // angka tidak diam-diam mengosongkan tiga lainnya.
+  $('di-drone-enum').value = p.droneEnumValue;
+  $('di-drone-sub').value = p.droneSubEnumValue;
+  $('di-payload-enum').value = p.payloadEnumValue;
+  $('di-payload-sub').value = p.payloadSubEnumValue;
+  $('di-namespace').value = p.wpmlNamespace;
+
   $('btn-di-forget').hidden = !state.enumOverrides[state.droneId];
   $('di-import').hidden = true;
   elDroneInfo.hidden = false;
 }
+
+$('btn-di-save').onclick = () => {
+  const num = (id) => Number($(id).value);
+  const values = [
+    num('di-drone-enum'),
+    num('di-drone-sub'),
+    num('di-payload-enum'),
+    num('di-payload-sub'),
+  ];
+
+  if (values.some((v) => !Number.isInteger(v) || v < 0)) {
+    toast('Keempat kode harus bilangan bulat tidak negatif.', 'err');
+    return;
+  }
+
+  state.enumOverrides = setEnumOverride(state.droneId, {
+    droneEnumValue: values[0],
+    droneSubEnumValue: values[1],
+    payloadEnumValue: values[2],
+    payloadSubEnumValue: values[3],
+    namespace: $('di-namespace').value,
+    verified: true,
+    confidence: 'manual',
+    note: 'Diisi sendiri lewat panel drone, bukan dibaca dari file.',
+  });
+
+  syncProfile();
+  render();
+  openDroneInfo();
+  toast(`Kode ${state.profile.name} diatur manual: ${values[0]}/${values[1]}.`, 'ok', 6000);
+};
 
 $('di-file').onchange = async (e) => {
   const file = e.target.files?.[0];
@@ -1800,13 +1846,14 @@ function renderPresets() {
 
 function renderEnumBadge() {
   const p = state.profile;
+  const info = p.enumConfidenceInfo;
+
   els.enumBadge.hidden = false;
-  els.enumBadge.className = `enum-badge ${p.enumVerified ? 'ok' : 'warn'}`;
-  els.enumBadge.textContent = p.enumVerified
-    ? `Kode drone terkunci dari file asli (${p.droneEnumValue})`
-    : p.enumKnown
-      ? 'Kode drone masih tebakan — ketuk i untuk menguncinya'
-      : 'Kode drone belum ada — ketuk i untuk menguncinya';
+  els.enumBadge.className = `enum-badge ${info.tone}`;
+  els.enumBadge.textContent =
+    p.enumConfidence === 'unknown'
+      ? 'Kode drone belum ada — ketuk i untuk mengisinya'
+      : `Kode drone ${p.droneEnumValue}/${p.droneSubEnumValue} · ${info.label.toLowerCase()}`;
 }
 
 function renderStats(plan) {

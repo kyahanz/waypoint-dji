@@ -177,10 +177,26 @@ function fakePlan(over = {}) {
   const clean = evaluateSafety(fakePlan(), verified);
   ok(clean.ok, 'rencana wajar + kode terverifikasi = tidak ada penghalang', clean.blockers.map((b) => b.code).join(','));
 
-  const unverified = evaluateSafety(fakePlan(), prof);
+  // Kode yang dipinjam dari model selini memberi peringatan, tapi TIDAK
+  // menahan export: nilainya punya dasar, cuma bukan dari drone ini sendiri.
+  const borrowed = evaluateSafety(fakePlan(), prof);
   ok(
-    unverified.blockers.some((b) => b.code === 'enum-unverified'),
-    'kode drone tebakan menahan export'
+    borrowed.ok && borrowed.findings.some((f) => f.code === 'enum-borrowed'),
+    'kode pinjaman memperingatkan tanpa menahan export',
+    prof.enumConfidence
+  );
+
+  // Tanpa dasar sama sekali, barulah ditahan.
+  const noEnum = resolveProfile(
+    { drones: [{ ...registry.drones[0], enums: null }] },
+    { droneId: registry.drones[0].id }
+  );
+  const blank = evaluateSafety(fakePlan(), noEnum);
+  ok(blank.blockers.some((b) => b.code === 'enum-unknown'), 'kode drone kosong menahan export');
+
+  ok(
+    resolveProfile(registry, { droneId: 'mini4pro' }).enumConfidence === 'observed-model',
+    'Mini 4 Pro ditandai teramati langsung, bukan dipinjam'
   );
 
   const tooHigh = evaluateSafety(fakePlan({ altitude: 150 }), verified);
@@ -250,6 +266,7 @@ console.log('\nIsi file WPML');
     ['takeOffSecurityHeight 45', '<wpml:takeOffSecurityHeight>45</wpml:takeOffSecurityHeight>'],
     ['gimbal -45', '<wpml:gimbalPitchRotateAngle>-45</wpml:gimbalPitchRotateAngle>'],
     ['enum drone hasil impor', '<wpml:droneEnumValue>77</wpml:droneEnumValue>'],
+    ['namespace ikut profil', 'xmlns:wpml="http://www.uav.com/wpmz/1.0.2"'],
     ['enum payload hasil impor', '<wpml:payloadEnumValue>66</wpml:payloadEnumValue>'],
     ['jepret per jarak', '<wpml:actionTriggerType>multipleDistance</wpml:actionTriggerType>'],
   ]) {

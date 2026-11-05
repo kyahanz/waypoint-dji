@@ -55,11 +55,65 @@ export function findMode(lens, modeId) {
  *
  * @param {object} o.enumOverride enum hasil impor KMZ asli, kalau ada
  */
+/**
+ * Seberapa jauh kode drone bisa dipercaya. Urut dari paling kuat:
+ *
+ *   verified        — dibaca dari KMZ asli yang dibuat drone kamu sendiri.
+ *   observed-model  — pernah terlihat keluar dari DJI Fly di model itu juga,
+ *                     tapi dari laporan orang lain, bukan file kamu.
+ *   observed-family — dipinjam dari model lain selini, karena belum ada bukti
+ *                     lini consumer memakai nilai berbeda per model.
+ *   unknown         — tidak ada dasarnya sama sekali.
+ *
+ * Pembedaan ini ada supaya "ada isinya" tidak otomatis berarti "sudah benar".
+ */
+export const ENUM_CONFIDENCE = {
+  verified: {
+    rank: 3,
+    label: 'Terkunci dari file asli',
+    short: 'terkunci',
+    tone: 'ok',
+  },
+  manual: {
+    rank: 2.5,
+    label: 'Diisi sendiri',
+    short: 'manual',
+    tone: 'ok',
+  },
+  'observed-model': {
+    rank: 2,
+    label: 'Teramati di model ini',
+    short: 'teramati',
+    tone: 'ok',
+  },
+  'observed-family': {
+    rank: 1,
+    label: 'Dipinjam dari model selini',
+    short: 'dipinjam',
+    tone: 'warn',
+  },
+  unknown: {
+    rank: 0,
+    label: 'Belum ada dasarnya',
+    short: 'kosong',
+    tone: 'bad',
+  },
+};
+
+export const confidenceOf = (enums) => {
+  if (!enums) return 'unknown';
+  // `confidence` yang eksplisit menang, supaya nilai yang diketik sendiri
+  // tidak mengaku "dibaca dari file asli".
+  if (enums.confidence && ENUM_CONFIDENCE[enums.confidence]) return enums.confidence;
+  return enums.verified ? 'verified' : 'unknown';
+};
+
 export function resolveProfile(registry, { droneId, lensId, modeId, enumOverride } = {}) {
   const drone = findDrone(registry, droneId);
   const lens = findLens(drone, lensId);
   const mode = findMode(lens, modeId);
   const enums = enumOverride ?? drone.enums;
+  const confidence = confidenceOf(enums);
 
   return {
     id: drone.id,
@@ -72,17 +126,28 @@ export function resolveProfile(registry, { droneId, lensId, modeId, enumOverride
     camera: cameraOf(lens, mode),
     limits: drone.limits,
 
-    // Enum belum terverifikasi tetap dikirim sebagai 0 supaya file tetap
-    // terbentuk dan bisa diuji — tapi `enumVerified` false adalah bendera
-    // yang menahan export di gerbang keselamatan.
     droneEnumValue: enums?.droneEnumValue ?? 0,
     droneSubEnumValue: enums?.droneSubEnumValue ?? 0,
     payloadEnumValue: enums?.payloadEnumValue ?? 0,
     payloadSubEnumValue: enums?.payloadSubEnumValue ?? 0,
-    enumVerified: !!enums?.verified,
-    enumKnown: !!enums,
+
+    enumConfidence: confidence,
+    enumConfidenceInfo: ENUM_CONFIDENCE[confidence],
+    // Diisi sendiri diperlakukan setara hasil impor: dua-duanya keputusan
+    // sadar pengguna, bukan tebakan aplikasi.
+    enumVerified: confidence === 'verified' || confidence === 'manual',
+    enumKnown: confidence !== 'unknown',
     enumNote: enums?.note ?? null,
     enumSource: enumOverride ? 'impor' : enums ? 'bawaan' : null,
+
+    /**
+     * Namespace WPML. DJI Fly consumer memakai uav.com/wpmz/1.0.2; angka
+     * 1.0.6 di dokumentasi Cloud API itu untuk lini Enterprise. Kemungkinan
+     * besar ini lebih menentukan diterima-tidaknya file daripada nilai enum.
+     */
+    wpmlNamespace:
+      enumOverride?.namespace ?? drone.wpml?.namespace ?? 'http://www.uav.com/wpmz/1.0.2',
+    namespaceSource: enumOverride?.namespace ? 'impor' : 'bawaan',
   };
 }
 

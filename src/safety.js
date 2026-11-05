@@ -33,13 +33,26 @@ export function evaluateSafety(plan, profile, o = {}) {
     );
   }
 
-  if (!profile.enumVerified) {
+  // Kode drone sekarang selalu ada isinya, jadi yang dinilai bukan "ada atau
+  // tidak" melainkan "dari mana asalnya". Cuma yang benar-benar tidak punya
+  // dasar yang menahan export; sisanya cukup diberitahu.
+  if (profile.enumConfidence === 'unknown') {
     add(
       'bad',
-      'enum-unverified',
-      profile.enumKnown
-        ? `Kode drone untuk ${profile.name} masih tebakan, belum pernah dicocokkan dengan file asli DJI Fly. Risikonya file ditolak, atau lebih buruk: diterima tapi dianggap drone lain, sehingga batas kecepatan dan perilaku RTH-nya bukan punya drone kamu. Impor satu KMZ asli untuk menguncinya.`
-        : `Belum ada kode drone terverifikasi untuk ${profile.name}. Bikin satu waypoint mission di DJI Fly, export KMZ-nya, lalu impor di sini — tanpa itu file ini kemungkinan besar ditolak.`
+      'enum-unknown',
+      `Tidak ada kode drone untuk ${profile.name}. Bikin satu waypoint mission di DJI Fly, export KMZ-nya, lalu impor di sini — tanpa itu file ini kemungkinan besar ditolak.`
+    );
+  } else if (profile.enumConfidence === 'observed-family') {
+    add(
+      'warn',
+      'enum-borrowed',
+      `Kode drone ${profile.droneEnumValue}/${profile.droneSubEnumValue} yang dipakai untuk ${profile.name} dipinjam dari model lain selini — belum pernah terlihat keluar dari DJI Fly di model ini sendiri. Kemungkinan besar benar, tapi kalau DJI Fly menolak file ini, inilah tersangka pertamanya. Impor satu KMZ asli untuk menguncinya.`
+    );
+  } else if (profile.enumConfidence === 'observed-model') {
+    add(
+      'info',
+      'enum-observed',
+      `Kode drone ${profile.droneEnumValue}/${profile.droneSubEnumValue} diambil dari laporan KMZ buatan DJI Fly di ${profile.name}, bukan dari file drone kamu sendiri. Impor KMZ asli kalau mau benar-benar yakin.`
     );
   }
 

@@ -14,7 +14,26 @@ Ini pembedaan paling penting, dan sengaja tidak disembunyikan di UI:
 | | Dari mana | Seberapa bisa dipercaya |
 |---|---|---|
 | **Spek kamera** (ekuivalen 35 mm, jumlah piksel) | Spec sheet publik | Tinggi — ini yang menentukan GSD dan ketinggian terbang |
-| **Kode drone** (`droneEnumValue` dkk) | Tidak dipublikasikan DJI untuk lini consumer | Belum terverifikasi sampai kamu mengimpor satu KMZ asli |
+| **Kode drone** (`droneEnumValue` dkk) | Tidak dipublikasikan DJI untuk lini consumer | Bertingkat — lihat di bawah |
+
+Semua drone sekarang punya kode terisi: `68/0`. Itu bukan angka karangan —
+itu satu-satunya nilai yang pernah terlihat keluar dari DJI Fly sendiri (pada
+KMZ yang dibuat DJI Fly di Mini 4 Pro), dan nilai yang sama dilaporkan
+memperbaiki impor di Mavic 3 Pro. Tapi "terisi" tidak sama dengan "terbukti",
+jadi tiap drone membawa tingkat kepercayaannya sendiri:
+
+| Tingkat | Artinya | Di UI |
+|---|---|---|
+| Terkunci dari file asli | Dibaca dari KMZ buatan drone kamu sendiri | hijau |
+| Diisi sendiri | Kamu ketik manual di panel drone | hijau |
+| Teramati di model ini | Pernah terlihat di model yang sama, tapi dari laporan orang | hijau |
+| Dipinjam dari model selini | Belum pernah terlihat di model ini | kuning, diperingatkan |
+| Belum ada | Tidak ada dasarnya | merah, export ditahan |
+
+Ada satu hal lagi yang kemungkinan sama menentukannya: **namespace XML**. DJI
+Fly consumer memakai `http://www.uav.com/wpmz/1.0.2`, sedangkan `1.0.6` yang
+beredar di dokumentasi DJI itu untuk lini Enterprise. Aplikasi ini menulis
+yang pertama, dan nilainya ikut terkunci waktu kamu mengimpor KMZ asli.
 
 Kode drone yang salah bukan cuma bikin file ditolak — kemungkinan lebih buruk
 adalah file diterima tapi drone dianggap model lain, sehingga batas kecepatan
@@ -308,8 +327,11 @@ selalu siap ambil alih manual saat menerbangkannya.
 
 Jujur soal ini lebih berguna daripada daftar fitur:
 
-- **Kode drone semua model** masih tebakan atau kosong. Satu-satunya cara
-  memperbaikinya: export KMZ asli dari DJI Fly lalu impor di aplikasi.
+- **Kode drone** baru terbukti langsung untuk Mini 4 Pro, dan itu pun dari
+  laporan orang lain, bukan dari file yang kita pegang. Sepuluh model lainnya
+  meminjam nilai yang sama. Satu-satunya cara menaikkannya jadi pasti: export
+  KMZ asli dari DJI Fly lalu impor di aplikasi.
+- **Namespace WPML** `uav.com/wpmz/1.0.2` juga dari satu laporan Mini 4 Pro.
 - **Batas 200 waypoint** di DJI Fly belum dikonfirmasi.
 - **Daya tahan baterai Lito X1** dan **dimensi piksel 100 MP Mavic 4 Pro**
   diturunkan, bukan dari spec resmi. Keduanya ditandai di
