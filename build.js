@@ -20,6 +20,7 @@ const WEB_FILES = [
   'store.js',
   'kmz.js',
   'unzip.js',
+  'exif.js',
   'view3d.js',
   'offline.js',
   'sw.js',

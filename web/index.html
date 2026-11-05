@@ -283,6 +283,18 @@
               drone balik sendiri. Ganti baterai biasa tidak butuh ini: tiap
               sortie sudah diexport sebagai file sendiri.
             </p>
+            <label class="btn primary wide" for="resume-photo" id="resume-photo-label">
+              Dari foto terakhir
+            </label>
+            <input id="resume-photo" type="file" accept="image/jpeg,image/jpg" multiple hidden />
+            <p class="sub">
+              Pilih foto-foto penerbangan tadi dari HP atau kartu SD. Posisi
+              jepretan terakhir dibaca sendiri dari dalam fotonya. Jangan pakai
+              foto hasil kirim WhatsApp — pengiriman chat membuang data GPS.
+            </p>
+            <div id="resume-photo-note" class="note info" hidden>
+              <span class="ic">i</span><span id="resume-photo-text"></span>
+            </div>
             <div class="row tight split">
               <button id="btn-resume-pick" class="btn">Pilih di peta</button>
               <button id="btn-resume-gps" class="btn ghost">Pakai lokasi saya</button>

@@ -276,8 +276,21 @@ export function evaluateSafety(plan, profile, o = {}) {
     add(
       'info',
       'resume-transit',
-      `Misi lanjutan dimulai dari waypoint #${plan.resume.index + 1}. Drone naik dulu ke ketinggian aman, baru menyeberang ke titik itu — bukan terbang rendah melintasi area yang belum tentu kosong.`
+      `Misi lanjutan dimulai dari waypoint #${plan.resume.index + 1}${
+        plan.resume.backedOff > 0 ? ', satu jalur mundur dari titik terakhir supaya tidak ada petak yang bolong' : ''
+      }. Drone naik dulu ke ketinggian aman, baru menyeberang ke titik itu — bukan terbang rendah melintasi area yang belum tentu kosong.`
     );
+
+    // Titik yang jauh dari jalur biasanya berarti fotonya dari penerbangan
+    // lain, atau rencananya sudah diubah sejak terbang. Dua-duanya membuat
+    // nomor waypoint tidak lagi berarti apa-apa.
+    if (plan.resume.snapDistM > 60) {
+      add(
+        'bad',
+        'resume-far',
+        `Titik lanjut ${plan.resume.snapDistM.toFixed(0)} m dari jalur terdekat. Kemungkinan fotonya dari penerbangan lain, atau parameter rencana sudah kamu ubah sejak terbang tadi — kalau begitu, jalurnya sudah bergeser dan "lanjut dari sini" tidak lagi nyambung dengan yang sudah terpotret.`
+      );
+    }
   }
 
   const blockers = out.filter((w) => w.level === 'bad');

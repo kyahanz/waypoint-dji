@@ -257,5 +257,58 @@ console.log('\nIsi file WPML');
   }
 }
 
+// ---------------------------------------------------------------- EXIF
+
+console.log('\nBaca posisi dari foto');
+{
+  const { makeExifJpeg } = await import('./make-exif-fixture.js');
+  const { readPhotoLocation, readLastPhoto } = await import('../web/exif.js');
+
+  const jpeg = (o) => new File([makeExifJpeg(o)], o.name ?? 'DJI_0001.JPG');
+
+  {
+    const r = await readPhotoLocation(
+      jpeg({ lat: -6.2549, lng: 107.1199, altitudeM: 97, takenAt: '2026:11:05 09:12:33' })
+    );
+    ok(near(r.lngLat[1], -6.2549, 1e-6), 'lintang selatan terbaca negatif', `${r.lngLat[1]}`);
+    ok(near(r.lngLat[0], 107.1199, 1e-6), 'bujur timur terbaca', `${r.lngLat[0]}`);
+    ok(near(r.altitudeM, 97, 0.01), 'ketinggian terbaca', `${r.altitudeM} m`);
+    ok(r.takenAt instanceof Date && r.takenAt.getHours() === 9, 'waktu pengambilan terbaca');
+    ok(r.model === 'FC8482', 'model kamera terbaca', r.model ?? '-');
+  }
+
+  {
+    // Belahan barat & utara: tanda harus ikut berbalik.
+    const r = await readPhotoLocation(jpeg({ lat: 40.7128, lng: -74.006 }));
+    ok(near(r.lngLat[0], -74.006, 1e-5) && near(r.lngLat[1], 40.7128, 1e-5), 'lintang utara / bujur barat');
+  }
+
+  {
+    // Yang dipilih harus foto dengan waktu TERAKHIR, bukan terakhir di daftar.
+    const files = [
+      jpeg({ lat: -6.2, lng: 107.1, takenAt: '2026:11:05 09:30:00', name: 'DJI_0003.JPG' }),
+      jpeg({ lat: -6.3, lng: 107.2, takenAt: '2026:11:05 09:45:00', name: 'DJI_0004.JPG' }),
+      jpeg({ lat: -6.1, lng: 107.0, takenAt: '2026:11:05 09:05:00', name: 'DJI_0001.JPG' }),
+    ];
+    const { last, read } = await readLastPhoto(files);
+    ok(read === 3 && last.name === 'DJI_0004.JPG', 'foto terakhir dipilih dari waktu, bukan urutan', last.name);
+  }
+
+  {
+    // File tanpa EXIF sama sekali (mis. hasil kirim lewat chat).
+    const plain = new File([Buffer.from([0xff, 0xd8, 0xff, 0xd9])], 'kiriman-wa.jpg');
+    let msg = '';
+    try {
+      await readPhotoLocation(plain);
+    } catch (e) {
+      msg = e.message;
+    }
+    ok(msg.includes('EXIF'), 'foto tanpa EXIF ditolak dengan penjelasan', msg);
+
+    const mixed = await readLastPhoto([plain, jpeg({ lat: -6.25, lng: 107.12 })]);
+    ok(mixed.read === 1 && mixed.skipped.length === 1, 'file rusak dilewati, sisanya tetap dipakai');
+  }
+}
+
 console.log(failed ? `\n${failed} pemeriksaan GAGAL\n` : '\nSemua pemeriksaan lolos\n');
 process.exit(failed ? 1 : 0);

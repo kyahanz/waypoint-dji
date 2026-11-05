@@ -30,6 +30,7 @@ import {
 } from '../src/profiles.js';
 import { evaluateSafety } from '../src/safety.js';
 import { readEnumsFromKmz } from './unzip.js';
+import { readLastPhoto } from './exif.js';
 import {
   installTerrainSources,
   applyViewMode,
@@ -451,6 +452,10 @@ const els = {
   gateAck: $('gate-ack'),
   resumePick: $('btn-resume-pick'),
   resumeGps: $('btn-resume-gps'),
+  resumePhoto: $('resume-photo'),
+  resumePhotoLabel: $('resume-photo-label'),
+  resumePhotoNote: $('resume-photo-note'),
+  resumePhotoText: $('resume-photo-text'),
   resumeClear: $('btn-resume-clear'),
   resumeReadout: $('resume-readout'),
   resumeStatus: $('resume-status'),
@@ -1338,26 +1343,31 @@ function buildPlan() {
   let resume = null;
   if (state.resume) {
     const target = proj.toXY(state.resume.lngLat);
-    let best = 0;
+    let nearest = 0;
     let bestD = Infinity;
     grid.waypoints.forEach((w, i) => {
       const d = Math.hypot(w.xy[0] - target[0], w.xy[1] - target[1]);
       if (d < bestD) {
         bestD = d;
-        best = i;
+        nearest = i;
       }
     });
 
+    const best = resumeIndexFor(grid.waypoints, nearest, stopAtEach);
     const skipped = grid.waypoints.slice(0, best);
     grid.waypoints = grid.waypoints.slice(best);
     grid.photos = grid.waypoints.reduce((n, w) => n + (w.photos || 0), 0);
 
     resume = {
       index: best,
+      backedOff: nearest - best,
       snapDistM: bestD,
+      source: state.resume.source ?? 'peta',
+      photo: state.resume.photo ?? null,
       skippedWaypoints: skipped.length,
       skippedPhotos: skipped.reduce((n, w) => n + (w.photos || 0), 0),
       lngLat: proj.toLL(grid.waypoints[0]?.xy ?? target),
+      pickedLngLat: state.resume.lngLat,
     };
 
     if (!grid.waypoints.length) return null;
@@ -1916,6 +1926,38 @@ function renderPatternCost(plan) {
 
 // ---------- Lanjutkan misi ----------
 
+/**
+ * Dari waypoint terdekat, mundur ke titik mulai yang aman.
+ *
+ * Kenapa harus mundur: titik terakhir yang diketahui — entah dari foto atau
+ * dari ketukan di peta — jatuh di suatu tempat SETELAH jepretan terakhir yang
+ * berhasil. Kalau jalur dipotong tepat di waypoint terdekat, ada kemungkinan
+ * satu petak yang tidak pernah terpotret dan juga tidak diulang. Lubang itu
+ * baru ketahuan waktu olah data di rumah, saat drone sudah dikemas.
+ *
+ * Mengulang satu-dua foto itu murah. Lubang di ortofoto tidak.
+ *
+ *   stop & shoot — satu waypoint satu foto, jadi mundur satu waypoint.
+ *   jalan terus  — waypoint cuma ujung-ujung jalur dan pemotretan dipicu per
+ *                  jarak di antaranya, jadi mundur ke pangkal jalur itu:
+ *                  satu jalur penuh diulang, dan itu memang satuan terkecil
+ *                  yang masuk akal di mode ini.
+ */
+function resumeIndexFor(waypoints, nearest, stopAtEach) {
+  if (nearest <= 0) return 0;
+
+  if (stopAtEach) return nearest - 1;
+
+  // Waypoint datang berpasangan (pangkal, ujung) per jalur. Pasangan dihitung
+  // dari awal lintasannya, karena pola silang menggabungkan dua lintasan jadi
+  // satu daftar dan penomoran globalnya tidak lagi genap-ganjil.
+  const pass = waypoints[nearest].pass ?? 0;
+  const passStart = waypoints.findIndex((w) => (w.pass ?? 0) === pass);
+  const isLineEnd = (nearest - passStart) % 2 === 1;
+
+  return isLineEnd ? nearest - 1 : nearest;
+}
+
 function renderResume(plan) {
   const r = plan.resume;
   els.resumeReadout.hidden = !r;
@@ -1928,8 +1970,15 @@ function renderResume(plan) {
       : 'Pilih di peta';
 
   if (!r) return;
-  els.resumeStatus.textContent = `Lanjut dari waypoint #${r.index + 1}`;
-  els.resumeVal.textContent = `${r.skippedPhotos} foto dilewati · geser ${r.snapDistM.toFixed(0)} m`;
+  els.resumeStatus.textContent =
+    r.source === 'foto'
+      ? `Lanjut dari waypoint #${r.index + 1} (dari foto)`
+      : `Lanjut dari waypoint #${r.index + 1}`;
+
+  // Mundurnya jalur bukan detail teknis — itu foto yang sengaja diulang,
+  // dan pengguna berhak tahu dia membayarnya.
+  const backed = r.backedOff > 0 ? ' · mundur 1 jalur biar tidak bolong' : '';
+  els.resumeVal.textContent = `${r.skippedPhotos} foto dilewati · geser ${r.snapDistM.toFixed(0)} m${backed}`;
 }
 
 els.resumePick.onclick = () => {
@@ -1972,12 +2021,81 @@ els.resumeGps.onclick = () => {
   );
 };
 
-function setResumePoint(lngLat) {
-  state.resume = { lngLat };
+function setResumePoint(lngLat, extra = {}) {
+  state.resume = { lngLat, source: 'peta', ...extra };
   state.resumePicking = false;
   map.getCanvas().style.cursor = '';
   render();
 }
+
+// ---------- Lanjut dari foto terakhir ----------
+//
+// Ini sumber paling jujur untuk "sampai mana yang sudah terpotret", karena
+// yang dibaca adalah posisi foto itu sendiri — bukan posisi drone saat
+// berbalik, yang bisa jauh setelahnya.
+
+els.resumePhoto.onchange = async (e) => {
+  const files = [...(e.target.files ?? [])];
+  e.target.value = ''; // supaya memilih file yang sama lagi tetap memicu onchange
+  if (!files.length) return;
+
+  if (!state.plan) {
+    toast('Gambar areanya dulu, baru pilih fotonya.', 'err');
+    return;
+  }
+
+  const label = els.resumePhotoLabel.textContent;
+  els.resumePhotoLabel.textContent = `Membaca ${files.length} foto…`;
+  els.resumePhotoNote.hidden = true;
+
+  try {
+    const { last, read, skipped, hasTime } = await readLastPhoto(files);
+
+    setResumePoint(last.lngLat, {
+      source: 'foto',
+      photo: {
+        name: last.name,
+        takenAt: last.takenAt ? last.takenAt.toLocaleString('id-ID') : null,
+        altitudeM: last.altitudeM,
+        model: last.model,
+        read,
+      },
+    });
+
+    const r = state.plan?.resume;
+    const far = r && r.snapDistM > 60;
+
+    els.resumePhotoNote.hidden = false;
+    els.resumePhotoNote.className = `note ${far ? 'warn' : 'ok'}`;
+    els.resumePhotoText.textContent = [
+      `${read} foto terbaca.`,
+      hasTime
+        ? `Yang terakhir ${last.name} (${last.takenAt.toLocaleString('id-ID')}).`
+        : `Tidak ada waktu di EXIF, jadi dipakai foto terakhir dalam urutan pilihan: ${last.name}.`,
+      last.altitudeM != null ? `Ketinggian saat itu ${last.altitudeM.toFixed(0)} m dpl.` : '',
+      far
+        ? `Tapi titiknya ${r.snapDistM.toFixed(0)} m dari jalur terdekat — periksa dulu, bisa jadi fotonya dari penerbangan atau lahan lain.`
+        : '',
+      skipped.length ? `${skipped.length} file dilewati (${skipped[0]}).` : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    toast(
+      far
+        ? 'Foto terbaca, tapi letaknya jauh dari jalur — cek titiknya di peta.'
+        : 'Titik lanjut diambil dari foto terakhir.',
+      far ? 'err' : 'ok',
+      7000
+    );
+  } catch (err) {
+    els.resumePhotoNote.hidden = false;
+    els.resumePhotoNote.className = 'note bad';
+    els.resumePhotoText.textContent = err.message;
+  } finally {
+    els.resumePhotoLabel.textContent = label;
+  }
+};
 
 function renderWarnings(list) {
   const icon = { bad: '!', warn: '!', info: 'i' };
