@@ -7,13 +7,36 @@ import {
   centroid,
   computeSurveyParams,
   generateGrid,
+  generatePattern,
+  PATTERNS,
   offsetPolygon,
   pathLengthXY,
   missionDuration,
   splitByBattery,
   sortieSummary,
   maxDistanceFrom,
+  altitudeFromGsd,
+  gsdFromAltitude,
 } from '../src/survey.js';
+import {
+  resolveProfile,
+  cameraOf,
+  findDrone,
+  findLens,
+  findMode,
+  PRESETS,
+  findPreset,
+  matchPreset,
+} from '../src/profiles.js';
+import { evaluateSafety } from '../src/safety.js';
+import { readEnumsFromKmz } from './unzip.js';
+import {
+  installTerrainSources,
+  applyViewMode,
+  fetchBuildings,
+  setBuildings,
+  obstaclesNearPath,
+} from './view3d.js';
 import { buildKmz, downloadBlob } from './kmz.js';
 import { fetchElevations, cachedElevation, missingCoords, reliefOf } from '../src/terrain.js';
 import {
@@ -34,14 +57,46 @@ import {
   parseCoords,
   getSettings,
   setSettings,
+  getEnumOverrides,
+  setEnumOverride,
+  SCHEMA_VERSION,
 } from './store.js';
 
 const CENTER = [107.11993938381485, -6.2549323363466];
 const BATTERY_COLORS = ['#4da3ff', '#55c57a', '#f0b429', '#f27272', '#b98cf5', '#52d3d8'];
 const EMPTY = { type: 'FeatureCollection', features: [] };
 
+// Setelan lanjutan yang aman. Ini bukan sekadar nilai awal — tombol
+// "kembalikan ke setelan aman" memulihkan persis isi objek ini, dan dua yang
+// pertama adalah satu-satunya yang membawa drone pulang kalau ada yang salah.
+const SAFE_ADVANCED = {
+  rcLostAction: 'goBack',
+  finishAction: 'goHome',
+  gimbalPitch: -90,
+  safeHeightM: 20,
+  angleDeg: 0, // 0 = otomatis, ikut sisi terpanjang
+};
+
 const state = {
+  registry: null,
   profile: null,
+  droneId: 'mini5pro',
+  lensId: 'wide',
+  modeId: '12mp',
+  enumOverrides: {},
+  presetId: 'standar',
+  altitudeM: 80,
+  speedMs: 10,
+  speedAuto: true,
+  pattern: 'single',
+  advanced: { ...SAFE_ADVANCED },
+  gateAck: false,
+  resume: null, // { index, lngLat }
+  resumePicking: false,
+  viewMode: '2d',
+  buildings: null,
+  buildingsLoading: false,
+  buildingsError: null,
   polygon: [],
   home: null, // [lng, lat]
   mode: 'continuous',
@@ -165,6 +220,18 @@ let mapInit = false;
 const initMap = () => {
   if (mapInit) return;
   mapInit = true;
+  try {
+    initMapInner();
+  } catch (err) {
+    // Kegagalan di sini membuat seluruh panel mati tanpa sebab yang kelihatan.
+    // Lebih baik muncul sebagai pesan daripada aplikasi yang diam saja.
+    console.error('[init]', err);
+    els.drawHint.textContent = `Gagal menyiapkan peta: ${err.message}`;
+    els.draw.textContent = 'Gagal memuat';
+  }
+};
+
+const initMapInner = () => {
 
   map.addSource('aoi', { type: 'geojson', data: EMPTY });
   map.addSource('buffer', { type: 'geojson', data: EMPTY });
@@ -221,6 +288,29 @@ const initMap = () => {
     },
   });
   editor.install();
+
+  installTerrainSources(map);
+
+  map.addSource('resume', { type: 'geojson', data: EMPTY });
+  map.addLayer({
+    id: 'resume-dot',
+    type: 'circle',
+    source: 'resume',
+    paint: {
+      'circle-radius': 7,
+      'circle-color': '#f0b429',
+      'circle-stroke-color': '#1b1f27',
+      'circle-stroke-width': 2,
+    },
+  });
+
+  // Dipasang setelah editor supaya tidak mengganggu penggambaran area: saat
+  // mode pilih-titik aktif, editor sedang tidak menggambar.
+  map.on('click', (e) => {
+    if (!state.resumePicking) return;
+    setResumePoint([e.lngLat.lng, e.lngLat.lat]);
+  });
+
   els.draw.disabled = false;
   els.demo.disabled = false;
   els.draw.textContent = DRAW_LABEL;
@@ -272,10 +362,50 @@ function createHomeMarker() {
 async function loadProfile() {
   // no-store: saat mengembangkan, profil sering diubah dan cache browser
   // membuat perubahannya tidak kelihatan sampai hard reload.
-  const res = await fetch('../profiles/mini5pro.json', { cache: 'no-store' });
-  state.profile = await res.json();
+  const res = await fetch('../profiles/drones.json', { cache: 'no-store' });
+  state.registry = await res.json();
+  state.enumOverrides = getEnumOverrides();
+
+  const saved = settings.droneId;
+  if (saved && state.registry.drones.some((d) => d.id === saved)) state.droneId = saved;
+
+  syncProfile();
+  buildDronePickers();
+  buildPresetChips();
+  applyPreset(state.presetId, { silent: true });
+
   // Rencana yang datang lewat URL dipulihkan dulu; kalau tidak ada, render biasa.
   if (!applyStateFromUrl()) render();
+}
+
+/** Susun ulang profil aktif setiap kali drone, lensa, atau mode foto berubah. */
+function syncProfile() {
+  const drone = findDrone(state.registry, state.droneId);
+  state.droneId = drone.id;
+
+  const lens = findLens(drone, state.lensId);
+  state.lensId = lens.id;
+
+  const mode = findMode(lens, state.modeId);
+  state.modeId = mode.id;
+
+  state.profile = resolveProfile(state.registry, {
+    droneId: state.droneId,
+    lensId: state.lensId,
+    modeId: state.modeId,
+    enumOverride: state.enumOverrides[state.droneId],
+  });
+
+  // Batas ketinggian ikut drone, dan nilai yang sudah melewatinya dipotong —
+  // tapi dengan diberitahu, bukan diam-diam.
+  const max = state.profile.limits.maxAltitudeM;
+  els.alt.max = String(max);
+  if (state.altitudeM > max) {
+    state.altitudeM = max;
+    toast(`Ketinggian dipotong ke batas ${max} m untuk ${state.profile.name}.`, 'info');
+  }
+
+  els.speed.max = String(state.profile.limits.maxSpeedMs);
 }
 
 // ---------- Elemen ----------
@@ -291,7 +421,41 @@ const els = {
   handoff: $('btn-handoff'),
   redo: $('btn-redo'),
   autoAngle: $('btn-auto-angle'),
-  gsd: $('gsd'),
+  drone: $('drone'),
+  lens: $('lens'),
+  photoMode: $('photo-mode'),
+  droneInfoBtn: $('btn-drone-info'),
+  enumBadge: $('enum-badge'),
+  presets: $('presets'),
+  presetNote: $('preset-note'),
+  alt: $('alt'),
+  altOut: $('alt-out'),
+  gsdDerived: $('gsd-derived'),
+  speed: $('speed'),
+  speedOut: $('speed-out'),
+  speedAuto: $('speed-auto'),
+  speedNote: $('speed-note'),
+  patternSeg: $('pattern-seg'),
+  patternHint: $('pattern-hint'),
+  patternCost: $('pattern-cost'),
+  patternCostVal: $('pattern-cost-val'),
+  gimbal: $('gimbal'),
+  gimbalOut: $('gimbal-out'),
+  rcLost: $('rc-lost'),
+  finish: $('finish'),
+  safeHeight: $('safe-height'),
+  safeHeightOut: $('safe-height-out'),
+  resetAdv: $('btn-reset-adv'),
+  gate: $('gate'),
+  gateTitle: $('gate-title'),
+  gateAck: $('gate-ack'),
+  resumePick: $('btn-resume-pick'),
+  resumeGps: $('btn-resume-gps'),
+  resumeClear: $('btn-resume-clear'),
+  resumeReadout: $('resume-readout'),
+  resumeStatus: $('resume-status'),
+  resumeVal: $('resume-val'),
+  viewSwitch: $('view-switch'),
   front: $('front'),
   side: $('side'),
   angle: $('angle'),
@@ -314,11 +478,9 @@ const els = {
   clearTiles: $('btn-clear-tiles'),
   bufferOut: $('buffer-out'),
   bufferM: $('buffer-m'),
-  gsdOut: $('gsd-out'),
   frontOut: $('front-out'),
   sideOut: $('side-out'),
   angleOut: $('angle-out'),
-  altDerived: $('alt-derived'),
   area: $('area-readout'),
   areaVal: $('area-val'),
   homeReadout: $('home-readout'),
@@ -433,9 +595,236 @@ els.sheetHandle.onclick = () => {
   els.sheetHandle.setAttribute('aria-expanded', String(!collapsed));
 };
 
-for (const el of [els.gsd, els.front, els.side, els.angle, els.buffer]) {
-  el.addEventListener('input', render);
+for (const el of [els.front, els.side, els.angle, els.buffer]) {
+  el.addEventListener('input', () => {
+    if (el === els.front || el === els.side) markCustomPreset();
+    render();
+  });
 }
+
+// ---------- Drone, lensa, mode foto ----------
+
+function buildDronePickers() {
+  const bySeries = new Map();
+  for (const d of state.registry.drones) {
+    if (!bySeries.has(d.series)) bySeries.set(d.series, []);
+    bySeries.get(d.series).push(d);
+  }
+
+  els.drone.innerHTML = [...bySeries.entries()]
+    .map(
+      ([series, list]) =>
+        `<optgroup label="${esc(series)}">${list
+          .map(
+            (d) =>
+              `<option value="${d.id}"${d.id === state.droneId ? ' selected' : ''}>${esc(d.name)}</option>`
+          )
+          .join('')}</optgroup>`
+    )
+    .join('');
+
+  buildLensPickers();
+}
+
+function buildLensPickers() {
+  const drone = findDrone(state.registry, state.droneId);
+  const lens = findLens(drone, state.lensId);
+
+  els.lens.innerHTML = drone.lenses
+    .map(
+      (l) =>
+        `<option value="${l.id}"${l.id === lens.id ? ' selected' : ''}>${esc(l.name)} · ${esc(l.sensor)}</option>`
+    )
+    .join('');
+  els.lens.disabled = drone.lenses.length < 2;
+
+  els.photoMode.innerHTML = lens.modes
+    .map(
+      (m) =>
+        `<option value="${m.id}"${m.id === state.modeId ? ' selected' : ''}>${esc(m.label)}${m.binned ? ' (binning)' : ''}</option>`
+    )
+    .join('');
+  els.photoMode.disabled = lens.modes.length < 2;
+}
+
+els.drone.onchange = () => {
+  state.droneId = els.drone.value;
+  // Lensa dan mode foto milik drone sebelumnya belum tentu ada di drone baru;
+  // kosongkan supaya findLens/findMode jatuh ke pilihan pertama yang sah.
+  state.lensId = '';
+  state.modeId = '';
+  settings = setSettings({ droneId: state.droneId });
+  syncProfile();
+  buildLensPickers();
+  reapplyPresetForDrone();
+  render();
+};
+
+els.lens.onchange = () => {
+  state.lensId = els.lens.value;
+  state.modeId = '';
+  syncProfile();
+  buildLensPickers();
+  reapplyPresetForDrone();
+  render();
+};
+
+els.photoMode.onchange = () => {
+  state.modeId = els.photoMode.value;
+  syncProfile();
+  reapplyPresetForDrone();
+  render();
+};
+
+/**
+ * Ganti drone atau lensa mengubah arti ketinggian yang sama.
+ *
+ * Kalau pengguna sedang memakai preset, yang dipertahankan adalah KETELITIAN
+ * yang dituju — ketinggiannya dihitung ulang. Kalau dia sudah mengatur sendiri
+ * (custom), ketinggiannya yang dipertahankan dan GSD-nya yang berubah, karena
+ * di situ angka yang dia pilih sendiri adalah ketinggian.
+ */
+function reapplyPresetForDrone() {
+  if (state.presetId) applyPreset(state.presetId, { silent: true });
+}
+
+// ---------- Preset ----------
+
+function buildPresetChips() {
+  els.presets.innerHTML =
+    PRESETS.map(
+      (p) =>
+        `<button class="preset" data-preset="${p.id}"><span class="pn">${esc(p.name)}</span><span class="pd" data-sub="${p.id}">—</span></button>`
+    ).join('') + '<button class="preset" data-preset="custom"><span class="pn">Custom</span><span class="pd">atur sendiri</span></button>';
+
+  els.presets.querySelectorAll('[data-preset]').forEach((btn) => {
+    btn.onclick = () => {
+      if (btn.dataset.preset === 'custom') {
+        markCustomPreset();
+        render();
+        return;
+      }
+      applyPreset(btn.dataset.preset);
+      render();
+    };
+  });
+}
+
+function applyPreset(id, { silent = false } = {}) {
+  const preset = findPreset(id);
+  if (!preset) return;
+
+  state.presetId = preset.id;
+  state.altitudeM = clampAltitude(altitudeFromGsd(state.profile.camera, preset.gsdCm));
+  els.front.value = String(Math.round(preset.frontOverlap * 100));
+  els.side.value = String(Math.round(preset.sideOverlap * 100));
+
+  if (!silent) toast(`Preset ${preset.name}: ${preset.note}`, 'ok', 5000);
+}
+
+function markCustomPreset() {
+  state.presetId = null;
+}
+
+function clampAltitude(m) {
+  const max = state.profile.limits.maxAltitudeM;
+  return Math.max(Number(els.alt.min), Math.min(max, Math.round(m)));
+}
+
+// ---------- Ketinggian & kecepatan ----------
+
+els.alt.addEventListener('input', () => {
+  state.altitudeM = Number(els.alt.value);
+  markCustomPreset();
+  render();
+});
+
+els.speed.addEventListener('input', () => {
+  state.speedMs = Number(els.speed.value);
+  if (state.speedAuto) {
+    state.speedAuto = false;
+    els.speedAuto.checked = false;
+  }
+  render();
+});
+
+els.speedAuto.onchange = () => {
+  state.speedAuto = els.speedAuto.checked;
+  render();
+};
+
+// ---------- Pola terbang ----------
+
+const PATTERN_HINT = {
+  single: 'Satu arah, kamera nunduk lurus. Untuk ortofoto dan ukur luas.',
+  cross:
+    'Dua arah menyilang 90°. Objek tegak terpotret dari dua sisi, jadi model 3D-nya tidak bolong. Foto dan waktu jadi dua kali lipat.',
+  crossOblique:
+    'Dua arah menyilang, kamera dimiringkan. Ini yang menangkap dinding tegak — untuk model bangunan. Dua kali lipat juga.',
+};
+
+els.patternSeg.querySelectorAll('[data-pattern]').forEach((btn) => {
+  btn.onclick = () => {
+    els.patternSeg.querySelectorAll('[data-pattern]').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.pattern = btn.dataset.pattern;
+    els.patternHint.textContent = PATTERN_HINT[state.pattern];
+
+    // Gimbal mengikuti pola, karena itulah yang membedakan silang biasa dari
+    // silang yang benar-benar berguna untuk 3D. Tetap bisa diubah manual.
+    state.advanced.gimbalPitch = PATTERNS[state.pattern].gimbalPitch;
+    els.gimbal.value = String(state.advanced.gimbalPitch);
+    render();
+  };
+});
+
+// ---------- Pengaturan lanjutan ----------
+
+els.angle.addEventListener('input', () => {
+  state.advanced.angleDeg = Number(els.angle.value) || 0;
+  render();
+});
+
+els.gimbal.addEventListener('input', () => {
+  state.advanced.gimbalPitch = Number(els.gimbal.value);
+  render();
+});
+
+els.safeHeight.addEventListener('input', () => {
+  state.advanced.safeHeightM = Number(els.safeHeight.value);
+  render();
+});
+
+els.rcLost.onchange = () => {
+  state.advanced.rcLostAction = els.rcLost.value;
+  render();
+};
+
+els.finish.onchange = () => {
+  state.advanced.finishAction = els.finish.value;
+  render();
+};
+
+els.resetAdv.onclick = () => {
+  state.advanced = { ...SAFE_ADVANCED, gimbalPitch: PATTERNS[state.pattern].gimbalPitch };
+  syncAdvancedInputs();
+  render();
+  toast('Setelan lanjutan dikembalikan: RTH saat sinyal hilang, RTH setelah selesai.', 'ok');
+};
+
+function syncAdvancedInputs() {
+  const a = state.advanced;
+  els.angle.value = String(a.angleDeg);
+  els.gimbal.value = String(a.gimbalPitch);
+  els.safeHeight.value = String(a.safeHeightM);
+  els.rcLost.value = a.rcLostAction;
+  els.finish.value = a.finishAction;
+}
+
+els.gateAck.onchange = () => {
+  state.gateAck = els.gateAck.checked;
+  render();
+};
 
 els.terrain.onchange = () => {
   state.terrain = els.terrain.checked;
@@ -443,9 +832,19 @@ els.terrain.onchange = () => {
   render();
 };
 
-document.querySelectorAll('.seg-btn').forEach((btn) => {
+/**
+ * Tombol mode pemotretan saja.
+ *
+ * Dulu ini `document.querySelectorAll('.seg-btn')`, dan begitu tombol pola
+ * terbang memakai kelas yang sama, handler mode ikut terpasang di sana dan
+ * menimpa handler pola — pilihan pola jadi tidak pernah berubah. Dibatasi ke
+ * wadahnya supaya dua kontrol dengan gaya yang sama tidak saling injak.
+ */
+const modeSegButtons = () => $('mode-seg').querySelectorAll('.seg-btn');
+
+modeSegButtons().forEach((btn) => {
   btn.onclick = () => {
-    document.querySelectorAll('.seg-btn').forEach((b) => b.classList.remove('active'));
+    modeSegButtons().forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     state.mode = btn.dataset.mode;
     els.modeHint.textContent =
@@ -488,6 +887,94 @@ function applyBasemap() {
   });
   map.addLayer({ id: 'base', type: 'raster', source: 'base' }, after);
 }
+
+// ---------- Info profil drone & impor kode asli ----------
+
+const elDroneInfo = $('drone-info');
+els.droneInfoBtn.onclick = openDroneInfo;
+$('btn-close-di').onclick = () => (elDroneInfo.hidden = true);
+elDroneInfo.onclick = (e) => {
+  if (e.target === elDroneInfo) elDroneInfo.hidden = true;
+};
+
+function openDroneInfo() {
+  const p = state.profile;
+  const drone = findDrone(state.registry, state.droneId);
+
+  $('di-name').textContent = p.name;
+  $('di-body').innerHTML = `
+    <div class="note ${p.enumVerified ? 'ok' : 'bad'}">
+      <span class="ic">${p.enumVerified ? '✓' : '!'}</span>
+      <span>${
+        p.enumVerified
+          ? `Kode drone ${p.droneEnumValue}/${p.droneSubEnumValue}, payload ${p.payloadEnumValue}/${p.payloadSubEnumValue} — dibaca dari file asli DJI Fly.`
+          : p.enumKnown
+            ? `Kode drone yang dipakai sekarang (${p.droneEnumValue}) masih tebakan. ${esc(p.enumNote ?? '')}`
+            : 'Belum ada kode drone untuk model ini. File tetap bisa dibuat, tapi besar kemungkinan ditolak DJI Fly.'
+      }</span>
+    </div>
+    <div class="note info">
+      <span class="ic">i</span>
+      <span>Spek kamera (${esc(p.lens.name)}, ekuivalen ${p.lens.eq35mm} mm, ${esc(p.mode.label)}) diambil dari spec sheet dan dipakai untuk hitung GSD. Itu bagian yang bisa dipercaya.</span>
+    </div>
+    ${
+      drone.waypoint?.note
+        ? `<div class="note warn"><span class="ic">!</span><span>${esc(drone.waypoint.note)}</span></div>`
+        : ''
+    }
+    ${
+      drone.limits._status
+        ? `<div class="note warn"><span class="ic">!</span><span>${esc(drone.limits._status)}</span></div>`
+        : ''
+    }
+    ${
+      p.lens._eq35Status
+        ? `<div class="note warn"><span class="ic">!</span><span>${esc(p.lens._eq35Status)}</span></div>`
+        : ''
+    }`;
+
+  $('btn-di-forget').hidden = !state.enumOverrides[state.droneId];
+  $('di-import').hidden = true;
+  elDroneInfo.hidden = false;
+}
+
+$('di-file').onchange = async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const box = $('di-import');
+  const text = $('di-import-text');
+  box.hidden = false;
+  box.className = 'note info';
+  text.textContent = 'Membaca file…';
+
+  try {
+    const enums = await readEnumsFromKmz(file);
+    state.enumOverrides = setEnumOverride(state.droneId, enums);
+    syncProfile();
+    render();
+
+    box.className = 'note ok';
+    text.textContent = `Terkunci: drone ${enums.droneEnumValue}/${enums.droneSubEnumValue}, payload ${enums.payloadEnumValue}/${enums.payloadSubEnumValue}${
+      enums.namespace ? ` · namespace ${enums.namespace}` : ''
+    }. Dipakai untuk semua export ${state.profile.name} mulai sekarang.`;
+    $('btn-di-forget').hidden = false;
+    toast(`Kode drone ${state.profile.name} terkunci dari file asli.`, 'ok', 6000);
+  } catch (err) {
+    box.className = 'note bad';
+    text.textContent = err.message;
+  } finally {
+    e.target.value = '';
+  }
+};
+
+$('btn-di-forget').onclick = () => {
+  state.enumOverrides = setEnumOverride(state.droneId, null);
+  syncProfile();
+  render();
+  openDroneInfo();
+  toast('Kode impor dilupakan — kembali ke nilai bawaan.', 'ok');
+};
 
 // ---------- Pemilih sumber citra ----------
 
@@ -575,6 +1062,62 @@ map.on('error', (e) => {
     7000
   );
 });
+
+// ---------- Tampilan 2D / 3D ----------
+
+els.viewSwitch.querySelectorAll('[data-view]').forEach((chip) => {
+  chip.onclick = async () => {
+    const mode = chip.dataset.view;
+    els.viewSwitch.querySelectorAll('[data-view]').forEach((c) => c.classList.remove('active'));
+    chip.classList.add('active');
+    state.viewMode = mode;
+
+    if (!applyViewMode(map, mode)) {
+      toast('Perangkat ini tidak sanggup menampilkan medan 3D. Tetap di 2D.', 'err', 6000);
+      els.viewSwitch.querySelector('[data-view="2d"]').classList.add('active');
+      chip.classList.remove('active');
+      state.viewMode = '2d';
+      return;
+    }
+
+    if (mode === '3dobj') await loadBuildingsForPlan();
+    else if (mode !== '3dobj') render();
+  };
+});
+
+/**
+ * Bangunan diambil sekali per area, bukan tiap render: Overpass itu layanan
+ * sukarela dan membanjirinya dengan permintaan tiap geseran slider adalah cara
+ * paling cepat untuk diblokir.
+ */
+async function loadBuildingsForPlan() {
+  const plan = state.plan;
+  if (!plan) return toast('Gambar areanya dulu.', 'err');
+  if (state.buildingsLoading) return;
+
+  state.buildingsLoading = true;
+  state.buildingsError = null;
+  toast('Mengambil data bangunan dari OpenStreetMap…', 'info');
+
+  try {
+    const { geojson, count, unknown } = await fetchBuildings(planBounds(plan));
+    state.buildings = geojson;
+    setBuildings(map, geojson);
+    toast(
+      count
+        ? `${count} bangunan dimuat${unknown ? `, ${unknown} dilewati karena tingginya tidak terdata` : ''}. Tinggi dari OSM sering kurang dari aslinya, dan antena di atap tidak terdata sama sekali.`
+        : 'Tidak ada data bangunan di area ini. Itu bukan berarti areanya kosong — OSM cuma belum memetakannya.',
+      count ? 'ok' : 'info',
+      8000
+    );
+  } catch (err) {
+    state.buildingsError = err.message;
+    toast(`Gagal mengambil data bangunan: ${err.message}`, 'err', 6000);
+  } finally {
+    state.buildingsLoading = false;
+    render();
+  }
+}
 
 $('chip-labels').onclick = () => {
   state.showLabels = !state.showLabels;
@@ -701,12 +1244,8 @@ function bounds(coords) {
   ];
 }
 
-function applyLongestEdgeAngle() {
-  if (state.polygon.length < 3) return;
-  const [lng0, lat0] = centroid(state.polygon);
-  const proj = makeProjector(lat0, lng0);
-  const xy = state.polygon.map(proj.toXY);
-
+/** Arah sisi terpanjang poligon (derajat, 0–179). Jalur sejajar ini paling sedikit. */
+function longestEdgeAngle(xy) {
   let best = 0;
   let bestLen = -1;
   for (let i = 0; i < xy.length; i++) {
@@ -718,9 +1257,23 @@ function applyLongestEdgeAngle() {
       best = (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
     }
   }
-  els.angle.value = Math.round(((best % 180) + 180) % 180);
+  return Math.round(((best % 180) + 180) % 180);
+}
+
+function applyLongestEdgeAngle() {
+  if (state.polygon.length < 3) return;
+  const [lng0, lat0] = centroid(state.polygon);
+  const proj = makeProjector(lat0, lng0);
+
+  // Dipasang sebagai angka eksplisit, bukan dibiarkan 0/otomatis, supaya
+  // pengguna melihat arah yang sebenarnya dipakai.
+  const deg = longestEdgeAngle(state.polygon.map(proj.toXY)) || 180;
+  state.advanced.angleDeg = deg;
+  els.angle.value = String(deg);
   render();
 }
+
+const labelOf = (select) => select.options[select.selectedIndex]?.textContent.trim() ?? '';
 
 // ---------- Perencanaan ----------
 
@@ -734,36 +1287,81 @@ function buildPlan() {
   const homeXY = proj.toXY(home ?? polygon[0]);
   const area = polygonArea(polyXY);
 
+  const lim = profile.limits;
   const params = computeSurveyParams(profile.camera, {
-    gsdCm: Number(els.gsd.value),
+    altitudeM: state.altitudeM,
     frontOverlap: Number(els.front.value) / 100,
     sideOverlap: Number(els.side.value) / 100,
+    // Jeda jepret ikut mode foto: 48 MP tidak bisa dijepret secepat 12 MP,
+    // dan itu langsung membatasi kecepatan terbang.
+    minIntervalSec: profile.camera.minIntervalSec,
   });
 
   const mode = state.mode;
   const stopAtEach = mode === 'stopAndShoot';
-  const accel = profile.limits.accelMs2 ?? 2.5;
-  const speed = Math.min(
-    stopAtEach ? profile.limits.maxSpeedMs : params.recommendedSpeed,
-    profile.limits.maxSpeedMs
+  const accel = lim.accelMs2 ?? 2.5;
+
+  const autoSpeed = Math.min(
+    stopAtEach ? lim.maxSpeedMs : params.recommendedSpeed,
+    lim.maxSpeedMs
   );
+  // Kecepatan manual tidak dipaksa turun ke batas aman di sini — kalau
+  // melewatinya, gerbang keselamatan yang bilang, bukan kode yang diam-diam
+  // membetulkan.
+  const speed = state.speedAuto ? autoSpeed : Math.min(state.speedMs, lim.maxSpeedMs);
+
+  // Arah 0 berarti otomatis: ikuti sisi terpanjang supaya jalurnya paling sedikit.
+  const angleDeg = state.advanced.angleDeg || longestEdgeAngle(polyXY);
 
   // Buffer dinyatakan dalam kelipatan jarak antar jalur, jadi nilainya ikut
-  // menyesuaikan sendiri saat GSD atau overlap diubah.
+  // menyesuaikan sendiri saat ketinggian atau overlap diubah.
   const bufferM = Number(els.buffer.value) * params.sideSpacing;
   const gridPoly = offsetPolygon(polyXY, bufferM);
 
-  const grid = generateGrid(gridPoly, {
-    angleDeg: Number(els.angle.value),
+  const gridOpts = {
+    angleDeg,
     sideSpacing: params.sideSpacing,
     frontSpacing: params.frontSpacing,
     mode,
     // Poligon yang sudah dibuffer sudah memberi ruang ancang-ancang; overshoot
     // hanya dipakai kalau buffer dimatikan, supaya jalur tidak dobel memanjang.
     overshoot: bufferM > 0 ? 0 : mode === 'continuous' ? params.frontSpacing : 0,
-  });
+  };
 
+  const grid = generatePattern(gridPoly, { ...gridOpts, pattern: state.pattern });
   if (!grid.waypoints.length) return null;
+
+  // ---- Lanjutan misi ----
+  //
+  // Titik yang dipilih di peta dipetakan ke waypoint terdekat, lalu jalur
+  // dipotong dari situ. Yang sudah terpotret tidak diterbangkan lagi.
+  let resume = null;
+  if (state.resume) {
+    const target = proj.toXY(state.resume.lngLat);
+    let best = 0;
+    let bestD = Infinity;
+    grid.waypoints.forEach((w, i) => {
+      const d = Math.hypot(w.xy[0] - target[0], w.xy[1] - target[1]);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+
+    const skipped = grid.waypoints.slice(0, best);
+    grid.waypoints = grid.waypoints.slice(best);
+    grid.photos = grid.waypoints.reduce((n, w) => n + (w.photos || 0), 0);
+
+    resume = {
+      index: best,
+      snapDistM: bestD,
+      skippedWaypoints: skipped.length,
+      skippedPhotos: skipped.reduce((n, w) => n + (w.photos || 0), 0),
+      lngLat: proj.toLL(grid.waypoints[0]?.xy ?? target),
+    };
+
+    if (!grid.waypoints.length) return null;
+  }
 
   const hoverPerPhoto = stopAtEach ? 2.5 : 0;
   const maxDist = maxDistanceFrom(homeXY, grid.waypoints);
@@ -824,11 +1422,9 @@ function buildPlan() {
   // pembanding, supaya angkanya jadi keputusan sadar, bukan biaya siluman.
   let bufferCost = null;
   if (bufferM > 0) {
-    const bare = generateGrid(polyXY, {
-      angleDeg: Number(els.angle.value),
-      sideSpacing: params.sideSpacing,
-      frontSpacing: params.frontSpacing,
-      mode,
+    const bare = generatePattern(polyXY, {
+      ...gridOpts,
+      pattern: state.pattern,
       overshoot: mode === 'continuous' ? params.frontSpacing : 0,
     });
     if (bare.waypoints.length) {
@@ -865,6 +1461,18 @@ function buildPlan() {
     params,
     grid,
     mode,
+    pattern: state.pattern,
+    patternName: PATTERNS[state.pattern].name,
+    gimbalPitch: state.advanced.gimbalPitch,
+    advanced: {
+      ...state.advanced,
+      angleDeg,
+      autoAngle: !state.advanced.angleDeg,
+      rcLostActionLabel: labelOf(els.rcLost),
+      finishActionLabel: labelOf(els.finish),
+    },
+    resume,
+    autoSpeed,
     stopAtEach,
     speed,
     maxDist,
@@ -877,110 +1485,13 @@ function buildPlan() {
 }
 
 function checkWarnings(plan) {
-  const out = [];
-  const lim = state.profile.limits;
-
-  if (plan.altitude > lim.maxAltitudeM) {
-    out.push({
-      level: 'bad',
-      text: `Ketinggian ${plan.altitude.toFixed(0)} m melewati batas regulasi ${lim.maxAltitudeM} m. Perhalus GSD, atau area ini butuh izin khusus.`,
-    });
-  }
-
-  if (plan.maxDist > 500) {
-    out.push({
-      level: plan.maxDist > 1500 ? 'bad' : 'warn',
-      text: `Titik terjauh ${(plan.maxDist / 1000).toFixed(2)} km dari titik lepas landas. VLOS jadi sulit — pindahkan penanda H lebih ke tengah lahan, atau bagi lahannya.`,
-    });
-  }
-
-  if (!plan.stopAtEach && plan.params.recommendedSpeed < 3) {
-    out.push({
-      level: 'warn',
-      text: `GSD serapat ini memaksa kecepatan turun ke ${plan.params.recommendedSpeed.toFixed(1)} m/s supaya tidak motion blur — rolling shutter Mini 5 Pro tidak bisa dipaksa. Pertimbangkan stop & shoot.`,
-    });
-  }
-
-  const wpMax = Math.max(...plan.sorties.map((s) => s.length));
-  if (wpMax > lim.maxWaypoints) {
-    out.push({
-      level: 'warn',
-      text: `Satu sortie butuh ${wpMax} waypoint, melebihi perkiraan batas DJI Fly (${lim.maxWaypoints}). Perkecil area atau pakai mode jalan terus.`,
-    });
-  }
-
-  if (plan.sorties.length > 4) {
-    out.push({
-      level: 'warn',
-      text: `Butuh ${plan.sorties.length} baterai. Posisi matahari dan cuaca bisa berubah banyak selama itu — pertimbangkan membagi lahan jadi beberapa hari.`,
-    });
-  }
-
-  const t = plan.terrain;
-  if (t.ready) {
-    const climb = t.maxHeight - t.minHeight;
-    if (climb > 60) {
-      out.push({
-        level: 'warn',
-        text: `Mengikuti kontur berarti drone naik-turun ${climb.toFixed(0)} m sepanjang misi. Boros baterai, dan pastikan tidak ada obstacle di jalur naiknya.`,
-      });
-    }
-    // Ketinggian diukur dari titik lepas landas, jadi medan yang lebih rendah
-    // dari titik itu menghasilkan perintah negatif — drone diminta turun ke
-    // bawah posisi start. DJI Fly kemungkinan menolak, dan kalaupun diterima
-    // itu berbahaya.
-    // Fallback eksplisit: tanpa ini, profil lama tanpa field tersebut membuat
-    // perbandingan jadi `x < undefined` yang selalu false — pemeriksaan mati
-    // diam-diam tanpa ada tanda apa pun.
-    const floorM = lim.takeOffSecurityHeightM ?? 20;
-    if (t.minHeight < floorM) {
-      out.push({
-        level: 'bad',
-        text: `Sebagian lahan lebih rendah dari titik lepas landas — perintah ketinggian terendah jadi ${t.minHeight.toFixed(0)} m. Lepas landas dari bagian terendah lahan, bukan dari puncak.`,
-      });
-    }
-
-    if (t.maxHeight > lim.maxAltitudeM) {
-      out.push({
-        level: 'bad',
-        text: `Titik tertinggi jadi ${t.maxHeight.toFixed(0)} m di atas titik lepas landas — melewati batas ${lim.maxAltitudeM} m. Lepas landas dari tempat yang lebih tinggi, atau pecah lahannya.`,
-      });
-    }
-  } else if (!plan.terrain.on) {
-    const r = plan.reliefHint;
-    if (r && r.relief > plan.altitude * 0.1) {
-      out.push({
-        level: 'warn',
-        text: `Medan di area ini naik-turun ${r.relief.toFixed(0)} m. Tanpa ikuti kontur, GSD bisa meleset sampai ${((r.relief / plan.altitude) * 100).toFixed(0)}% antara bagian tinggi dan rendah.`,
-      });
-    }
-  }
-
-  // Pada lahan kecil, buffer bisa hampir melipatgandakan area terbang.
-  const overhead = plan.gridArea / plan.area - 1;
-  if (plan.bufferM > 0 && overhead > 0.6) {
-    out.push({
-      level: 'info',
-      text: `Buffer menambah ${Math.round(overhead * 100)}% luas terbang — di lahan sekecil ini buffernya proporsional besar. Turunkan ke 0.5× kalau tepi lahan tidak kritis.`,
-    });
-  }
-
-  if (plan.bufferM === 0) {
-    out.push({
-      level: 'info',
-      text: 'Buffer mati — jalur berhenti persis di batas lahan. Pinggiran ortofoto kemungkinan melengkung atau kosong. Aman kalau cuma bagian tengah yang dipakai.',
-    });
-  }
-
-  if (plan.stopAtEach && plan.grid.photos > 150) {
-    out.push({
-      level: 'info',
-      text: `Stop & shoot untuk ${plan.grid.photos} foto makan waktu lama. Mode jalan terus jauh lebih cepat, dan biasanya masih cukup tajam.`,
-    });
-  }
-
-  return out;
+  // Semua pemeriksaan tinggal di src/safety.js supaya tidak ada yang lolos
+  // diam-diam, dan supaya CLI bisa memakai pemeriksaan yang sama persis.
+  const result = evaluateSafety(plan, state.profile, { obstacles: plan.obstacles });
+  state.safety = result;
+  return result.findings;
 }
+
 
 // ---------- Data elevasi ----------
 //
@@ -1096,6 +1607,9 @@ function render() {
       '<p class="placeholder">Gambar area dulu untuk melihat rencana terbang.</p>';
     els.sorties.innerHTML = '';
     els.warnings.innerHTML = '';
+    els.gate.hidden = true;
+    els.patternCost.hidden = true;
+    els.resumeReadout.hidden = true;
     els.legend.hidden = true;
     els.export.disabled = true;
     els.geojson.disabled = true;
@@ -1151,6 +1665,12 @@ function render() {
     })),
   });
 
+  map.getSource('resume')?.setData(
+    plan.resume
+      ? { type: 'Feature', geometry: { type: 'Point', coordinates: plan.resume.lngLat } }
+      : EMPTY
+  );
+
   els.area.hidden = false;
   els.areaVal.textContent = fmtArea(plan.area);
 
@@ -1163,11 +1683,24 @@ function render() {
   ensureTerrain(plan);
   updateTileEstimate(plan);
 
+  // Rintangan dihitung sebelum pemeriksaan keselamatan, karena salah satu
+  // pemeriksaannya memang tentang itu.
+  plan.obstacles = state.buildings
+    ? obstaclesNearPath(state.buildings, {
+        proj: plan.proj,
+        pathLL: plan.grid.waypoints.map((w) => plan.proj.toLL(w.xy)),
+        altitudeM: plan.altitude,
+      })
+    : null;
+
   updateDerived(plan);
   renderStats(plan);
   renderSorties(plan);
   renderLegend(plan);
   renderWarnings(checkWarnings(plan));
+  renderGate();
+  renderPatternCost(plan);
+  renderResume(plan);
 
   els.sheetSummary.textContent =
     `${fmtArea(plan.area)} · ${plan.altitude.toFixed(0)} m · ${fmtDur(plan.duration)} · ` +
@@ -1177,28 +1710,93 @@ function render() {
 }
 
 function updateDerived(plan) {
-  els.gsdOut.textContent = `${Number(els.gsd.value).toFixed(1)} cm/px`;
   els.frontOut.textContent = `${els.front.value}%`;
   els.sideOut.textContent = `${els.side.value}%`;
-  els.angleOut.textContent = `${els.angle.value}°`;
+  els.angleOut.textContent = state.advanced.angleDeg
+    ? `${state.advanced.angleDeg}°`
+    : plan
+      ? `otomatis · ${plan.advanced.angleDeg}°`
+      : 'otomatis';
+  els.gimbalOut.textContent = `${state.advanced.gimbalPitch}°`;
+  els.safeHeightOut.textContent = `${state.advanced.safeHeightM} m`;
 
   const mult = Number(els.buffer.value);
   els.bufferOut.textContent = mult === 0 ? 'mati' : `${mult.toFixed(1)}× jalur`;
 
-  if (state.profile) {
-    const p = computeSurveyParams(state.profile.camera, {
-      gsdCm: Number(els.gsd.value),
-      frontOverlap: Number(els.front.value) / 100,
-      sideOverlap: Number(els.side.value) / 100,
-    });
-    els.altDerived.textContent = `${p.altitude.toFixed(0)} m`;
-    const meters = mult === 0 ? 'tepat di batas' : `${(mult * p.sideSpacing).toFixed(0)} m`;
-    const cost = plan?.bufferCost;
-    els.bufferM.textContent =
-      cost && cost.photos > 0
-        ? `${meters} — biayanya +${cost.photos} foto, +${fmtDur(cost.seconds)}`
-        : meters;
+  if (!state.profile) return;
+
+  // Ketinggian adalah input utama; GSD-nya yang diturunkan. Ini kebalikan dari
+  // versi sebelumnya, dan sengaja: di lapangan orang berpikir dalam meter.
+  els.alt.value = String(state.altitudeM);
+  els.altOut.textContent = `${state.altitudeM} m`;
+
+  const gsd = gsdFromAltitude(state.profile.camera, state.altitudeM);
+  els.gsdDerived.textContent = `${gsd.toFixed(2)} cm/px`;
+
+  const p = computeSurveyParams(state.profile.camera, {
+    altitudeM: state.altitudeM,
+    frontOverlap: Number(els.front.value) / 100,
+    sideOverlap: Number(els.side.value) / 100,
+    minIntervalSec: state.profile.camera.minIntervalSec,
+  });
+
+  const shown = plan ? plan.speed : Math.min(p.recommendedSpeed, state.profile.limits.maxSpeedMs);
+  if (state.speedAuto) {
+    state.speedMs = shown;
+    els.speed.value = String(shown.toFixed(1));
   }
+  els.speedOut.textContent = `${shown.toFixed(1)} m/s`;
+  els.speedNote.textContent = state.speedAuto
+    ? `Batas blur ${p.maxSpeedBlur.toFixed(1)} m/s · batas jeda jepret ${p.maxSpeedInterval.toFixed(1)} m/s (${state.profile.mode.label}).`
+    : `Diatur manual. Batas amannya ${Math.min(p.maxSpeedBlur, p.maxSpeedInterval).toFixed(1)} m/s.`;
+
+  const meters = mult === 0 ? 'tepat di batas' : `${(mult * p.sideSpacing).toFixed(0)} m`;
+  const cost = plan?.bufferCost;
+  els.bufferM.textContent =
+    cost && cost.photos > 0
+      ? `${meters} — biayanya +${cost.photos} foto, +${fmtDur(cost.seconds)}`
+      : meters;
+
+  renderPresets();
+  renderEnumBadge();
+}
+
+/** Tiap preset menampilkan ketinggian yang DIA hasilkan di drone yang aktif. */
+function renderPresets() {
+  const active = matchPreset({
+    gsdCm: gsdFromAltitude(state.profile.camera, state.altitudeM),
+    frontOverlap: Number(els.front.value) / 100,
+    sideOverlap: Number(els.side.value) / 100,
+  });
+  state.presetId = active?.id ?? null;
+
+  for (const p of PRESETS) {
+    const sub = els.presets.querySelector(`[data-sub="${p.id}"]`);
+    if (!sub) continue;
+    const alt = altitudeFromGsd(state.profile.camera, p.gsdCm);
+    sub.textContent = `${alt.toFixed(0)} m · ${Math.round(p.frontOverlap * 100)}/${Math.round(p.sideOverlap * 100)}`;
+  }
+
+  els.presets.querySelectorAll('[data-preset]').forEach((b) => {
+    const isCustom = b.dataset.preset === 'custom';
+    b.classList.toggle('active', isCustom ? !state.presetId : b.dataset.preset === state.presetId);
+  });
+
+  const preset = state.presetId ? findPreset(state.presetId) : null;
+  els.presetNote.textContent = preset
+    ? preset.note
+    : 'Diatur sendiri. Preset menyimpan ketelitian yang dituju, jadi artinya tetap sama waktu drone diganti.';
+}
+
+function renderEnumBadge() {
+  const p = state.profile;
+  els.enumBadge.hidden = false;
+  els.enumBadge.className = `enum-badge ${p.enumVerified ? 'ok' : 'warn'}`;
+  els.enumBadge.textContent = p.enumVerified
+    ? `Kode drone terkunci dari file asli (${p.droneEnumValue})`
+    : p.enumKnown
+      ? 'Kode drone masih tebakan — ketuk i untuk menguncinya'
+      : 'Kode drone belum ada — ketuk i untuk menguncinya';
 }
 
 function renderStats(plan) {
@@ -1211,6 +1809,10 @@ function renderStats(plan) {
     <div class="stat">
       <span class="k">Kecepatan</span>
       <span class="v">${plan.speed.toFixed(1)}<small>m/s</small></span>
+    </div>
+    <div class="stat">
+      <span class="k">GSD</span>
+      <span class="v">${plan.params.gsd.toFixed(2)}<small>cm/px</small></span>
     </div>
     <div class="stat">
       <span class="k">Jumlah foto</span>
@@ -1231,6 +1833,10 @@ function renderStats(plan) {
     <div class="stat full">
       <span class="k">Jarak antar jalur · jarak antar foto</span>
       <span class="v">${plan.params.sideSpacing.toFixed(0)}<small>m</small> · ${plan.params.frontSpacing.toFixed(0)}<small>m</small></span>
+    </div>
+    <div class="stat full">
+      <span class="k">Drone · lensa · pola</span>
+      <span class="v sm">${esc(state.profile.name)} · ${esc(state.profile.lens.name)} ${esc(state.profile.mode.label)} · ${esc(plan.patternName)} ${plan.gimbalPitch}°</span>
     </div>`;
 }
 
@@ -1272,6 +1878,107 @@ function renderLegend(plan) {
     .join('');
 }
 
+/**
+ * Gerbang keselamatan: satu pintu yang harus dilewati semua rencana.
+ *
+ * Temuan merah tidak membatalkan apa pun sendiri — pengguna tetap boleh
+ * lanjut, tapi harus mencentang bahwa dia sudah membacanya. Yang dilarang di
+ * sini bukan keputusan pengguna, melainkan export yang terjadi tanpa dia tahu.
+ */
+function renderGate() {
+  const s = state.safety;
+  const blocked = !!s?.blockers.length;
+
+  els.gate.hidden = !blocked;
+  if (blocked) {
+    els.gateTitle.textContent =
+      s.blockers.length === 1
+        ? '1 masalah keselamatan di rencana ini'
+        : `${s.blockers.length} masalah keselamatan di rencana ini`;
+    els.gateAck.checked = state.gateAck;
+  } else {
+    state.gateAck = false;
+    els.gateAck.checked = false;
+  }
+
+  els.export.disabled = blocked && !state.gateAck;
+  els.export.textContent = blocked && state.gateAck ? 'Export KMZ (dengan risiko)' : 'Export KMZ';
+}
+
+function renderPatternCost(plan) {
+  if (plan.pattern === 'single') {
+    els.patternCost.hidden = true;
+    return;
+  }
+  els.patternCost.hidden = false;
+  els.patternCostVal.textContent = `${plan.grid.photos} foto · ${fmtDur(plan.duration)} · ${plan.sorties.length} baterai`;
+}
+
+// ---------- Lanjutkan misi ----------
+
+function renderResume(plan) {
+  const r = plan.resume;
+  els.resumeReadout.hidden = !r;
+  els.resumeClear.hidden = !r;
+  els.resumePick.classList.toggle('active', state.resumePicking);
+  els.resumePick.textContent = state.resumePicking
+    ? 'Ketuk titik terakhir di peta…'
+    : r
+      ? 'Pilih ulang di peta'
+      : 'Pilih di peta';
+
+  if (!r) return;
+  els.resumeStatus.textContent = `Lanjut dari waypoint #${r.index + 1}`;
+  els.resumeVal.textContent = `${r.skippedPhotos} foto dilewati · geser ${r.snapDistM.toFixed(0)} m`;
+}
+
+els.resumePick.onclick = () => {
+  if (!state.plan) return toast('Gambar areanya dulu.', 'err');
+  state.resumePicking = !state.resumePicking;
+  map.getCanvas().style.cursor = state.resumePicking ? 'crosshair' : '';
+  render();
+};
+
+els.resumeClear.onclick = () => {
+  state.resume = null;
+  state.resumePicking = false;
+  map.getCanvas().style.cursor = '';
+  render();
+};
+
+els.resumeGps.onclick = () => {
+  if (!navigator.geolocation) return toast('Browser ini tidak punya GPS.', 'err');
+  if (!state.plan) return toast('Gambar areanya dulu.', 'err');
+
+  els.resumeGps.classList.add('busy');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      els.resumeGps.classList.remove('busy');
+      // Lokasi KAMU, bukan lokasi drone. Berguna karena biasanya kamu berdiri
+      // dekat tempat drone berhenti — tapi itu tetap perkiraan, dan titiknya
+      // di-snap ke waypoint terdekat, jadi hasilnya tetap koordinat rencana.
+      setResumePoint([pos.coords.longitude, pos.coords.latitude]);
+      toast(
+        `Dipakai lokasi kamu (akurasi ±${pos.coords.accuracy.toFixed(0)} m). Cek titiknya di peta — itu posisi kamu, bukan posisi drone.`,
+        'info',
+        7000
+      );
+    },
+    () => {
+      els.resumeGps.classList.remove('busy');
+      toast('Tidak bisa membaca lokasi.', 'err');
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+};
+
+function setResumePoint(lngLat) {
+  state.resume = { lngLat };
+  state.resumePicking = false;
+  map.getCanvas().style.cursor = '';
+  render();
+}
+
 function renderWarnings(list) {
   const icon = { bad: '!', warn: '!', info: 'i' };
   els.warnings.innerHTML = list
@@ -1311,10 +2018,17 @@ function onSave() {
     home: state.home,
     homePinned: state.homePinned,
     mode: state.mode,
-    gsd: Number(els.gsd.value),
+    droneId: state.droneId,
+    lensId: state.lensId,
+    modeId: state.modeId,
+    altitudeM: state.altitudeM,
+    speedMs: state.speedMs,
+    speedAuto: state.speedAuto,
+    pattern: state.pattern,
+    advanced: { ...state.advanced },
+    terrain: state.terrain,
     front: Number(els.front.value),
     side: Number(els.side.value),
-    angle: Number(els.angle.value),
     buffer: Number(els.buffer.value),
   });
 
@@ -1365,13 +2079,44 @@ function openProject(id) {
 
   state.currentProjectId = p.id;
   els.projName.value = p.name;
-  els.gsd.value = p.gsd;
   els.front.value = p.front;
   els.side.value = p.side;
-  els.angle.value = p.angle;
   els.buffer.value = p.buffer ?? 1;
 
-  document.querySelectorAll('.seg-btn').forEach((b) => {
+  // Project lama (skema 1) tidak menyimpan ketinggian sama sekali — dulu
+  // selalu diturunkan dari GSD. Jadi di sini GSD-nya yang dipakai untuk
+  // menghitung ulang ketinggian, memakai kamera drone yang tersimpan.
+  state.droneId = p.droneId ?? 'mini5pro';
+  state.lensId = p.lensId ?? '';
+  state.modeId = p.modeId ?? '';
+  state.pattern = p.pattern ?? 'single';
+  state.speedAuto = p.speedAuto ?? true;
+  state.advanced = { ...SAFE_ADVANCED, ...(p.advanced ?? {}) };
+  syncProfile();
+  buildDronePickers();
+
+  state.altitudeM = p.altitudeM ?? clampAltitude(altitudeFromGsd(state.profile.camera, p.gsdTarget ?? p.gsd ?? 2));
+  state.speedMs = p.speedMs ?? state.speedMs;
+  state.terrain = !!p.terrain;
+  els.terrain.checked = state.terrain;
+  state.resume = null;
+
+  syncAdvancedInputs();
+  els.speedAuto.checked = state.speedAuto;
+  els.patternSeg.querySelectorAll('[data-pattern]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.pattern === state.pattern);
+  });
+  els.patternHint.textContent = PATTERN_HINT[state.pattern];
+
+  if (p.migratedFrom) {
+    toast(
+      `Project ini dibuat versi lama (skema ${p.migratedFrom}). Ketinggiannya dihitung ulang dari ketelitian yang tersimpan — cek dulu sebelum terbang.`,
+      'info',
+      8000
+    );
+  }
+
+  modeSegButtons().forEach((b) => {
     b.classList.toggle('active', b.dataset.mode === p.mode);
   });
   state.mode = p.mode;
@@ -1402,7 +2147,7 @@ function planWaypointsToMission(plan, sortie) {
       speed: plan.speed,
       heading: w.heading,
       headingMode: 'smoothTransition',
-      gimbalPitch: -90,
+      gimbalPitch: plan.gimbalPitch,
       takePhoto: plan.stopAtEach,
       hoverTime: plan.stopAtEach ? 2 : 0,
     };
@@ -1428,12 +2173,22 @@ async function exportKmz() {
   const plan = state.plan;
   if (!plan) return;
 
+  // Pengaman kedua, selain tombol yang dinonaktifkan: export lewat jalur lain
+  // (keyboard, skrip) tidak boleh menembus gerbang keselamatan.
+  if (state.safety && !state.safety.ok && !state.gateAck) {
+    toast('Masih ada masalah keselamatan yang belum dibaca. Centang dulu di atas tombol.', 'err', 6000);
+    return;
+  }
+
   els.export.disabled = true;
   const original = els.export.textContent;
   els.export.textContent = 'Membuat file…';
 
   try {
-    const base = (els.projName.value.trim() || 'survei').replace(/[^\w\-]+/g, '-');
+    const base =
+      (els.projName.value.trim() || 'survei').replace(/[^\w\-]+/g, '-') +
+      (plan.resume ? '-lanjut' : '') +
+      (plan.pattern === 'single' ? '' : '-silang');
     const stamp = new Date().toISOString().slice(0, 10);
 
     const files = plan.sorties.map((sortie, i) => {
@@ -1442,6 +2197,18 @@ async function exportKmz() {
           waypoints: planWaypointsToMission(plan, sortie),
           height: plan.altitude,
           speed: plan.speed,
+
+          // Setelan lanjutan ikut masuk file, bukan cuma jadi tampilan.
+          finishAction: plan.advanced.finishAction,
+          exitOnRCLost: 'executeLostAction',
+          executeRCLostAction: plan.advanced.rcLostAction,
+
+          // Naik dulu ke ketinggian aman sebelum menyeberang ke titik mulai.
+          // Untuk sortie kedua dan misi lanjutan, inilah yang mencegah drone
+          // melintas rendah di atas area yang belum tentu kosong.
+          takeOffSecurityHeight: plan.advanced.safeHeightM,
+          flyToWaylineMode: 'safely',
+
           intervalShooting: plan.stopAtEach
             ? null
             : { mode: 'distance', value: plan.params.frontSpacing },
@@ -1549,12 +2316,19 @@ function encodeState() {
     h: state.homePinned && state.home
       ? [round6(state.home[0]), round6(state.home[1])]
       : null,
-    g: Number(els.gsd.value),
+    alt: state.altitudeM,
     f: Number(els.front.value),
     s: Number(els.side.value),
-    a: Number(els.angle.value),
     b: Number(els.buffer.value),
     m: state.mode === 'stopAndShoot' ? 1 : 0,
+    d: state.droneId,
+    l: state.lensId,
+    pm: state.modeId,
+    pt: state.pattern,
+    sp: state.speedAuto ? null : state.speedMs,
+    tf: state.terrain ? 1 : 0,
+    adv: state.advanced,
+    v: SCHEMA_VERSION,
   };
   const json = JSON.stringify(payload);
   return btoa(String.fromCharCode(...new TextEncoder().encode(json)))
@@ -1589,13 +2363,34 @@ function applyStateFromUrl() {
     const d = decodeState(m[1]);
     if (!Array.isArray(d.p) || d.p.length < 3) return false;
 
-    els.gsd.value = d.g;
     els.front.value = d.f;
     els.side.value = d.s;
-    els.angle.value = d.a;
     els.buffer.value = d.b ?? 1;
     state.mode = d.m ? 'stopAndShoot' : 'continuous';
-    document.querySelectorAll('.seg-btn').forEach((b) => {
+
+    // Link lama (skema 1) membawa `g` = GSD dan tidak membawa drone sama
+    // sekali. Diperlakukan sebagai Mini 5 Pro, lalu ketinggiannya dihitung
+    // ulang — sama seperti project lama.
+    state.droneId = d.d ?? 'mini5pro';
+    state.lensId = d.l ?? '';
+    state.modeId = d.pm ?? '';
+    state.pattern = d.pt ?? 'single';
+    state.terrain = !!d.tf;
+    els.terrain.checked = state.terrain;
+    state.advanced = { ...SAFE_ADVANCED, ...(d.adv ?? {}) };
+    syncProfile();
+    buildDronePickers();
+    syncAdvancedInputs();
+
+    state.altitudeM = d.alt ?? clampAltitude(altitudeFromGsd(state.profile.camera, d.g ?? 2));
+    state.speedAuto = d.sp == null;
+    state.speedMs = d.sp ?? state.speedMs;
+    els.speedAuto.checked = state.speedAuto;
+    els.patternSeg.querySelectorAll('[data-pattern]').forEach((b) => {
+      b.classList.toggle('active', b.dataset.pattern === state.pattern);
+    });
+    els.patternHint.textContent = PATTERN_HINT[state.pattern];
+    modeSegButtons().forEach((b) => {
       b.classList.toggle('active', b.dataset.mode === state.mode);
     });
 

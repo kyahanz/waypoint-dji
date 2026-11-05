@@ -3,9 +3,10 @@
   "configurations": [
     {
       "name": "prototype",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "5173"],
-      "port": 5173
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tools/devserver.js", "5180"],
+      "port": 5180,
+      "url": "http://localhost:5180"
     }
   ]
 }

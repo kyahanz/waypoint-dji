@@ -272,6 +272,81 @@ export function generateGrid(polyXY, o) {
 }
 
 /**
+ * Pola terbang di atas satu poligon.
+ *
+ *   single        — satu arah. Cukup untuk ortofoto / peta datar.
+ *   cross         — ditambah jalur menyilang 90°. Objek tegak terpotret dari
+ *                   dua arah, jadi model 3D-nya tidak bolong di sisi yang
+ *                   tidak pernah menghadap kamera.
+ *   crossOblique  — cross, tapi kamera dimiringkan (lihat gimbalPitch di
+ *                   pemanggilnya). Ini yang benar-benar menangkap dinding
+ *                   tegak; cross saja dengan kamera nunduk lurus masih tipis.
+ *
+ * Ongkosnya nyata: cross dan crossOblique melipatgandakan foto, waktu, dan
+ * jumlah baterai. Pemanggil wajib menampilkan itu sebelum berangkat.
+ */
+export const PATTERNS = {
+  single: { id: 'single', name: 'Peta datar', passes: 1, gimbalPitch: -90 },
+  cross: { id: 'cross', name: 'Silang', passes: 2, gimbalPitch: -90 },
+  crossOblique: { id: 'crossOblique', name: 'Silang + miring', passes: 2, gimbalPitch: -45 },
+};
+
+export function generatePattern(polyXY, o) {
+  const { pattern = 'single', angleDeg = 0, ...rest } = o;
+  const spec = PATTERNS[pattern] ?? PATTERNS.single;
+  const angles = spec.passes === 1 ? [angleDeg] : [angleDeg, angleDeg + 90];
+
+  const lines = [];
+  const waypoints = [];
+  const passes = [];
+  let photos = 0;
+
+  angles.forEach((ang, i) => {
+    const g = generateGrid(polyXY, { ...rest, angleDeg: ang });
+    for (const w of g.waypoints) w.pass = i;
+    lines.push(...g.lines);
+    waypoints.push(...g.waypoints);
+    photos += g.photos;
+    passes.push({
+      index: i,
+      angleDeg: ((ang % 360) + 360) % 360,
+      photos: g.photos,
+      waypoints: g.waypoints.length,
+      lines: g.lines,
+    });
+  });
+
+  return { lines, waypoints, photos, passes, pattern: spec.id, gimbalPitch: spec.gimbalPitch };
+}
+
+/**
+ * Laju naik-turun yang dituntut jalur, dalam m/s.
+ *
+ * Kenapa ini penting: saat mengikuti kontur, ketinggian perintah berubah tiap
+ * waypoint. Kalau lerengnya curam dan kecepatan jelajahnya tinggi, drone
+ * diminta naik lebih cepat dari kemampuan vertikalnya. Dia tidak akan menolak
+ * — dia cuma tertinggal, dan makin lama makin rendah dari rencana. Itu
+ * kegagalan yang tidak kelihatan di layar sampai drone menyentuh sesuatu.
+ */
+export function climbDemand(waypoints, speed) {
+  let max = 0;
+  let maxAt = -1;
+  for (let i = 1; i < waypoints.length; i++) {
+    const a = waypoints[i - 1];
+    const b = waypoints[i];
+    if (a.height === undefined || b.height === undefined) continue;
+    const dist = Math.hypot(b.xy[0] - a.xy[0], b.xy[1] - a.xy[1]);
+    if (dist < 1) continue;
+    const rate = (Math.abs(b.height - a.height) / dist) * speed;
+    if (rate > max) {
+      max = rate;
+      maxAt = i;
+    }
+  }
+  return { rateMs: max, atIndex: maxAt };
+}
+
+/**
  * Waktu tempuh satu ruas, dengan memperhitungkan akselerasi.
  *
  * Penting untuk mode stop-and-shoot: pada ruas sependek 20 m, drone tidak

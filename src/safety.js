@@ -1,0 +1,285 @@
+// Gerbang keselamatan.
+//
+// Semua pemeriksaan rencana terbang berkumpul di satu tempat supaya tidak ada
+// yang lolos diam-diam. Aturannya:
+//
+//   'bad'  — bisa membuat drone hilang atau file ditolak. Export ditahan
+//            sampai pengguna mencentang bahwa dia sadar.
+//   'warn' — hasilnya jelek atau misinya tidak efisien. Lewat saja boleh.
+//   'info' — konsekuensi yang perlu diketahui, bukan masalah.
+//
+// Aplikasi tidak pernah diam-diam membetulkan angka pengguna. Kalau ada yang
+// dibatasi, itu harus muncul di sini sebagai kalimat, bukan dipotong di
+// belakang layar.
+
+import { climbDemand } from './survey.js';
+
+const pct = (v) => `${Math.round(v * 100)}%`;
+
+export function evaluateSafety(plan, profile, o = {}) {
+  const out = [];
+  const lim = profile.limits;
+  const adv = plan.advanced ?? {};
+
+  const add = (level, code, text) => out.push({ level, code, text });
+
+  // ---- Identitas drone & format file ----
+
+  if (profile.waypoint?.supported === false) {
+    add(
+      'bad',
+      'no-waypoint',
+      `${profile.name} tidak mendukung waypoint mission di DJI Fly. File-nya bisa dibuat, tapi drone tidak akan menerimanya.`
+    );
+  }
+
+  if (!profile.enumVerified) {
+    add(
+      'bad',
+      'enum-unverified',
+      profile.enumKnown
+        ? `Kode drone untuk ${profile.name} masih tebakan, belum pernah dicocokkan dengan file asli DJI Fly. Risikonya file ditolak, atau lebih buruk: diterima tapi dianggap drone lain, sehingga batas kecepatan dan perilaku RTH-nya bukan punya drone kamu. Impor satu KMZ asli untuk menguncinya.`
+        : `Belum ada kode drone terverifikasi untuk ${profile.name}. Bikin satu waypoint mission di DJI Fly, export KMZ-nya, lalu impor di sini — tanpa itu file ini kemungkinan besar ditolak.`
+    );
+  }
+
+  // ---- Ketinggian ----
+
+  if (plan.altitude > lim.maxAltitudeM) {
+    add(
+      'bad',
+      'alt-over',
+      `Ketinggian ${plan.altitude.toFixed(0)} m melewati batas ${lim.maxAltitudeM} m. Perhalus GSD, atau area ini butuh izin khusus.`
+    );
+  }
+
+  if (plan.altitude < (lim.takeOffSecurityHeightM ?? 20)) {
+    add(
+      'warn',
+      'alt-low',
+      `Ketinggian ${plan.altitude.toFixed(0)} m di bawah ketinggian aman lepas landas (${lim.takeOffSecurityHeightM} m). Pohon, tiang, dan kabel ada di ketinggian ini.`
+    );
+  }
+
+  // ---- Jarak & VLOS ----
+
+  if (plan.maxDist > 500) {
+    add(
+      plan.maxDist > 1500 ? 'bad' : 'warn',
+      'vlos',
+      `Titik terjauh ${(plan.maxDist / 1000).toFixed(2)} km dari titik lepas landas. VLOS jadi sulit — geser penanda H lebih ke tengah lahan, atau bagi lahannya.`
+    );
+  }
+
+  // ---- Kecepatan: blur dan jeda jepret ----
+
+  const cam = profile.camera;
+  if (!plan.stopAtEach && plan.params.recommendedSpeed < 3) {
+    add(
+      'warn',
+      'speed-blur',
+      `GSD serapat ini memaksa kecepatan turun ke ${plan.params.recommendedSpeed.toFixed(1)} m/s supaya tidak motion blur — ${
+        cam.mechanicalShutter
+          ? 'meski kamera ini punya mechanical shutter'
+          : `${profile.name} pakai rolling shutter, jadi ini tidak bisa dipaksa`
+      }. Pertimbangkan stop & shoot.`
+    );
+  }
+
+  if (!plan.stopAtEach && plan.speed > plan.params.maxSpeedInterval + 0.05) {
+    add(
+      'bad',
+      'speed-interval',
+      `Mode ${profile.mode.label} butuh jeda ${cam.minIntervalSec} detik antar jepretan, jadi kecepatan maksimum cuma ${plan.params.maxSpeedInterval.toFixed(1)} m/s. Di ${plan.speed.toFixed(1)} m/s akan ada foto yang terlewat dan overlap depan bolong.`
+    );
+  }
+
+  if (profile.mode.binned === true && plan.params.gsd < 1.5) {
+    add(
+      'info',
+      'mp-binned',
+      `${profile.mode.label} itu hasil binning — detailnya tidak sehalus angka pikselnya. Untuk GSD serapat ini, mode resolusi penuh lebih jujur, tapi jeda jepretnya lebih lama.`
+    );
+  }
+
+  // ---- Waypoint & baterai ----
+
+  const wpMax = Math.max(...plan.sorties.map((s) => s.length));
+  if (wpMax > lim.maxWaypoints) {
+    add(
+      'warn',
+      'wp-limit',
+      `Satu sortie butuh ${wpMax} waypoint, melewati perkiraan batas DJI Fly (${lim.maxWaypoints}). Perkecil area atau pakai mode jalan terus.`
+    );
+  }
+
+  if (plan.sorties.length > 4) {
+    add(
+      'warn',
+      'many-sorties',
+      `Butuh ${plan.sorties.length} baterai. Posisi matahari dan cuaca bisa berubah banyak selama itu — pertimbangkan membagi lahan jadi beberapa hari.`
+    );
+  }
+
+  // ---- Pola terbang ----
+
+  if (plan.pattern !== 'single') {
+    add(
+      'info',
+      'pattern-cost',
+      `Pola ${plan.patternName.toLowerCase()} menerbangkan lahan dua kali: ${plan.grid.photos} foto, ${plan.sorties.length} baterai. Kalau yang kamu butuh cuma peta datar, ini mubazir.`
+    );
+  }
+
+  if (plan.pattern === 'cross' && plan.gimbalPitch === -90) {
+    add(
+      'info',
+      'pattern-nadir',
+      'Jalur menyilang dengan kamera nunduk lurus memperbaiki medan, tapi dinding tegak masih tipis terpotret. Untuk model bangunan, pakai silang + miring.'
+    );
+  }
+
+  // ---- Terrain following ----
+
+  const t = plan.terrain;
+  if (t?.ready) {
+    const climb = t.maxHeight - t.minHeight;
+    if (climb > 60) {
+      add(
+        'warn',
+        'terrain-climb',
+        `Mengikuti kontur berarti drone naik-turun ${climb.toFixed(0)} m sepanjang misi. Boros baterai, dan pastikan tidak ada obstacle di jalur naiknya.`
+      );
+    }
+
+    // Tuntutan laju naik: inilah kegagalan yang tidak kelihatan di layar.
+    const demand = climbDemand(plan.grid.waypoints, plan.speed);
+    const capable = lim.climbRateMs ?? 5;
+    if (demand.rateMs > capable) {
+      add(
+        'bad',
+        'climb-rate',
+        `Lereng di jalur ini menuntut drone naik ${demand.rateMs.toFixed(1)} m/s pada kecepatan ${plan.speed.toFixed(1)} m/s, sementara ${profile.name} cuma sanggup sekitar ${capable} m/s. Drone akan tertinggal dari ketinggian rencananya — makin lama makin dekat ke tanah. Turunkan kecepatan ke sekitar ${((capable / demand.rateMs) * plan.speed).toFixed(1)} m/s, atau matikan ikut kontur.`
+      );
+    }
+
+    const floorM = lim.takeOffSecurityHeightM ?? 20;
+    if (t.minHeight < floorM) {
+      add(
+        'bad',
+        'terrain-floor',
+        `Sebagian lahan lebih rendah dari titik lepas landas — perintah ketinggian terendah jadi ${t.minHeight.toFixed(0)} m. Lepas landas dari bagian terendah lahan, bukan dari puncak.`
+      );
+    }
+
+    if (t.maxHeight > lim.maxAltitudeM) {
+      add(
+        'bad',
+        'terrain-ceiling',
+        `Titik tertinggi jadi ${t.maxHeight.toFixed(0)} m di atas titik lepas landas — melewati batas ${lim.maxAltitudeM} m. Lepas landas dari tempat yang lebih tinggi, atau pecah lahannya.`
+      );
+    }
+
+    add(
+      'info',
+      'terrain-dem',
+      'Data elevasi yang dipakai resolusinya sekitar 90 m. Dia tahu bukit; dia TIDAK tahu pohon, tiang, menara, atau kabel listrik. Tetap lihat medannya dengan mata sendiri.'
+    );
+  } else if (!t?.on) {
+    const r = plan.reliefHint;
+    if (r && r.relief > plan.altitude * 0.1) {
+      add(
+        'warn',
+        'relief',
+        `Medan di area ini naik-turun ${r.relief.toFixed(0)} m. Tanpa ikuti kontur, GSD bisa meleset sampai ${pct(r.relief / plan.altitude)} antara bagian tinggi dan rendah.`
+      );
+    }
+  }
+
+  // ---- Rintangan dari peta bangunan ----
+
+  if (o.obstacles?.length) {
+    const worst = o.obstacles.reduce((a, b) => (a.clearanceM < b.clearanceM ? a : b));
+    if (worst.clearanceM < 0) {
+      add(
+        'bad',
+        'obstacle-hit',
+        `Ada bangunan setinggi ${worst.heightM.toFixed(0)} m tepat di jalur, sementara drone terbang di ${plan.altitude.toFixed(0)} m. Naikkan ketinggian atau geser areanya.`
+      );
+    } else if (worst.clearanceM < 15) {
+      add(
+        'warn',
+        'obstacle-near',
+        `Jarak vertikal ke bangunan tertinggi di jalur cuma ${worst.clearanceM.toFixed(0)} m. Data bangunan OSM sering kurang tinggi dari aslinya, dan antena di atap tidak terdata sama sekali.`
+      );
+    }
+  }
+
+  // ---- Setelan lanjutan ----
+
+  if (adv.rcLostAction && adv.rcLostAction !== 'goBack') {
+    add(
+      'bad',
+      'rc-lost',
+      `Saat sinyal hilang drone diset "${adv.rcLostActionLabel}". Kalau kamu kehilangan kendali di luar jangkauan pandang, satu-satunya yang membawa drone pulang adalah RTH.`
+    );
+  }
+
+  if (adv.finishAction && adv.finishAction !== 'goHome') {
+    add(
+      adv.finishAction === 'autoLand' ? 'bad' : 'warn',
+      'finish-action',
+      adv.finishAction === 'autoLand'
+        ? `Setelah selesai drone akan mendarat di tempat, bukan pulang. Dia akan turun di titik terakhir jalur — pastikan kamu tahu persis itu di mana dan ada apa di bawahnya.`
+        : `Setelah selesai drone diset "${adv.finishActionLabel}", bukan pulang sendiri. Baterai terus terpakai selama dia menunggu.`
+    );
+  }
+
+  if (adv.gimbalPitch !== undefined && adv.gimbalPitch > -30) {
+    add(
+      'warn',
+      'gimbal-flat',
+      `Gimbal ${adv.gimbalPitch}° hampir mendatar. Untuk fotogrametri, sudut sedatar ini membuat skala foto tidak seragam dan hasil olahannya melenceng.`
+    );
+  }
+
+  // ---- Buffer ----
+
+  const overhead = plan.gridArea / plan.area - 1;
+  if (plan.bufferM > 0 && overhead > 0.6) {
+    add(
+      'info',
+      'buffer-cost',
+      `Buffer menambah ${pct(overhead)} luas terbang — di lahan sekecil ini buffernya proporsional besar. Turunkan ke 0.5x kalau tepi lahan tidak kritis.`
+    );
+  }
+
+  if (plan.bufferM === 0) {
+    add(
+      'info',
+      'buffer-off',
+      'Buffer mati — jalur berhenti persis di batas lahan. Pinggiran ortofoto kemungkinan melengkung atau kosong. Aman kalau cuma bagian tengah yang dipakai.'
+    );
+  }
+
+  if (plan.stopAtEach && plan.grid.photos > 150) {
+    add(
+      'info',
+      'stop-slow',
+      `Stop & shoot untuk ${plan.grid.photos} foto makan waktu lama. Mode jalan terus jauh lebih cepat, dan biasanya masih cukup tajam.`
+    );
+  }
+
+  // ---- Lanjutan misi ----
+
+  if (plan.resume) {
+    add(
+      'info',
+      'resume-transit',
+      `Misi lanjutan dimulai dari waypoint #${plan.resume.index + 1}. Drone naik dulu ke ketinggian aman, baru menyeberang ke titik itu — bukan terbang rendah melintasi area yang belum tentu kosong.`
+    );
+  }
+
+  const blockers = out.filter((w) => w.level === 'bad');
+  return { findings: out, blockers, ok: blockers.length === 0 };
+}

@@ -1172,3 +1172,205 @@ input[type="range"]::-moz-range-thumb {
   color: var(--warn);
   border-color: #5c4a12;
 }
+
+/* ---------- Pemilih drone, lensa, mode foto ---------- */
+
+.drone-bar {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.drone-bar .pick {
+  flex: 1;
+  min-width: 0;
+}
+
+select.pick {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+select.pick:disabled {
+  opacity: 0.5;
+}
+
+.row.tight select.pick {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Status kode drone selalu kelihatan: ini perbedaan antara file yang diterima
+   drone dan file yang ditolak, jadi tidak boleh disembunyikan di menu. */
+.enum-badge {
+  margin-top: 8px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  border: 1px solid;
+}
+
+.enum-badge.ok {
+  color: var(--ok);
+  border-color: rgba(85, 197, 122, 0.4);
+  background: rgba(85, 197, 122, 0.1);
+}
+
+.enum-badge.warn {
+  color: var(--warn);
+  border-color: rgba(240, 180, 41, 0.4);
+  background: rgba(240, 180, 41, 0.1);
+}
+
+/* ---------- Preset ---------- */
+
+.presets {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.preset {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 10px;
+  text-align: left;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.preset:hover {
+  border-color: var(--accent);
+}
+
+.preset.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.preset .pn {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.preset .pd {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---------- Pengaturan lanjutan ---------- */
+
+.adv {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.adv > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  list-style: none;
+  padding: 4px 0;
+}
+
+.adv > summary::before {
+  content: '▸ ';
+}
+
+.adv[open] > summary::before {
+  content: '▾ ';
+}
+
+.adv > summary:hover {
+  color: var(--text);
+}
+
+.adv input[type='number'] {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+
+/* ---------- Gerbang keselamatan ---------- */
+
+.gate {
+  margin: 12px 0;
+  padding: 11px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--danger);
+  background: rgba(242, 114, 114, 0.09);
+}
+
+.gate-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.gate-head .ic {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #1b1f27;
+  font-size: 12px;
+  font-weight: 700;
+  flex: none;
+}
+
+.gate .sub {
+  margin: 6px 0 8px;
+}
+
+/* ---------- Pemilih tampilan 2D/3D ---------- */
+
+#view-switch {
+  position: absolute;
+  top: 58px;
+  left: 12px;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  z-index: 3;
+}
+
+.stat .v.sm {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* Pola terbang punya tiga pilihan, bukan dua. Dengan grid dua kolom bawaan,
+   pilihan ketiga jatuh sendirian di baris kedua dan terlihat seperti sisa. */
+#pattern-seg {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+#pattern-seg .seg-btn {
+  font-size: 11px;
+  padding-left: 4px;
+  padding-right: 4px;
+}

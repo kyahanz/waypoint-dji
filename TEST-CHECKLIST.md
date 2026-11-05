@@ -1,3 +1,30 @@
+## Prioritas satu: kunci kode drone
+
+Sebelum menguji apa pun yang lain, lakukan ini sekali per drone yang kamu
+punya. Hasilnya dipakai seterusnya dan menghilangkan tebakan terbesar di
+seluruh aplikasi.
+
+1. Buka DJI Fly, bikin **satu** waypoint mission apa saja (2 titik cukup),
+   simpan.
+2. Ambil file `.kmz`-nya dari HP.
+3. Di web app: panel drone -> tombol **i** -> pilih file itu di **Kunci kode
+   drone**.
+4. Lencana kode drone berubah jadi hijau dan gerbang keselamatan berhenti
+   menahan export.
+
+Alternatif lewat terminal, kalau mau lihat isinya mentah:
+
+```bash
+npm run inspect -- "C:/path/ke/mission-dari-hp.kmz"
+```
+
+Salin `droneEnumValue`, `droneSubEnumValue`, `payloadEnumValue`, dan
+`payloadSubEnumValue` ke entri drone yang sesuai di `profiles/drones.json`,
+set `"verified": true`, dan kirimkan hasilnya — satu drone terverifikasi
+menolong semua orang yang pakai model yang sama.
+
+---
+
 # Fase 0 — Checklist Uji Lapangan
 
 Tujuan: menjawab **satu pertanyaan go/no-go** — bisakah DJI Fly di Mini 5 Pro

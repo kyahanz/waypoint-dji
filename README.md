@@ -1,9 +1,29 @@
 # waypoint-dji
 
-Mission planner untuk DJI Mini 5 Pro — fokus mapping / ortofoto.
+Mission planner untuk drone DJI consumer (Mini, Air, Mavic, Lito) — fokus
+mapping / ortofoto.
 
-**Status: Fase 0 (spike).** Belum ada web app. Yang ada baru CLI untuk
-menjawab satu pertanyaan: bisakah kita bikin file mission yang dibaca DJI Fly?
+**Status: prototipe.** Ada web app (`web/`) dan CLI (`src/cli.js`). Yang masih
+terbuka tetap pertanyaan yang sama sejak awal: apakah file yang kita bikin
+benar-benar dibaca DJI Fly? Itu baru bisa dijawab dengan menguji di perangkat.
+
+## Dua jenis angka di aplikasi ini
+
+Ini pembedaan paling penting, dan sengaja tidak disembunyikan di UI:
+
+| | Dari mana | Seberapa bisa dipercaya |
+|---|---|---|
+| **Spek kamera** (ekuivalen 35 mm, jumlah piksel) | Spec sheet publik | Tinggi — ini yang menentukan GSD dan ketinggian terbang |
+| **Kode drone** (`droneEnumValue` dkk) | Tidak dipublikasikan DJI untuk lini consumer | Belum terverifikasi sampai kamu mengimpor satu KMZ asli |
+
+Kode drone yang salah bukan cuma bikin file ditolak — kemungkinan lebih buruk
+adalah file diterima tapi drone dianggap model lain, sehingga batas kecepatan
+dan perilaku RTH-nya bukan punya drone kamu. Karena itu export ditahan gerbang
+keselamatan sampai kamu mencentang bahwa kamu sadar, atau sampai kodenya
+dikunci lewat **Impor KMZ asli** di panel drone.
+
+Mengganti nama file tidak mengubah kode ini: yang dibaca DJI Fly adalah isi
+file, bukan namanya.
 
 ## Kenapa pendekatannya begini
 
@@ -27,6 +47,26 @@ Node.js 18+. Tidak ada dependency — ZIP writer/reader ditulis sendiri di atas
 `zlib` bawaan Node.
 
 ## Pakai
+
+Web app (perencana survei lengkap):
+
+```bash
+npm run dev
+```
+
+lalu buka http://localhost:5180/web/
+
+Uji hitungan dan gerbang keselamatan tanpa browser:
+
+```bash
+npm test
+```
+
+Lihat daftar drone yang tersedia beserta status kodenya:
+
+```bash
+npm run drones
+```
 
 Generate mission test (3 waypoint melingkar di sekitar satu titik):
 
@@ -239,3 +279,43 @@ Ikuti [TEST-CHECKLIST.md](TEST-CHECKLIST.md).
 Indonesia: batas 120 m AGL, wajib VLOS, hindari KKOP bandara. Registrasi dan
 izin lewat SIDOPI-GO (DGCA). File mission hasil generator ini **belum teruji** —
 selalu siap ambil alih manual saat menerbangkannya.
+
+
+## Fitur perencana (web)
+
+- **Pilih drone** — Mini 3 Pro / 4 Pro / 5 Pro, Lito 1 / X1, Air 3 / 3S,
+  Mavic 3 / 3 Classic / 3 Pro / 4 Pro. Tiap drone membawa batas dan kameranya
+  sendiri.
+- **Pilih lensa dan resolusi foto** — wide / tele / med-tele, 12 MP sampai
+  100 MP. Ini bukan sekadar label: mode resolusi penuh punya jeda jepret lebih
+  lama, yang langsung membatasi kecepatan terbang dan mengubah lama misi.
+- **Preset Cepat / Standar / Detail** — menyimpan ketelitian yang dituju, bukan
+  ketinggian mati, jadi artinya tetap sama waktu drone diganti. Geser slider
+  apa pun dan presetnya berubah jadi Custom.
+- **Pola terbang** — peta datar, silang (double grid), atau silang + miring
+  untuk model 3D. Biayanya ditampilkan sebelum berangkat, bukan setelah.
+- **Ikuti kontur tanah** — plus peringatan kalau lereng menuntut laju naik di
+  atas kemampuan drone.
+- **Peta 2D / 3D / objek** — medan timbul dari DEM, dan bangunan OSM sebagai
+  pemeriksa rintangan.
+- **Lanjutkan misi** — ketuk titik terakhir yang sudah dipotret, jalur dipotong
+  dari situ, dan drone naik ke ketinggian aman dulu sebelum menyeberang.
+- **Gerbang keselamatan** — satu pintu yang semua rencana harus lewati.
+  Aplikasi tidak pernah diam-diam membetulkan angka; kalau ada yang berbahaya,
+  dia bilang.
+
+## Yang belum diverifikasi
+
+Jujur soal ini lebih berguna daripada daftar fitur:
+
+- **Kode drone semua model** masih tebakan atau kosong. Satu-satunya cara
+  memperbaikinya: export KMZ asli dari DJI Fly lalu impor di aplikasi.
+- **Batas 200 waypoint** di DJI Fly belum dikonfirmasi.
+- **Daya tahan baterai Lito X1** dan **dimensi piksel 100 MP Mavic 4 Pro**
+  diturunkan, bukan dari spec resmi. Keduanya ditandai di
+  `profiles/drones.json`.
+- **Ekuivalen 35 mm Lito 1** diturunkan dari FOV, bukan angka resmi.
+- **Data elevasi** resolusinya ~90 m: tahu bukit, tidak tahu pohon, tiang,
+  menara, atau kabel.
+- **Tinggi bangunan OSM** sering kurang dari aslinya, dan bangunan tanpa data
+  tinggi sengaja tidak digambar daripada ditebak.

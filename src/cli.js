@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createZip } from './zip.js';
 import { destination } from './geo.js';
+import { resolveProfile } from './profiles.js';
 import {
   buildTemplateKml,
   buildWaylinesWpml,
@@ -52,13 +53,32 @@ Opsional:
   --gimbal <derajat>   Sudut pitch gimbal, -90 = nadir/lurus ke bawah
   --finish <aksi>      goHome | autoLand | noAction | gotoFirstWaypoint (default goHome)
   --name <nama>        Nama file output (default test-mission)
-  --profile <file>     Profil drone (default profiles/mini5pro.json)
+  --drone <id>         Drone dari profiles/drones.json (default mini5pro)
+  --lens <id>          Lensa drone itu (default lensa pertama)
+  --mp <id>            Mode foto lensa itu (default mode pertama)
+  --drones             Tampilkan daftar drone yang tersedia lalu keluar
+  --profile <file>     Profil tunggal lama (menimpa --drone)
   --out <dir>          Folder output (default out/)
   --help               Tampilkan bantuan ini
 `;
 
+const loadRegistry = () =>
+  JSON.parse(fs.readFileSync(path.join(ROOT, 'profiles', 'drones.json'), 'utf8'));
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
+
+  if (args.drones) {
+    for (const d of loadRegistry().drones) {
+      const lenses = d.lenses
+        .map((l) => `${l.id} (${l.modes.map((m) => m.id).join('/')})`)
+        .join(', ');
+      console.log(
+        `${d.id.padEnd(14)} ${d.name.padEnd(22)} ${d.enums?.verified ? 'kode OK' : 'kode ?  '}  ${lenses}`
+      );
+    }
+    process.exit(0);
+  }
 
   if (args.help || (!args.lat && !args.lng)) {
     console.log(HELP);
@@ -76,10 +96,22 @@ function main() {
     process.exit(1);
   }
 
-  const profilePath = args.profile
-    ? path.resolve(args.profile)
-    : path.join(ROOT, 'profiles', 'mini5pro.json');
-  const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+  // Profil tunggal lama masih didukung supaya file profil buatan sendiri
+  // tidak mendadak tidak kepakai; selain itu, sumbernya registry.
+  const profile = args.profile
+    ? JSON.parse(fs.readFileSync(path.resolve(args.profile), 'utf8'))
+    : resolveProfile(loadRegistry(), {
+        droneId: args.drone ?? 'mini5pro',
+        lensId: args.lens,
+        modeId: args.mp,
+      });
+
+  if (!args.profile) {
+    console.log(
+      `Drone  : ${profile.name} — ${profile.lens.name}, ${profile.mode.label}` +
+        (profile.enumVerified ? '' : '  [kode drone BELUM terverifikasi]')
+    );
+  }
 
   const alt = Number(args.alt ?? MISSION_DEFAULTS.height);
   const radius = Number(args.radius ?? 40);

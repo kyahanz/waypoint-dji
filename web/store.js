@@ -4,6 +4,52 @@
 
 const KEY = 'waypoint-dji.projects.v1';
 
+// Versi skema project yang ditulis aplikasi sekarang.
+//
+//   1 — prototipe awal: satu drone (Mini 5 Pro), parameter berbasis GSD.
+//   2 — pilihan drone/lensa/mode foto, ketinggian jadi input utama,
+//       pola terbang, setelan lanjutan.
+//
+// Project lama tidak boleh jadi tidak terbaca cuma karena aplikasinya maju.
+// Tiap project dinaikkan versinya saat dibuka, bukan saat disimpan, supaya
+// file yang belum pernah disentuh tetap utuh.
+export const SCHEMA_VERSION = 2;
+
+/**
+ * Naikkan satu project ke skema terbaru.
+ *
+ * v1 menyimpan `gsd` dan tidak menyimpan ketinggian sama sekali — ketinggian
+ * dulu selalu diturunkan dari GSD memakai kamera Mini 5 Pro. Jadi di sini
+ * GSD-nya dipertahankan apa adanya dan drone-nya dikunci ke Mini 5 Pro;
+ * aplikasi yang akan menghitung ulang ketinggiannya. Menebak ketinggian di
+ * sini justru akan mengubah arti rencana yang sudah tersimpan.
+ */
+export function migrateProject(p) {
+  if (!p || p.schemaVersion === SCHEMA_VERSION) return p;
+
+  const out = { ...p };
+
+  if (!out.schemaVersion || out.schemaVersion < 2) {
+    out.droneId = out.droneId ?? 'mini5pro';
+    out.lensId = out.lensId ?? 'wide';
+    out.modeId = out.modeId ?? '12mp';
+    out.pattern = out.pattern ?? 'single';
+    out.speedAuto = out.speedAuto ?? true;
+    out.gsdTarget = out.gsdTarget ?? out.gsd ?? null;
+
+    // Arah jalur v1 adalah angka eksplisit 0–179, di mana 0 berarti
+    // timur-barat. Di v2 nilai 0 berarti "otomatis", jadi 0 yang lama
+    // dipindahkan ke 180 — arah yang sama persis, tapi tidak tertukar makna.
+    out.advanced = out.advanced ?? {
+      angleDeg: out.angle === 0 ? 180 : (out.angle ?? 0),
+    };
+    out.migratedFrom = out.schemaVersion ?? 1;
+  }
+
+  out.schemaVersion = SCHEMA_VERSION;
+  return out;
+}
+
 function readAll() {
   try {
     const raw = localStorage.getItem(KEY);
@@ -29,7 +75,7 @@ export function listProjects() {
 export function saveProject(project) {
   const list = readAll();
   const id = project.id || `p_${Date.now().toString(36)}`;
-  const record = { ...project, id, savedAt: Date.now() };
+  const record = { ...project, id, schemaVersion: SCHEMA_VERSION, savedAt: Date.now() };
   const i = list.findIndex((p) => p.id === id);
   if (i >= 0) list[i] = record;
   else list.push(record);
@@ -37,7 +83,36 @@ export function saveProject(project) {
 }
 
 export function loadProject(id) {
-  return readAll().find((p) => p.id === id) ?? null;
+  const found = readAll().find((p) => p.id === id);
+  return found ? migrateProject(found) : null;
+}
+
+// ---------- Kode drone hasil impor ----------
+//
+// Nilai enum yang dibaca dari KMZ asli DJI Fly disimpan per drone dan
+// bertahan antar sesi. Ini satu-satunya cara memperbaiki data yang tidak
+// dipublikasikan DJI, jadi sekali dikunci jangan sampai hilang.
+
+const ENUM_KEY = 'waypoint-dji.droneEnums.v1';
+
+export function getEnumOverrides() {
+  try {
+    return JSON.parse(localStorage.getItem(ENUM_KEY)) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export function setEnumOverride(droneId, enums) {
+  const all = getEnumOverrides();
+  if (enums) all[droneId] = enums;
+  else delete all[droneId];
+  try {
+    localStorage.setItem(ENUM_KEY, JSON.stringify(all));
+  } catch {
+    // Penyimpanan diblokir — kode tetap berlaku untuk sesi ini saja.
+  }
+  return all;
 }
 
 export function deleteProject(id) {

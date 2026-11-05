@@ -19,13 +19,25 @@ const WEB_FILES = [
   'draw.js',
   'store.js',
   'kmz.js',
+  'unzip.js',
+  'view3d.js',
   'offline.js',
   'sw.js',
   'manifest.webmanifest',
   'icon.svg',
 ];
 
-const SRC_FILES = ['survey.js', 'geo.js', 'wpml.js', 'zip-core.js', 'terrain.js'];
+const SRC_FILES = [
+  'survey.js',
+  'geo.js',
+  'wpml.js',
+  'zip-core.js',
+  'terrain.js',
+  'profiles.js',
+  'safety.js',
+];
+
+const PROFILE_FILES = ['drones.json', 'mini5pro.json'];
 
 // CSS MapLibre disalin ke dalam proyek, bukan diambil dari CDN: artifact
 // viewer memblokir stylesheet lintas situs, dan satu dependensi eksternal
@@ -71,10 +83,9 @@ for (const f of VENDOR_FILES) {
   fs.copyFileSync(path.join(ROOT, 'web', 'vendor', f), path.join(DIST, 'vendor', f));
 }
 
-fs.copyFileSync(
-  path.join(ROOT, 'profiles', 'mini5pro.json'),
-  path.join(DIST, 'profiles', 'mini5pro.json')
-);
+for (const f of PROFILE_FILES) {
+  fs.copyFileSync(path.join(ROOT, 'profiles', f), path.join(DIST, 'profiles', f));
+}
 
 // Jaring pengaman: kalau masih ada ../ yang tersisa, hosting akan 404 diam-diam.
 const leftovers = [];
@@ -95,5 +106,6 @@ fs.writeFileSync(
   ['.env*', '.vercel', ''].join('\n')
 );
 
-const count = fs.readdirSync(DIST).length + SRC_FILES.length + 1;
-console.log(`dist/ siap — ${WEB_FILES.length + SRC_FILES.length + 1} berkas, ${rewritten} ditulis ulang`);
+console.log(
+  `dist/ siap — ${WEB_FILES.length + SRC_FILES.length + PROFILE_FILES.length} berkas, ${rewritten} ditulis ulang`
+);

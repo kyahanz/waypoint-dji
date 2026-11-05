@@ -1,0 +1,365 @@
+{
+  "schemaVersion": 2,
+  "_catatan": "Registry drone. Ada dua jenis angka di sini dan keduanya tidak boleh dicampur. (1) SPEK KAMERA — eq35mm dan jumlah piksel, diambil dari spec sheet publik. Ini yang menentukan GSD dan footprint, jadi ini yang menentukan benar-tidaknya rencana terbang. (2) ENUM DJI — droneEnumValue dan kawan-kawan, tidak dipublikasikan DJI untuk lini consumer. enums null berarti BELUM ADA nilai terverifikasi. Cara mengisinya: bikin satu waypoint mission di DJI Fly dengan drone itu, export .kmz-nya, lalu impor lewat tombol 'Impor KMZ asli' di aplikasi, atau jalankan `npm run inspect -- file.kmz`.",
+  "_catatanGsd": "GSD cuma butuh perbandingan sensor terhadap fokal, dan perbandingan itu sudah terkandung di ekuivalen 35mm: GSD = 3600 * tinggi / (eq35mm * lebarPiksel). Jadi ukuran sensor fisik tidak perlu ditebak sama sekali.",
+  "drones": [
+    {
+      "id": "mini3pro",
+      "name": "DJI Mini 3 Pro",
+      "series": "Mini",
+      "waypoint": { "supported": true, "note": "Waypoint ditambahkan lewat pembaruan firmware." },
+      "enums": null,
+      "lenses": [
+        {
+          "id": "wide",
+          "name": "Wide",
+          "eq35mm": 24,
+          "sensor": "1/1.3 inci",
+          "aperture": "f/1.7",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
+            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+          ]
+        }
+      ],
+      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 5, "accelMs2": 2.5, "nominalFlightMin": 34, "usableFlightMin": 20 }
+    },
+    {
+      "id": "mini4pro",
+      "name": "DJI Mini 4 Pro",
+      "series": "Mini",
+      "waypoint": { "supported": true },
+      "enums": null,
+      "lenses": [
+        {
+          "id": "wide",
+          "name": "Wide",
+          "eq35mm": 24,
+          "sensor": "1/1.3 inci",
+          "aperture": "f/1.7",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
+            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+          ]
+        }
+      ],
+      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 5, "accelMs2": 2.5, "nominalFlightMin": 34, "usableFlightMin": 20 }
+    },
+    {
+      "id": "mini5pro",
+      "name": "DJI Mini 5 Pro",
+      "series": "Mini",
+      "waypoint": { "supported": true },
+      "enums": {
+        "droneEnumValue": 68,
+        "droneSubEnumValue": 0,
+        "payloadEnumValue": 68,
+        "payloadSubEnumValue": 0,
+        "verified": false,
+        "note": "Tebakan dari lini Enterprise (M3E). Belum pernah dicocokkan dengan file asli DJI Fly."
+      },
+      "lenses": [
+        {
+          "id": "wide",
+          "name": "Wide",
+          "eq35mm": 24,
+          "sensor": "1 inci",
+          "aperture": "f/1.8",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4096, "imageHeightPx": 3072, "minIntervalSec": 2, "binned": true },
+            { "id": "50mp", "label": "50 MP", "imageWidthPx": 8192, "imageHeightPx": 6144, "minIntervalSec": 3 }
+          ]
+        },
+        {
+          "id": "medtele",
+          "name": "Med-Tele 2x",
+          "eq35mm": 48,
+          "sensor": "1 inci (crop)",
+          "aperture": "f/1.8",
+          "mechanicalShutter": false,
+          "digitalZoom": true,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4096, "imageHeightPx": 3072, "minIntervalSec": 2 }
+          ]
+        }
+      ],
+      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 5, "accelMs2": 2.5, "nominalFlightMin": 36, "usableFlightMin": 22 }
+    },
+    {
+      "id": "litox1",
+      "name": "DJI Lito X1",
+      "series": "Lito",
+      "waypoint": { "supported": true, "note": "Didukung menurut basis data pihak ketiga, belum dicek di app resmi." },
+      "enums": null,
+      "lenses": [
+        {
+          "id": "wide",
+          "name": "Wide",
+          "eq35mm": 24,
+          "sensor": "1/1.3 inci",
+          "aperture": "f/1.7",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
+            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+          ]
+        }
+      ],
+      "limits": {
+        "maxWaypoints": 200,
+        "maxAltitudeM": 120,
+        "takeOffSecurityHeightM": 20,
+        "maxSpeedMs": 15,
+        "climbRateMs": 5,
+        "accelMs2": 2.5,
+        "nominalFlightMin": 36,
+        "usableFlightMin": 21,
+        "_status": "Daya tahan baterai belum dikonfirmasi dari spec resmi."
+      }
+    },
+    {
+      "id": "lito1",
+      "name": "DJI Lito 1",
+      "series": "Lito",
+      "waypoint": { "supported": true, "note": "Disebut mendukung Waypoint Flight oleh listing retail, belum dikonfirmasi DJI." },
+      "enums": null,
+      "lenses": [
+        {
+          "id": "wide",
+          "name": "Wide",
+          "eq35mm": 26,
+          "_eq35Status": "Diturunkan dari FOV 79 derajat, bukan angka resmi. Verifikasi sebelum dipakai untuk mapping serius.",
+          "sensor": "1/2 inci",
+          "aperture": "f/1.8",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4000, "imageHeightPx": 3000, "minIntervalSec": 2, "binned": true },
+            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8000, "imageHeightPx": 6000, "minIntervalSec": 3 }
+          ]
+        }
+      ],
+      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 5, "accelMs2": 2.5, "nominalFlightMin": 36, "usableFlightMin": 21 }
+    },
+    {
+      "id": "air3",
+      "name": "DJI Air 3",
+      "series": "Air",
+      "waypoint": { "supported": true },
+      "enums": null,
+      "lenses": [
+        {
+          "id": "wide",
+          "name": "Wide 24mm",
+          "eq35mm": 24,
+          "sensor": "1/1.3 inci",
+          "aperture": "f/1.7",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
+            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+          ]
+        },
+        {
+          "id": "tele",
+          "name": "Tele 70mm",
+          "eq35mm": 70,
+          "sensor": "1/1.3 inci",
+          "aperture": "f/2.8",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
+            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+          ]
+        }
+      ],
+      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 10, "accelMs2": 3, "nominalFlightMin": 46, "usableFlightMin": 28 }
+    },
+    {
+      "id": "air3s",
+      "name": "DJI Air 3S",
+      "series": "Air",
+      "waypoint": { "supported": true },
+      "enums": null,
+      "lenses": [
+        {
+          "id": "wide",
+          "name": "Wide 24mm",
+          "eq35mm": 24,
+          "sensor": "1 inci",
+          "aperture": "f/1.8",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4096, "imageHeightPx": 3072, "minIntervalSec": 2, "binned": true },
+            { "id": "50mp", "label": "50 MP", "imageWidthPx": 8192, "imageHeightPx": 6144, "minIntervalSec": 3 }
+          ]
+        },
+        {
+          "id": "tele",
+          "name": "Tele 70mm",
+          "eq35mm": 70,
+          "sensor": "1/1.3 inci",
+          "aperture": "f/2.8",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
+            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+          ]
+        }
+      ],
+      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 10, "accelMs2": 3, "nominalFlightMin": 45, "usableFlightMin": 27 }
+    },
+    {
+      "id": "mavic3classic",
+      "name": "DJI Mavic 3 Classic",
+      "series": "Mavic",
+      "waypoint": { "supported": true },
+      "enums": null,
+      "lenses": [
+        {
+          "id": "hasselblad",
+          "name": "Hasselblad 24mm",
+          "eq35mm": 24,
+          "sensor": "4/3 inci",
+          "aperture": "f/2.8 - f/11",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "20mp", "label": "20 MP", "imageWidthPx": 5280, "imageHeightPx": 3956, "minIntervalSec": 2 }
+          ]
+        }
+      ],
+      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 8, "accelMs2": 3, "nominalFlightMin": 46, "usableFlightMin": 28 }
+    },
+    {
+      "id": "mavic3",
+      "name": "DJI Mavic 3",
+      "series": "Mavic",
+      "waypoint": { "supported": true },
+      "enums": null,
+      "lenses": [
+        {
+          "id": "hasselblad",
+          "name": "Hasselblad 24mm",
+          "eq35mm": 24,
+          "sensor": "4/3 inci",
+          "aperture": "f/2.8 - f/11",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "20mp", "label": "20 MP", "imageWidthPx": 5280, "imageHeightPx": 3956, "minIntervalSec": 2 }
+          ]
+        },
+        {
+          "id": "tele",
+          "name": "Tele 162mm",
+          "eq35mm": 162,
+          "sensor": "1/2 inci",
+          "aperture": "f/4.4",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4000, "imageHeightPx": 3000, "minIntervalSec": 2 }
+          ]
+        }
+      ],
+      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 8, "accelMs2": 3, "nominalFlightMin": 46, "usableFlightMin": 28 }
+    },
+    {
+      "id": "mavic3pro",
+      "name": "DJI Mavic 3 Pro",
+      "series": "Mavic",
+      "waypoint": { "supported": true },
+      "enums": null,
+      "lenses": [
+        {
+          "id": "hasselblad",
+          "name": "Hasselblad 24mm",
+          "eq35mm": 24,
+          "sensor": "4/3 inci",
+          "aperture": "f/2.8 - f/11",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "20mp", "label": "20 MP", "imageWidthPx": 5280, "imageHeightPx": 3956, "minIntervalSec": 2 }
+          ]
+        },
+        {
+          "id": "medtele",
+          "name": "Med-Tele 70mm",
+          "eq35mm": 70,
+          "sensor": "1/1.3 inci",
+          "aperture": "f/2.8",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
+            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+          ]
+        },
+        {
+          "id": "tele",
+          "name": "Tele 166mm",
+          "eq35mm": 166,
+          "sensor": "1/2 inci",
+          "aperture": "f/3.4",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4000, "imageHeightPx": 3000, "minIntervalSec": 2 }
+          ]
+        }
+      ],
+      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 8, "accelMs2": 3, "nominalFlightMin": 43, "usableFlightMin": 26 }
+    },
+    {
+      "id": "mavic4pro",
+      "name": "DJI Mavic 4 Pro",
+      "series": "Mavic",
+      "waypoint": { "supported": true },
+      "enums": null,
+      "lenses": [
+        {
+          "id": "hasselblad",
+          "name": "Hasselblad 28mm",
+          "eq35mm": 28,
+          "sensor": "4/3 inci",
+          "aperture": "f/2.0 - f/11",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "25mp", "label": "25 MP", "imageWidthPx": 5760, "imageHeightPx": 4320, "minIntervalSec": 2, "binned": true },
+            {
+              "id": "100mp",
+              "label": "100 MP",
+              "imageWidthPx": 11520,
+              "imageHeightPx": 8640,
+              "minIntervalSec": 5,
+              "_status": "Dimensi piksel diturunkan dari klaim 100 MP, bukan dari spec resmi."
+            }
+          ]
+        },
+        {
+          "id": "medtele",
+          "name": "Med-Tele 70mm",
+          "eq35mm": 70,
+          "sensor": "1/1.3 inci",
+          "aperture": "f/2.8",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4032, "imageHeightPx": 3024, "minIntervalSec": 2, "binned": true },
+            { "id": "48mp", "label": "48 MP", "imageWidthPx": 8064, "imageHeightPx": 6048, "minIntervalSec": 3 }
+          ]
+        },
+        {
+          "id": "tele",
+          "name": "Tele 168mm",
+          "eq35mm": 168,
+          "sensor": "1/1.5 inci",
+          "aperture": "f/2.8",
+          "mechanicalShutter": false,
+          "modes": [
+            { "id": "12mp", "label": "12 MP", "imageWidthPx": 4096, "imageHeightPx": 3072, "minIntervalSec": 2, "binned": true },
+            { "id": "50mp", "label": "50 MP", "imageWidthPx": 8192, "imageHeightPx": 6144, "minIntervalSec": 3 }
+          ]
+        }
+      ],
+      "limits": { "maxWaypoints": 200, "maxAltitudeM": 120, "takeOffSecurityHeightM": 20, "maxSpeedMs": 15, "climbRateMs": 10, "accelMs2": 3, "nominalFlightMin": 51, "usableFlightMin": 31 }
+    }
+  ]
+}

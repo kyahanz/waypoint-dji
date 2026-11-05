@@ -1,7 +1,7 @@
 // Service worker: membuat aplikasi dan tile peta tetap bisa dipakai tanpa
 // sinyal. Dipasang dari app.js, hanya jalan di konteks aman (https/localhost).
 
-const SHELL = 'wpdji-shell-v2';
+const SHELL = 'wpdji-shell-v3';
 const TILES = 'wpdji-tiles-v1';
 const DATA = 'wpdji-data-v1';
 
@@ -14,13 +14,17 @@ const SHELL_FILES = [
   './draw.js',
   './store.js',
   './kmz.js',
+  './unzip.js',
+  './view3d.js',
   './offline.js',
   '../src/survey.js',
   '../src/geo.js',
   '../src/wpml.js',
   '../src/zip-core.js',
   '../src/terrain.js',
-  '../profiles/mini5pro.json',
+  '../src/profiles.js',
+  '../src/safety.js',
+  '../profiles/drones.json',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js',
   './vendor/maplibre-gl.css',
   'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
@@ -31,9 +35,12 @@ const TILE_HOSTS = [
   'tile.openstreetmap.org',
   'api.mapbox.com',
   'api.maptiler.com',
+  // Tile elevasi untuk medan 3D: ikut di-cache supaya tampilan 3D tetap ada
+  // di lapangan, bukan cuma di kantor.
+  's3.amazonaws.com',
 ];
 
-const DATA_HOSTS = ['api.open-meteo.com'];
+const DATA_HOSTS = ['api.open-meteo.com', 'overpass-api.de'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(

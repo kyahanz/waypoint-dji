@@ -23,9 +23,19 @@
               <span class="dot"></span>
               <div>
                 <h1>waypoint-dji</h1>
-                <p>Prototipe perencana survei · Mini 5 Pro</p>
+                <p>Prototipe perencana survei</p>
               </div>
             </div>
+
+            <div class="drone-bar">
+              <select id="drone" class="pick" aria-label="Pilih drone"></select>
+              <button id="btn-drone-info" class="icon-btn" title="Status profil drone">i</button>
+            </div>
+            <div class="row tight">
+              <select id="lens" class="pick" aria-label="Lensa"></select>
+              <select id="photo-mode" class="pick" aria-label="Resolusi foto"></select>
+            </div>
+            <div id="enum-badge" class="enum-badge" hidden></div>
 
             <div class="search">
               <input
@@ -83,15 +93,41 @@
             </div>
 
             <div class="field">
-              <div class="field-head">
-                <label for="gsd">Ketelitian (GSD)</label>
-                <output id="gsd-out">2.0 cm/px</output>
-              </div>
-              <input id="gsd" type="range" min="0.5" max="6" step="0.1" value="2" />
-              <p class="sub">
-                Ketinggian terbang <strong id="alt-derived">—</strong> · makin rendah
-                makin detail, tapi makin lama
+              <label class="block-label">Preset</label>
+              <div class="presets" id="presets"></div>
+              <p class="sub" id="preset-note">
+                Preset menyimpan ketelitian yang dituju, bukan ketinggian mati —
+                jadi artinya tetap sama waktu drone diganti.
               </p>
+            </div>
+
+            <div class="field">
+              <div class="field-head">
+                <label for="alt">Ketinggian</label>
+                <output id="alt-out">100 m</output>
+              </div>
+              <input id="alt" type="range" min="20" max="120" step="1" value="100" />
+              <p class="sub">
+                GSD <strong id="gsd-derived">—</strong> · makin rendah makin
+                detail, tapi makin lama
+              </p>
+            </div>
+
+            <div class="field">
+              <div class="field-head">
+                <label for="speed">Kecepatan</label>
+                <output id="speed-out">10 m/s</output>
+              </div>
+              <input id="speed" type="range" min="1" max="15" step="0.5" value="10" />
+              <label class="switch-row" for="speed-auto">
+                <input id="speed-auto" type="checkbox" checked />
+                <span class="switch-body">
+                  <span class="switch-label">Kecepatan otomatis</span>
+                  <span class="switch-note" id="speed-note">
+                    Dibatasi motion blur dan jeda jepret kamera.
+                  </span>
+                </span>
+              </label>
             </div>
 
             <div class="grid-2">
@@ -112,13 +148,17 @@
             </div>
 
             <div class="field">
-              <div class="field-head">
-                <label for="angle">Arah jalur</label>
-                <output id="angle-out">0°</output>
+              <label class="block-label">Pola terbang</label>
+              <div class="seg" id="pattern-seg">
+                <button class="seg-btn active" data-pattern="single">Peta datar</button>
+                <button class="seg-btn" data-pattern="cross">Silang</button>
+                <button class="seg-btn" data-pattern="crossOblique">Silang + miring</button>
               </div>
-              <input id="angle" type="range" min="0" max="179" step="1" value="0" />
-              <div class="row tight">
-                <button class="btn link" id="btn-auto-angle">Ikuti sisi terpanjang</button>
+              <p class="sub" id="pattern-hint">
+                Satu arah, kamera nunduk lurus. Untuk ortofoto dan ukur luas.
+              </p>
+              <div class="readout" id="pattern-cost" hidden>
+                <span>Biaya pola ini</span><strong id="pattern-cost-val">—</strong>
               </div>
             </div>
 
@@ -153,13 +193,107 @@
 
             <div class="field">
               <label class="block-label">Mode pemotretan</label>
-              <div class="seg">
+              <div class="seg" id="mode-seg">
                 <button class="seg-btn active" data-mode="continuous">Jalan terus</button>
                 <button class="seg-btn" data-mode="stopAndShoot">Stop &amp; shoot</button>
               </div>
               <p class="sub" id="mode-hint">
                 Drone menjepret tiap sekian meter tanpa berhenti. Lebih cepat.
               </p>
+            </div>
+
+            <details class="adv" id="adv">
+              <summary>Pengaturan lanjutan</summary>
+
+              <div class="field">
+                <div class="field-head">
+                  <label for="angle">Arah terbang (°, 0 = otomatis)</label>
+                  <output id="angle-out">otomatis</output>
+                </div>
+                <input id="angle" type="number" min="0" max="359" step="1" value="0" />
+                <div class="row tight">
+                  <button class="btn link" id="btn-auto-angle">Ikuti sisi terpanjang</button>
+                </div>
+                <p class="sub">
+                  0 berarti aplikasi memilih arah jalur paling sedikit, mengikuti
+                  sisi terpanjang lahan.
+                </p>
+              </div>
+
+              <div class="field">
+                <div class="field-head">
+                  <label for="gimbal">Gimbal pitch (°)</label>
+                  <output id="gimbal-out">-90°</output>
+                </div>
+                <input id="gimbal" type="range" min="-90" max="0" step="5" value="-90" />
+                <p class="sub">
+                  -90° nunduk lurus untuk ortofoto. -45° untuk menangkap dinding
+                  tegak pada model 3D.
+                </p>
+              </div>
+
+              <div class="field">
+                <label class="block-label" for="rc-lost">Sinyal hilang</label>
+                <select id="rc-lost" class="pick">
+                  <option value="goBack" selected>RTH — pulang sendiri</option>
+                  <option value="hover">Diam di tempat</option>
+                  <option value="landing">Mendarat di tempat</option>
+                </select>
+                <p class="sub">
+                  Kalau kendali hilang di luar jangkauan pandang, hanya RTH yang
+                  membawa drone pulang.
+                </p>
+              </div>
+
+              <div class="field">
+                <label class="block-label" for="finish">Setelah selesai</label>
+                <select id="finish" class="pick">
+                  <option value="goHome" selected>RTH — pulang sendiri</option>
+                  <option value="hover">Diam di titik terakhir</option>
+                  <option value="gotoFirstWaypoint">Balik ke waypoint pertama</option>
+                  <option value="autoLand">Mendarat di tempat</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <div class="field-head">
+                  <label for="safe-height">Ketinggian aman transit (m)</label>
+                  <output id="safe-height-out">20 m</output>
+                </div>
+                <input id="safe-height" type="range" min="10" max="120" step="5" value="20" />
+                <p class="sub">
+                  Ketinggian naik sebelum menyeberang ke titik mulai, dan ke
+                  titik lanjut saat ganti baterai.
+                </p>
+              </div>
+
+              <button id="btn-reset-adv" class="btn ghost wide">
+                Kembalikan ke setelan aman
+              </button>
+            </details>
+          </section>
+
+          <section class="step">
+            <div class="step-head">
+              <span class="num">↻</span>
+              <h2>Lanjutkan misi</h2>
+            </div>
+            <p class="hint">
+              Untuk misi yang terputus di tengah — angin, baterai turun duluan,
+              drone balik sendiri. Ganti baterai biasa tidak butuh ini: tiap
+              sortie sudah diexport sebagai file sendiri.
+            </p>
+            <div class="row tight split">
+              <button id="btn-resume-pick" class="btn">Pilih di peta</button>
+              <button id="btn-resume-gps" class="btn ghost">Pakai lokasi saya</button>
+            </div>
+            <div class="readout" id="resume-readout" hidden>
+              <span id="resume-status">—</span><strong id="resume-val">—</strong>
+            </div>
+            <div class="row tight">
+              <button id="btn-resume-clear" class="btn link" hidden>
+                Batalkan, terbangkan seluruh area
+              </button>
             </div>
           </section>
 
@@ -175,6 +309,24 @@
 
             <div id="sorties"></div>
             <div id="warnings"></div>
+
+            <div id="gate" class="gate" hidden>
+              <div class="gate-head">
+                <span class="ic">!</span>
+                <span id="gate-title">Rencana ini punya masalah keselamatan</span>
+              </div>
+              <p class="sub" id="gate-sub">
+                Yang merah di atas bisa membuat drone hilang atau file ditolak.
+                Tidak ada yang dibetulkan diam-diam — kalau kamu tetap mau
+                lanjut, centang di bawah.
+              </p>
+              <label class="switch-row" for="gate-ack">
+                <input id="gate-ack" type="checkbox" />
+                <span class="switch-body">
+                  <span class="switch-label">Saya sudah baca dan tetap lanjut</span>
+                </span>
+              </label>
+            </div>
 
             <button id="btn-export" class="btn primary wide" disabled>Export KMZ</button>
             <div class="row tight split">
@@ -258,6 +410,12 @@
           <button class="chip" id="chip-imagery" title="Sumber citra">⚙</button>
         </div>
 
+        <div id="view-switch" class="floating">
+          <button class="chip active" data-view="2d" title="Peta datar">2D</button>
+          <button class="chip" data-view="3d" title="Medan timbul">3D</button>
+          <button class="chip" data-view="3dobj" title="Medan + bangunan">Objek</button>
+        </div>
+
         <div id="legend" class="floating legend" hidden></div>
 
         <div id="map-help" class="floating help">
@@ -282,6 +440,27 @@
         </p>
         <div id="imagery-list" class="imagery-list"></div>
         <button id="btn-close-imagery" class="btn wide">Tutup</button>
+      </div>
+    </div>
+
+    <div id="drone-info" class="modal" hidden>
+      <div class="modal-card">
+        <h3 id="di-name">Profil drone</h3>
+        <div id="di-body"></div>
+        <h4>Kunci kode drone</h4>
+        <p class="sub">
+          Bikin satu waypoint mission apa saja di DJI Fly dengan drone ini,
+          export .kmz-nya dari HP, lalu pilih file itu di sini. Aplikasi akan
+          membaca kode asli dari dalam file dan memakainya seterusnya.
+        </p>
+        <input id="di-file" type="file" accept=".kmz,.kml,.wpml" />
+        <div id="di-import" class="note info" hidden>
+          <span class="ic">i</span><span id="di-import-text"></span>
+        </div>
+        <div class="row tight split">
+          <button id="btn-di-forget" class="btn ghost" hidden>Lupakan kode impor</button>
+          <button id="btn-close-di" class="btn">Tutup</button>
+        </div>
       </div>
     </div>
 
