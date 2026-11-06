@@ -275,11 +275,22 @@ export function evaluateSafety(plan, profile, o = {}) {
     );
   }
 
+  // Mode tanpa jeda belum pernah terlihat di file mana pun yang kita punya.
+  // Itu bukan berarti salah — cuma belum ada yang membuktikannya, dan
+  // pengguna berhak tahu mana jalur yang sudah ada contohnya.
+  if (!plan.stopAtEach) {
+    add(
+      'warn',
+      'no-hover-unproven',
+      'Mode tanpa jeda belum ada contoh nyatanya: baik file buatan DJI Fly maupun generator pihak ketiga selalu menaruh jeda di tiap titik. Kalau DJI Fly menolak file ini, coba dulu dengan jeda sebelum mengejar sebab lain.'
+    );
+  }
+
   if (plan.stopAtEach && plan.grid.photos > 150) {
     add(
       'info',
       'stop-slow',
-      `Stop & shoot untuk ${plan.grid.photos} foto makan waktu lama. Mode jalan terus jauh lebih cepat, dan biasanya masih cukup tajam.`
+      `${plan.grid.photos} foto dengan jeda di tiap titik makan waktu lama. Mode tanpa jeda lebih cepat, tapi bentuknya belum terbukti diterima.`
     );
   }
 

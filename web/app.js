@@ -101,7 +101,7 @@ const state = {
   buildingsError: null,
   polygon: [],
   home: null, // [lng, lat]
-  mode: 'continuous',
+  mode: 'stopAndShoot',
   plan: null,
   currentProjectId: null,
   showLabels: false,
@@ -897,15 +897,30 @@ els.terrain.onchange = () => {
  */
 const modeSegButtons = () => $('mode-seg').querySelectorAll('.seg-btn');
 
+/**
+ * Dua mode ini dulu soal CARA memotret: jepret per jarak vs berhenti tiap
+ * titik. Sejak perintah jepret-per-jarak dibuang — tidak ada satu pun contoh
+ * nyata yang memakainya, dan file yang memakainya ditolak DJI Fly — keduanya
+ * sama-sama menjepret di setiap titik.
+ *
+ * Yang tersisa sebagai pembeda cuma jedanya. Dan itu tetap pilihan yang nyata,
+ * jadi tidak dihapus: jeda menukar waktu dengan ketajaman.
+ */
+const HOVER_SEC = 1; // sama dengan contoh file yang terbukti bentuknya
+
+const MODE_HINT = {
+  stopAndShoot:
+    'Drone berhenti sebentar di tiap titik sebelum menjepret. Foto paling tajam, dan ini satu-satunya bentuk yang cocok dengan contoh file yang kita punya.',
+  continuous:
+    'Drone melintas tanpa berhenti, menjepret sambil jalan. Lebih cepat dan hemat baterai — tapi belum ada contoh nyata yang bentuknya begini, jadi belum tentu diterima DJI Fly.',
+};
+
 modeSegButtons().forEach((btn) => {
   btn.onclick = () => {
     modeSegButtons().forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     state.mode = btn.dataset.mode;
-    els.modeHint.textContent =
-      state.mode === 'continuous'
-        ? 'Drone menjepret tiap sekian meter tanpa berhenti. Lebih cepat.'
-        : 'Drone berhenti di tiap titik foto. Lebih tajam, tapi jauh lebih lama dan boros baterai.';
+    els.modeHint.textContent = MODE_HINT[state.mode];
     render();
   };
 });
@@ -1457,7 +1472,7 @@ function buildPlan() {
     if (!grid.waypoints.length) return null;
   }
 
-  const hoverPerPhoto = stopAtEach ? 2.5 : 0;
+  const hoverPerPhoto = stopAtEach ? HOVER_SEC : 0;
   const maxDist = maxDistanceFrom(homeXY, grid.waypoints);
 
   // Cadangan baterai harus menutup transit pergi-pulang ke titik terjauh,
@@ -2374,7 +2389,7 @@ function planWaypointsToMission(plan, sortie) {
       // Jeda sejenak hanya di mode stop & shoot. Di mode jalan terus drone
       // melintas sambil menjepret, dan itulah bedanya sekarang — bukan lagi
       // soal berapa waypoint yang ditulis.
-      hoverTime: plan.stopAtEach ? 2 : 0,
+      hoverTime: plan.stopAtEach ? HOVER_SEC : 0,
     };
   });
 }
