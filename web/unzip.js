@@ -99,8 +99,14 @@ export async function readEnumsFromKmz(fileOrBuffer) {
   return {
     droneEnumValue: Number(drone),
     droneSubEnumValue: Number(tag(xml, 'droneSubEnumValue') ?? 0),
-    payloadEnumValue: Number(tag(xml, 'payloadEnumValue') ?? drone),
-    payloadSubEnumValue: Number(tag(xml, 'payloadSubEnumValue') ?? 0),
+    // DJI Fly tidak menulis payloadInfo sama sekali. Kalau memang tidak ada,
+    // jangan mengarang nilainya — melaporkan "payload 68/0" dari file yang
+    // tidak memuatnya itu kebohongan kecil yang bikin orang mengejar hal
+    // yang tidak ada.
+    payloadEnumValue: tag(xml, 'payloadEnumValue') === null ? null : Number(tag(xml, 'payloadEnumValue')),
+    payloadSubEnumValue:
+      tag(xml, 'payloadSubEnumValue') === null ? null : Number(tag(xml, 'payloadSubEnumValue')),
+    hasPayloadInfo: tag(xml, 'payloadEnumValue') !== null,
     verified: true,
     confidence: 'verified',
     note: 'Dibaca dari file asli DJI Fly.',

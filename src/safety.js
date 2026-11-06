@@ -238,6 +238,17 @@ export function evaluateSafety(plan, profile, o = {}) {
     );
   }
 
+  // Temuan dari file asli DJI Fly: payloadInfo tidak pernah ditulis, jadi
+  // kode payload tidak menentukan apa pun untuk lini consumer. Disebut sekali
+  // supaya tidak ada yang mengejarnya sia-sia.
+  if (profile.dialect === 'djifly' && profile.enumConfidence !== 'verified') {
+    add(
+      'info',
+      'payload-unused',
+      'Kode payload tidak dipakai DJI Fly — file aslinya memang tidak memuat payloadInfo sama sekali. Yang menentukan cuma kode drone.'
+    );
+  }
+
   if (adv.finishAction && adv.finishAction !== 'goHome') {
     add(
       adv.finishAction === 'autoLand' ? 'bad' : 'warn',

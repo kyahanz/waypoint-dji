@@ -260,17 +260,37 @@ console.log('\nIsi file WPML');
   const kml = buildTemplateKml(mission, p);
   const wpml = buildWaylinesWpml(mission, p);
 
+  // Tag khas Enterprise TIDAK boleh muncul di dialek DJI Fly: file asli
+  // tidak memuatnya, dan tag asing ke parser yang menolak tanpa pesan error
+  // adalah cara tercepat bikin impor gagal tanpa ketahuan sebabnya.
+  for (const tag of ['payloadInfo', 'takeOffSecurityHeight', 'templateType', 'globalHeight']) {
+    ok(!kml.includes(`wpml:${tag}`) && !wpml.includes(`wpml:${tag}`), `tanpa ${tag}`);
+  }
+  ok(!kml.includes('<Placemark>'), 'template.kml tanpa Placemark, seperti file asli');
+  ok(kml.includes('<wpml:author>fly</wpml:author>'), 'author fly');
+  ok(wpml.includes('<wpml:distance>0</wpml:distance>'), 'distance 0, dihitung drone sendiri');
+
+  // Sejak template.kml jadi minimal, tiap tag harus diperiksa di berkas yang
+  // memang memuatnya — bukan di dua-duanya.
   for (const [label, want] of [
     ['finishAction goHome', '<wpml:finishAction>goHome</wpml:finishAction>'],
     ['executeRCLostAction goBack', '<wpml:executeRCLostAction>goBack</wpml:executeRCLostAction>'],
-    ['takeOffSecurityHeight 45', '<wpml:takeOffSecurityHeight>45</wpml:takeOffSecurityHeight>'],
-    ['gimbal -45', '<wpml:gimbalPitchRotateAngle>-45</wpml:gimbalPitchRotateAngle>'],
     ['enum drone hasil impor', '<wpml:droneEnumValue>77</wpml:droneEnumValue>'],
-    ['namespace ikut profil', 'xmlns:wpml="http://www.uav.com/wpmz/1.0.2"'],
-    ['enum payload hasil impor', '<wpml:payloadEnumValue>66</wpml:payloadEnumValue>'],
+    ['namespace DJI Fly', 'xmlns:wpml="http://www.uav.com/wpmz/1.0.2"'],
+  ]) {
+    ok(kml.includes(want) && wpml.includes(want), label);
+  }
+
+  for (const [label, want] of [
+    ['gimbal -45', '<wpml:gimbalPitchRotateAngle>-45</wpml:gimbalPitchRotateAngle>'],
+    ['gimbal dikunci tiap titik', '<wpml:waypointGimbalPitchAngle>-45</wpml:waypointGimbalPitchAngle>'],
+    ['belok mulus seperti DJI Fly', 'toPointAndStopWithContinuityCurvature'],
+    ['action group paralel', '<wpml:actionGroupMode>parallel</wpml:actionGroupMode>'],
+    ['useStraightLine 0', '<wpml:useStraightLine>0</wpml:useStraightLine>'],
+    ['poi index ikut ditulis', '<wpml:waypointHeadingPoiIndex>0</wpml:waypointHeadingPoiIndex>'],
     ['jepret per jarak', '<wpml:actionTriggerType>multipleDistance</wpml:actionTriggerType>'],
   ]) {
-    ok(kml.includes(want) && wpml.includes(want.replace('<wpml:takeOffSecurityHeight>45', '<wpml:takeOffSecurityHeight>45')), label);
+    ok(wpml.includes(want), label);
   }
 }
 

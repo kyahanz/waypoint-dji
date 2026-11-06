@@ -30,10 +30,38 @@ jadi tiap drone membawa tingkat kepercayaannya sendiri:
 | Dipinjam dari model selini | Belum pernah terlihat di model ini | kuning, diperingatkan |
 | Belum ada | Tidak ada dasarnya | merah, export ditahan |
 
-Ada satu hal lagi yang kemungkinan sama menentukannya: **namespace XML**. DJI
-Fly consumer memakai `http://www.uav.com/wpmz/1.0.2`, sedangkan `1.0.6` yang
-beredar di dokumentasi DJI itu untuk lini Enterprise. Aplikasi ini menulis
-yang pertama, dan nilainya ikut terkunci waktu kamu mengimpor KMZ asli.
+## Dua dialek WPML
+
+Ini temuan terpenting di repo ini, dan baru terbukti setelah satu KMZ asli
+buatan DJI Fly dibongkar dengan `npm run inspect`.
+
+Dokumentasi WPML yang dipublikasikan DJI itu untuk lini **Enterprise** (DJI
+Pilot 2, Cloud API). **DJI Fly menulis bentuk yang berbeda**, dan bedanya
+bukan kosmetik:
+
+| | DJI Fly (consumer) | Dokumentasi Enterprise |
+|---|---|---|
+| namespace | `uav.com/wpmz/1.0.2` | `dji.com/wpmz/1.0.6` |
+| `template.kml` | hanya author + waktu + missionConfig, **tanpa satu pun Placemark** | seluruh misi ditulis ulang di sini |
+| `payloadInfo` | tidak ditulis sama sekali | ada |
+| `takeOffSecurityHeight` | tidak ada | ada |
+| `waypointTurnMode` | `...WithContinuityCurvature` | `...WithDiscontinuityCurvature` |
+| `useStraightLine` | `0` | `1` |
+| `actionGroupMode` | `parallel`, actionId mulai 1 | `sequence`, mulai 0 |
+| `distance` / `duration` | ditulis `0`, drone menghitung sendiri | dihitung di file |
+
+Plus dua tag yang hanya ada di file DJI Fly: `waypointHeadingPoiIndex` dan
+`waypointGimbalHeadingParam`.
+
+Generator di repo ini sekarang mengikuti **bentuk DJI Fly**, bukan
+dokumentasi. Hasilnya nol selisih tag dengan file asli. Dialek Enterprise
+masih bisa dipakai lewat `wpml.dialect` di profil drone.
+
+Konsekuensi praktis: **kode payload tidak menentukan apa pun** di lini
+consumer — DJI Fly tidak pernah membacanya. Yang menentukan cuma kode drone.
+Dan setelan "ketinggian aman transit" di UI dimatikan, karena angkanya tidak
+pernah sampai ke drone; naik-aman sebelum transit diurus
+`flyToWaylineMode=safely` plus setelan RTH di drone sendiri.
 
 Kode drone yang salah bukan cuma bikin file ditolak — kemungkinan lebih buruk
 adalah file diterima tapi drone dianggap model lain, sehingga batas kecepatan
@@ -331,7 +359,11 @@ Jujur soal ini lebih berguna daripada daftar fitur:
   laporan orang lain, bukan dari file yang kita pegang. Sepuluh model lainnya
   meminjam nilai yang sama. Satu-satunya cara menaikkannya jadi pasti: export
   KMZ asli dari DJI Fly lalu impor di aplikasi.
-- **Namespace WPML** `uav.com/wpmz/1.0.2` juga dari satu laporan Mini 4 Pro.
+- **Aksi jepret otomatis** (`multipleDistance`) adalah satu-satunya bagian
+  yang belum bisa dicocokkan dengan file asli, karena misi contoh yang kita
+  punya tidak memakai aksi foto sama sekali. Bentuknya mengikuti dokumentasi
+  Enterprise, dibungkus gaya DJI Fly. Kalau drone terbang rapi tapi tidak
+  menjepret, inilah tersangkanya — jalan keluarnya mode stop & shoot.
 - **Batas 200 waypoint** di DJI Fly belum dikonfirmasi.
 - **Daya tahan baterai Lito X1** dan **dimensi piksel 100 MP Mavic 4 Pro**
   diturunkan, bukan dari spec resmi. Keduanya ditandai di

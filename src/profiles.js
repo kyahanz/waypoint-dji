@@ -148,6 +148,13 @@ export function resolveProfile(registry, { droneId, lensId, modeId, enumOverride
     wpmlNamespace:
       enumOverride?.namespace ?? drone.wpml?.namespace ?? 'http://www.uav.com/wpmz/1.0.2',
     namespaceSource: enumOverride?.namespace ? 'impor' : 'bawaan',
+
+    /**
+     * Dialek file. 'djifly' mengikuti bentuk yang benar-benar ditulis DJI Fly
+     * (dibongkar dari file asli); 'enterprise' bentuk lama sesuai dokumentasi
+     * DJI Pilot 2. Semua drone di registry ini consumer, jadi djifly.
+     */
+    dialect: drone.wpml?.dialect ?? 'djifly',
   };
 }
 

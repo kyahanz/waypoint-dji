@@ -1038,9 +1038,11 @@ $('di-file').onchange = async (e) => {
     render();
 
     box.className = 'note ok';
-    text.textContent = `Terkunci: drone ${enums.droneEnumValue}/${enums.droneSubEnumValue}, payload ${enums.payloadEnumValue}/${enums.payloadSubEnumValue}${
-      enums.namespace ? ` · namespace ${enums.namespace}` : ''
-    }. Dipakai untuk semua export ${state.profile.name} mulai sekarang.`;
+    text.textContent = `Terkunci: kode drone ${enums.droneEnumValue}/${enums.droneSubEnumValue}${
+      enums.hasPayloadInfo
+        ? `, payload ${enums.payloadEnumValue}/${enums.payloadSubEnumValue}`
+        : ' (file ini tidak memuat payloadInfo — DJI Fly memang tidak memakainya)'
+    }${enums.namespace ? ` · namespace ${enums.namespace}` : ''}. Dipakai untuk semua export ${state.profile.name} mulai sekarang.`;
     $('btn-di-forget').hidden = false;
     toast(`Kode drone ${state.profile.name} terkunci dari file asli.`, 'ok', 6000);
   } catch (err) {
@@ -1806,7 +1808,15 @@ function updateDerived(plan) {
       ? `otomatis · ${plan.advanced.angleDeg}°`
       : 'otomatis';
   els.gimbalOut.textContent = `${state.advanced.gimbalPitch}°`;
-  els.safeHeightOut.textContent = `${state.advanced.safeHeightM} m`;
+
+  // DJI Fly tidak memakai takeOffSecurityHeight sama sekali — itu terbaca
+  // dari file aslinya. Jadi kontrolnya dimatikan, bukan dibiarkan terlihat
+  // berfungsi padahal angkanya tidak pernah sampai ke drone.
+  const usesSafeHeight = state.profile?.dialect === 'enterprise';
+  els.safeHeight.disabled = !usesSafeHeight;
+  els.safeHeightOut.textContent = usesSafeHeight
+    ? `${state.advanced.safeHeightM} m`
+    : 'diurus drone';
 
   const mult = Number(els.buffer.value);
   els.bufferOut.textContent = mult === 0 ? 'mati' : `${mult.toFixed(1)}× jalur`;
