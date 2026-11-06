@@ -1,3 +1,31 @@
+## Prioritas dua: apa yang sebenarnya diterima DJI Fly soal foto
+
+Bagian pemotretan adalah satu-satunya yang belum bisa dicocokkan dengan file
+asli, karena misi contoh yang ada tidak memakai aksi foto sama sekali.
+
+Bikin tiga file uji — bedanya HANYA di bagian pemotretan:
+
+```bash
+npm run probe -- <lat> <lng>
+```
+
+Lalu pindahkan ketiganya ke RC dan impor satu per satu. Urutannya penting:
+
+| File | Isi | Kalau ditolak artinya |
+|---|---|---|
+| A-kontrol-tanpa-foto | tanpa aksi foto | struktur dasarnya yang salah — B dan C tidak perlu diuji |
+| B-stopshoot-foto-per-titik | `takePhoto` + `hover` tiap titik | DJI Fly tidak menerima bentuk aksi foto kita |
+| C-interval-jepret-per-20m | `multipleDistance` sepanjang jalur | DJI Fly tidak punya jepret-interval |
+
+Catat untuk tiap file: **berhasil diimpor?** dan, kalau diterbangkan,
+**berapa foto yang benar-benar diambil?**
+
+A yang lolos tapi B/C ditolak adalah hasil yang bagus, bukan kegagalan: itu
+memberi tahu persis di mana batasnya, dan artinya mapping harus jalan lewat
+cara lain.
+
+---
+
 ## Prioritas satu: kunci kode drone
 
 Sebelum menguji apa pun yang lain, lakukan ini sekali per drone yang kamu

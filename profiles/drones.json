@@ -14,8 +14,6 @@
       "enums": {
         "droneEnumValue": 68,
         "droneSubEnumValue": 0,
-        "payloadEnumValue": 68,
-        "payloadSubEnumValue": 0,
         "confidence": "observed-family",
         "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
       },
@@ -70,8 +68,6 @@
       "enums": {
         "droneEnumValue": 68,
         "droneSubEnumValue": 0,
-        "payloadEnumValue": 68,
-        "payloadSubEnumValue": 0,
         "confidence": "observed-model",
         "note": "Dibaca dari KMZ buatan DJI Fly di Mini 4 Pro itu sendiri (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Ini satu-satunya model yang nilainya pernah terlihat langsung."
       },
@@ -126,8 +122,6 @@
       "enums": {
         "droneEnumValue": 68,
         "droneSubEnumValue": 0,
-        "payloadEnumValue": 68,
-        "payloadSubEnumValue": 0,
         "confidence": "observed-family",
         "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
       },
@@ -201,8 +195,6 @@
       "enums": {
         "droneEnumValue": 68,
         "droneSubEnumValue": 0,
-        "payloadEnumValue": 68,
-        "payloadSubEnumValue": 0,
         "confidence": "observed-family",
         "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
       },
@@ -259,8 +251,6 @@
       "enums": {
         "droneEnumValue": 68,
         "droneSubEnumValue": 0,
-        "payloadEnumValue": 68,
-        "payloadSubEnumValue": 0,
         "confidence": "observed-family",
         "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
       },
@@ -316,8 +306,6 @@
       "enums": {
         "droneEnumValue": 68,
         "droneSubEnumValue": 0,
-        "payloadEnumValue": 68,
-        "payloadSubEnumValue": 0,
         "confidence": "observed-family",
         "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
       },
@@ -397,8 +385,6 @@
       "enums": {
         "droneEnumValue": 68,
         "droneSubEnumValue": 0,
-        "payloadEnumValue": 68,
-        "payloadSubEnumValue": 0,
         "confidence": "observed-family",
         "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
       },
@@ -478,8 +464,6 @@
       "enums": {
         "droneEnumValue": 68,
         "droneSubEnumValue": 0,
-        "payloadEnumValue": 68,
-        "payloadSubEnumValue": 0,
         "confidence": "observed-family",
         "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
       },
@@ -526,8 +510,6 @@
       "enums": {
         "droneEnumValue": 68,
         "droneSubEnumValue": 0,
-        "payloadEnumValue": 68,
-        "payloadSubEnumValue": 0,
         "confidence": "observed-family",
         "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
       },
@@ -591,8 +573,6 @@
       "enums": {
         "droneEnumValue": 68,
         "droneSubEnumValue": 0,
-        "payloadEnumValue": 68,
-        "payloadSubEnumValue": 0,
         "confidence": "observed-family",
         "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
       },
@@ -681,8 +661,6 @@
       "enums": {
         "droneEnumValue": 68,
         "droneSubEnumValue": 0,
-        "payloadEnumValue": 68,
-        "payloadSubEnumValue": 0,
         "confidence": "observed-family",
         "note": "DJI Fly menulis 68/0 pada KMZ yang dia buat sendiri di Mini 4 Pro (laporan dev di dji-sdk/Mobile-SDK-Android-V5 isu 791). Forum MavicPilots melaporkan nilai yang sama dipakai untuk memperbaiki impor di Mavic 3 Pro. Belum ada bukti lini consumer memakai nilai berbeda per model — tapi juga belum ada yang membuktikan sebaliknya untuk model ini."
       },
@@ -779,6 +757,6 @@
       }
     }
   ],
-  "_catatanEnum": "Semua drone memakai 68/0. Itu BUKAN tebakan acak: itu satu-satunya nilai yang pernah terlihat keluar dari DJI Fly sendiri (di Mini 4 Pro), dan nilai yang sama dilaporkan memperbaiki impor di Mavic 3 Pro. Tingkat kepercayaan dibedakan lewat confidence: observed-model berarti pernah dilihat di model itu sendiri; observed-family berarti dipinjam dari model lain selini. Keduanya tetap kalah dari verified, yang hanya didapat dengan mengimpor KMZ asli dari drone kamu sendiri.",
+  "_catatanEnum": "Semua drone memakai 68/0. Itu BUKAN tebakan acak: itu satu-satunya nilai yang pernah terlihat keluar dari DJI Fly sendiri (di Mini 4 Pro), dan nilai yang sama dilaporkan memperbaiki impor di Mavic 3 Pro. Tingkat kepercayaan dibedakan lewat confidence: observed-model berarti pernah dilihat di model itu sendiri; observed-family berarti dipinjam dari model lain selini. Keduanya tetap kalah dari verified, yang hanya didapat dengan mengimpor KMZ asli dari drone kamu sendiri. Kode payload sengaja tidak disimpan: file asli DJI Fly tidak memuat payloadInfo sama sekali, jadi angka itu tidak menentukan apa pun di lini consumer.",
   "_catatanNamespace": "DJI Fly consumer memakai namespace http://www.uav.com/wpmz/1.0.2, bukan http://www.dji.com/wpmz/1.0.6 yang dipakai dokumentasi Cloud API lini Enterprise. Ini kemungkinan lebih menentukan diterima-tidaknya file daripada nilai enum itu sendiri."
 }

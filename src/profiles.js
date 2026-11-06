@@ -128,7 +128,12 @@ export function resolveProfile(registry, { droneId, lensId, modeId, enumOverride
 
     droneEnumValue: enums?.droneEnumValue ?? 0,
     droneSubEnumValue: enums?.droneSubEnumValue ?? 0,
-    payloadEnumValue: enums?.payloadEnumValue ?? 0,
+
+    // Kode payload cuma relevan untuk dialek Enterprise. DJI Fly tidak
+    // pernah menulis payloadInfo, jadi untuk lini consumer angka ini tidak
+    // menentukan apa pun — dan menyimpan angka yang tidak dipakai cuma bikin
+    // orang mengejar hal yang tidak ada.
+    payloadEnumValue: enums?.payloadEnumValue ?? enums?.droneEnumValue ?? 0,
     payloadSubEnumValue: enums?.payloadSubEnumValue ?? 0,
 
     enumConfidence: confidence,

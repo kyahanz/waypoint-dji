@@ -944,8 +944,7 @@ function openDroneInfo() {
     <div class="note ${tone}">
       <span class="ic">${tone === 'ok' ? '✓' : '!'}</span>
       <span><b>${esc(p.enumConfidenceInfo.label)}.</b>
-        Kode drone ${p.droneEnumValue}/${p.droneSubEnumValue}, payload
-        ${p.payloadEnumValue}/${p.payloadSubEnumValue}.
+        Kode drone ${p.droneEnumValue}/${p.droneSubEnumValue}.
         ${esc(p.enumNote ?? '')}</span>
     </div>
     <div class="note ${p.namespaceSource === 'impor' ? 'ok' : 'info'}">
@@ -981,8 +980,6 @@ function openDroneInfo() {
   // angka tidak diam-diam mengosongkan tiga lainnya.
   $('di-drone-enum').value = p.droneEnumValue;
   $('di-drone-sub').value = p.droneSubEnumValue;
-  $('di-payload-enum').value = p.payloadEnumValue;
-  $('di-payload-sub').value = p.payloadSubEnumValue;
   $('di-namespace').value = p.wpmlNamespace;
 
   $('btn-di-forget').hidden = !state.enumOverrides[state.droneId];
@@ -992,23 +989,16 @@ function openDroneInfo() {
 
 $('btn-di-save').onclick = () => {
   const num = (id) => Number($(id).value);
-  const values = [
-    num('di-drone-enum'),
-    num('di-drone-sub'),
-    num('di-payload-enum'),
-    num('di-payload-sub'),
-  ];
+  const values = [num('di-drone-enum'), num('di-drone-sub')];
 
   if (values.some((v) => !Number.isInteger(v) || v < 0)) {
-    toast('Keempat kode harus bilangan bulat tidak negatif.', 'err');
+    toast('Kedua kode harus bilangan bulat tidak negatif.', 'err');
     return;
   }
 
   state.enumOverrides = setEnumOverride(state.droneId, {
     droneEnumValue: values[0],
     droneSubEnumValue: values[1],
-    payloadEnumValue: values[2],
-    payloadSubEnumValue: values[3],
     namespace: $('di-namespace').value,
     verified: true,
     confidence: 'manual',
@@ -1038,11 +1028,7 @@ $('di-file').onchange = async (e) => {
     render();
 
     box.className = 'note ok';
-    text.textContent = `Terkunci: kode drone ${enums.droneEnumValue}/${enums.droneSubEnumValue}${
-      enums.hasPayloadInfo
-        ? `, payload ${enums.payloadEnumValue}/${enums.payloadSubEnumValue}`
-        : ' (file ini tidak memuat payloadInfo — DJI Fly memang tidak memakainya)'
-    }${enums.namespace ? ` · namespace ${enums.namespace}` : ''}. Dipakai untuk semua export ${state.profile.name} mulai sekarang.`;
+    text.textContent = `Terkunci: kode drone ${enums.droneEnumValue}/${enums.droneSubEnumValue}${enums.namespace ? ` · namespace ${enums.namespace}` : ''}. Dipakai untuk semua export ${state.profile.name} mulai sekarang.`;
     $('btn-di-forget').hidden = false;
     toast(`Kode drone ${state.profile.name} terkunci dari file asli.`, 'ok', 6000);
   } catch (err) {
