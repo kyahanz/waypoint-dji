@@ -137,7 +137,6 @@ function takePhotoAction(id, index) {
             <wpml:actionActuatorFunc>takePhoto</wpml:actionActuatorFunc>
             <wpml:actionActuatorFuncParam>
               <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>
-              <wpml:fileSuffix>wp${index}</wpml:fileSuffix>
             </wpml:actionActuatorFuncParam>
           </wpml:action>`;
 }
@@ -182,16 +181,28 @@ function intervalActionGroup(m, lastIndex, id) {
             <wpml:actionActuatorFunc>takePhoto</wpml:actionActuatorFunc>
             <wpml:actionActuatorFuncParam>
               <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>
-              <wpml:fileSuffix>seq</wpml:fileSuffix>
             </wpml:actionActuatorFuncParam>
           </wpml:action>
         </wpml:actionGroup>`;
 }
 
-function headingParam(wp, m) {
+/**
+ * Arah hadap drone.
+ *
+ * File asli DJI Fly memakai `followWayline` — drone menghadap ke arah
+ * jalurnya sendiri — dengan waypointHeadingAngleEnable 1 di titik pertama
+ * dan 0 setelahnya. Kami dulu menulis `smoothTransition` dengan sudut
+ * eksplisit tiap titik, gaya Enterprise, dan nilai itu tidak pernah muncul di
+ * file yang terbukti diterima.
+ *
+ * Untuk jalur bolak-balik, followWayline juga memang yang benar: arah hadap
+ * mengikuti jalur dengan sendirinya, tidak perlu disuapi sudut per titik.
+ */
+function headingParam(wp, m, i = 0) {
   const mode = wp.headingMode ?? m.headingMode;
   const angle = wp.heading ?? 0;
-  const enable = mode === 'smoothTransition' ? 1 : 0;
+  const enable =
+    mode === 'followWayline' ? (i === 0 ? 1 : 0) : mode === 'smoothTransition' ? 1 : 0;
 
   return `        <wpml:waypointHeadingParam>
           <wpml:waypointHeadingMode>${mode}</wpml:waypointHeadingMode>
@@ -257,7 +268,7 @@ function waylinePlacemark(wp, i, m, total) {
         <wpml:index>${i}</wpml:index>
         <wpml:executeHeight>${num(wp.height, 2)}</wpml:executeHeight>
         <wpml:waypointSpeed>${num(wp.speed ?? m.speed, 1)}</wpml:waypointSpeed>
-${headingParam(wp, m)}
+${headingParam(wp, m, i)}
 ${turnParam(m)}
         <wpml:useStraightLine>${m.useStraightLine}</wpml:useStraightLine>${groups.join('')}${gimbalHeading}
       </Placemark>`;

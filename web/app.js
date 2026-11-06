@@ -2360,7 +2360,10 @@ function planWaypointsToMission(plan, sortie) {
       height: w.height ?? plan.altitude,
       speed: plan.speed,
       heading: w.heading,
-      headingMode: 'smoothTransition',
+      // followWayline: arah hadap mengikuti jalur dengan sendirinya. Ini yang
+      // dipakai file asli DJI Fly, dan untuk jalur bolak-balik memang itu
+      // yang benar.
+      headingMode: 'followWayline',
       gimbalPitch: plan.gimbalPitch,
       takePhoto: plan.stopAtEach,
       hoverTime: plan.stopAtEach ? 2 : 0,

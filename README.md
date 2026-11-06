@@ -54,8 +54,21 @@ Plus dua tag yang hanya ada di file DJI Fly: `waypointHeadingPoiIndex` dan
 `waypointGimbalHeadingParam`.
 
 Generator di repo ini sekarang mengikuti **bentuk DJI Fly**, bukan
-dokumentasi. Hasilnya nol selisih tag dengan file asli. Dialek Enterprise
-masih bisa dipakai lewat `wpml.dialect` di profil drone.
+dokumentasi. Dialek Enterprise masih bisa dipakai lewat `wpml.dialect` di
+profil drone.
+
+Pembandingnya ikut disertakan, supaya klaim ini bisa diperiksa sendiri —
+bukan dipercaya begitu saja:
+
+```bash
+npm run compare -- file-asli-dji-fly.kmz file-bikinan-kita.kmz
+```
+
+Dia membandingkan tag **dan nilai**, lalu menandai apa saja yang kita tulis
+tapi tidak pernah muncul di file asli. Itu penting: tag yang sama dengan nilai
+asing sama berbahayanya dengan tag yang hilang. Contohnya `waypointHeadingMode`
+— tag-nya cocok, tapi kita dulu mengisi `smoothTransition` sementara DJI Fly
+cuma memakai `followWayline`. Ketahuan lewat alat ini, bukan lewat tebakan.
 
 Konsekuensi praktis: **kode payload tidak menentukan apa pun** di lini
 consumer — DJI Fly tidak pernah membacanya. Yang menentukan cuma kode drone.
@@ -359,7 +372,8 @@ Jujur soal ini lebih berguna daripada daftar fitur:
   laporan orang lain, bukan dari file yang kita pegang. Sepuluh model lainnya
   meminjam nilai yang sama. Satu-satunya cara menaikkannya jadi pasti: export
   KMZ asli dari DJI Fly lalu impor di aplikasi.
-- **Aksi jepret otomatis** (`multipleDistance`) adalah satu-satunya bagian
+- **Aksi foto dan hover** (`takePhoto`, `hover`, `multipleDistance`,
+  `actionTriggerParam`, `hoverTime`) adalah satu-satunya bagian
   yang belum bisa dicocokkan dengan file asli, karena misi contoh yang kita
   punya tidak memakai aksi foto sama sekali. Bentuknya mengikuti dokumentasi
   Enterprise, dibungkus gaya DJI Fly. Kalau drone terbang rapi tapi tidak

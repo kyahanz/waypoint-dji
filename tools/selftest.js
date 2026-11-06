@@ -239,8 +239,8 @@ console.log('\nIsi file WPML');
   const mission = {
     ...MISSION_DEFAULTS,
     waypoints: [
-      { lat: -6.25, lng: 107.12, height: 80, speed: 8, heading: 90, headingMode: 'smoothTransition', gimbalPitch: -45, takePhoto: false, hoverTime: 0 },
-      { lat: -6.251, lng: 107.121, height: 85, speed: 8, heading: 90, headingMode: 'smoothTransition', gimbalPitch: -45, takePhoto: false, hoverTime: 0 },
+      { lat: -6.25, lng: 107.12, height: 80, speed: 8, heading: 90, headingMode: 'followWayline', gimbalPitch: -45, takePhoto: false, hoverTime: 0 },
+      { lat: -6.251, lng: 107.121, height: 85, speed: 8, heading: 90, headingMode: 'followWayline', gimbalPitch: -45, takePhoto: false, hoverTime: 0 },
     ],
     height: 80,
     speed: 8,
@@ -288,6 +288,7 @@ console.log('\nIsi file WPML');
     ['action group paralel', '<wpml:actionGroupMode>parallel</wpml:actionGroupMode>'],
     ['useStraightLine 0', '<wpml:useStraightLine>0</wpml:useStraightLine>'],
     ['poi index ikut ditulis', '<wpml:waypointHeadingPoiIndex>0</wpml:waypointHeadingPoiIndex>'],
+    ['arah hadap followWayline', '<wpml:waypointHeadingMode>followWayline</wpml:waypointHeadingMode>'],
     ['jepret per jarak', '<wpml:actionTriggerType>multipleDistance</wpml:actionTriggerType>'],
   ]) {
     ok(wpml.includes(want), label);

@@ -7,6 +7,7 @@
   "scripts": {
     "gen": "node src/cli.js",
     "inspect": "node src/inspect.js",
+    "compare": "node tools/compare.js",
     "drones": "node src/cli.js --drones",
     "dev": "node tools/devserver.js 5180",
     "test": "node tools/selftest.js",
