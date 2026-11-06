@@ -73,7 +73,13 @@ export function createZip(entries, opts = {}) {
     const lv = new DataView(lh.buffer);
     lv.setUint32(0, 0x04034b50, true);
     lv.setUint16(4, 20, true); // version needed
-    lv.setUint16(6, 0x0800, true); // flag: nama file UTF-8
+    // Penanda "nama file UTF-8" hanya dipasang kalau namanya memang di luar
+    // ASCII. Arsip buatan DJI Fly memakai flag 0, dan pembaca ZIP buatan
+    // sendiri — seperti yang kemungkinan dipakai DJI Fly — kadang rewel pada
+    // flag yang tidak dia harapkan. Nama di dalam KMZ selalu ASCII, jadi
+    // tidak ada yang hilang.
+    const needsUtf8 = nameBytes.some((b) => b > 0x7f);
+    lv.setUint16(6, needsUtf8 ? 0x0800 : 0, true);
     lv.setUint16(8, method, true);
     lv.setUint16(10, dosTime, true);
     lv.setUint16(12, dosDate, true);
@@ -89,7 +95,7 @@ export function createZip(entries, opts = {}) {
     cv.setUint32(0, 0x02014b50, true);
     cv.setUint16(4, 20, true); // version made by
     cv.setUint16(6, 20, true); // version needed
-    cv.setUint16(8, 0x0800, true);
+    cv.setUint16(8, needsUtf8 ? 0x0800 : 0, true);
     cv.setUint16(10, method, true);
     cv.setUint16(12, dosTime, true);
     cv.setUint16(14, dosDate, true);

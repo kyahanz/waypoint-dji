@@ -76,7 +76,6 @@ const build = (name, waypoints, extra = {}) => {
   };
 
   const bytes = createZip([
-    { name: 'wpmz/', dir: true },
     { name: 'wpmz/template.kml', data: buildTemplateKml(mission, profile) },
     { name: 'wpmz/waylines.wpml', data: buildWaylinesWpml(mission, profile) },
   ]);

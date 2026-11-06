@@ -12,8 +12,9 @@ import { buildTemplateKml, buildWaylinesWpml, MISSION_DEFAULTS } from '../src/wp
  */
 export function buildKmz(mission, profile) {
   const full = { ...MISSION_DEFAULTS, ...mission };
+  // Tanpa entri folder 'wpmz/': arsip buatan DJI Fly tidak memuatnya, dan
+  // tujuan di sini semirip mungkin dengannya.
   return createZip([
-    { name: 'wpmz/', dir: true },
     { name: 'wpmz/template.kml', data: buildTemplateKml(full, profile) },
     { name: 'wpmz/waylines.wpml', data: buildWaylinesWpml(full, profile) },
   ]);

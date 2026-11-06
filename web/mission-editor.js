@@ -346,7 +346,8 @@ export function createMissionEditor({ map, toast, $, onModeChange }) {
       const template = state.template ? writeMissionConfig(state.template, patch) : null;
 
       // Berkas lain di dalam arsip — apa pun itu — ikut disalin apa adanya.
-      const entries = [{ name: 'wpmz/', dir: true }];
+      // Daftar entri meniru arsip aslinya, termasuk tidak adanya entri folder.
+      const entries = [];
       for (const [name, bytes] of Object.entries(state.files)) {
         if (name === state.keys.wayKey) entries.push({ name, data: waylines });
         else if (name === state.keys.tplKey && template) entries.push({ name, data: template });
