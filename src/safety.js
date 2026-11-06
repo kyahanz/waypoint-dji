@@ -107,6 +107,20 @@ export function evaluateSafety(plan, profile, o = {}) {
     );
   }
 
+  // Tidak ada satu pun contoh file nyata yang memuat tag resolusi foto —
+  // baik buatan DJI Fly maupun generator pihak ketiga. Artinya resolusi
+  // ditentukan setelan di DJI Fly, bukan oleh file ini. Pilihan MP di sini
+  // cuma dipakai untuk hitungan; kalau tidak dicocokkan, ketelitian yang
+  // dijanjikan di layar bukan ketelitian yang kamu dapat.
+  {
+    const mb = plan.grid.photos * (profile.mode.approxPhotoMB ?? 8);
+    add(
+      'warn',
+      'photo-mode-manual',
+      `Resolusi foto tidak ikut masuk file — setel sendiri di DJI Fly ke ${profile.mode.label} supaya cocok dengan hitungan di sini. Kalau drone menembak resolusi lain, ketelitian ${plan.params.gsd.toFixed(2)} cm/px di layar tidak berlaku. Perkiraan ruang kartu: ${mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : Math.round(mb) + ' MB'} untuk ${plan.grid.photos} foto JPEG; RAW jauh lebih besar.`
+    );
+  }
+
   if (profile.mode.binned === true && plan.params.gsd < 1.5) {
     add(
       'info',

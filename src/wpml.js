@@ -90,7 +90,7 @@ function missionConfig(m, p) {
       <wpml:finishAction>${m.finishAction}</wpml:finishAction>
       <wpml:exitOnRCLost>${m.exitOnRCLost}</wpml:exitOnRCLost>
       <wpml:executeRCLostAction>${m.executeRCLostAction}</wpml:executeRCLostAction>${takeOff}
-      <wpml:globalTransitionalSpeed>${num(m.transitionalSpeed, 1)}</wpml:globalTransitionalSpeed>${rthHeight}
+      <wpml:globalTransitionalSpeed>${num(m.transitionalSpeed ?? m.speed, 1)}</wpml:globalTransitionalSpeed>${rthHeight}
       <wpml:droneInfo>
         <wpml:droneEnumValue>${p.droneEnumValue}</wpml:droneEnumValue>
         <wpml:droneSubEnumValue>${p.droneSubEnumValue}</wpml:droneSubEnumValue>
@@ -418,7 +418,12 @@ export const MISSION_DEFAULTS = {
   executeRCLostAction: 'goBack', // goBack | landing | hover
   takeOffSecurityHeight: 20, // naik ke sini dulu sebelum menuju titik awal
   rthHeight: 100, // ketinggian pulang otomatis
-  transitionalSpeed: 2.5, // m/s menuju waypoint pertama
+  // Kecepatan menuju waypoint pertama. Dibiarkan kosong supaya mengikuti
+  // kecepatan misi: kedua file acuan — buatan DJI Fly dan buatan generator
+  // pihak ketiga — selalu menyamakan keduanya. Sebelumnya angka ini terpaku
+  // 2.5 sementara kecepatan rencana bisa 7.6, dan itulah yang terbaca
+  // sebagai "kecepatan tidak kepakai" di lapangan.
+  transitionalSpeed: null,
   headingMode: 'followWayline', // followWayline | manually | fixed | smoothTransition
   turnMode: 'toPointAndPassWithContinuityCurvature',
   turnDampingDist: 0,

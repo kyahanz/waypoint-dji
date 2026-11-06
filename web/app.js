@@ -1945,6 +1945,10 @@ function renderStats(plan) {
       <span class="v">${plan.grid.photos}</span>
     </div>
     <div class="stat">
+      <span class="k">Ruang kartu</span>
+      <span class="v">${fmtSize(plan.grid.photos * (state.profile.mode.approxPhotoMB ?? 8))}</span>
+    </div>
+    <div class="stat">
       <span class="k">Kecepatan</span>
       <span class="v">${plan.speed.toFixed(1)}<small>m/s</small></span>
     </div>
@@ -2229,6 +2233,11 @@ const esc = (s) =>
 function fmtArea(m2) {
   const ha = m2 / 10000;
   return ha >= 1 ? `${ha.toFixed(2)} ha` : `${m2.toFixed(0)} m²`;
+}
+
+/** Perkiraan ruang kartu. Kasar, dan memang cuma untuk ancang-ancang. */
+function fmtSize(mb) {
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)}<small>GB</small>` : `${Math.round(mb)}<small>MB</small>`;
 }
 
 function fmtDur(sec) {
