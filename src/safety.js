@@ -150,7 +150,7 @@ export function evaluateSafety(plan, profile, o = {}) {
 
   // ---- Pola terbang ----
 
-  if (plan.pattern !== 'single') {
+  if (plan.pattern !== 'single' && plan.pattern !== 'orbit') {
     add(
       'info',
       'pattern-cost',
@@ -163,6 +163,124 @@ export function evaluateSafety(plan, profile, o = {}) {
       'info',
       'pattern-nadir',
       'Jalur menyilang dengan kamera nunduk lurus memperbaiki medan, tapi dinding tegak masih tipis terpotret. Untuk model bangunan, pakai silang + miring.'
+    );
+  }
+
+  // ---- Orbit: objek tegak ----
+  //
+  // Orbit memakai hampir semua pemeriksaan di atas, tapi punya cara gagalnya
+  // sendiri — dan hampir semuanya tidak kelihatan di angka ringkasan.
+  const orb = plan.orbit;
+  if (plan.pattern === 'orbit' && orb) {
+    const low = orb.rings[0];
+    const high = orb.rings[orb.rings.length - 1];
+
+    // Arah hadap per titik: inti dari orbit, dan justru bagian yang paling
+    // tidak punya contoh nyata. Pengguna berhak tahu ini jalur yang belum
+    // terbukti, bukan menemukannya sendiri di lapangan.
+    add(
+      'warn',
+      'orbit-heading-unproven',
+      `Orbit butuh arah hadap sendiri di tiap titik (${plan.orbitHeadingMode === 'towardPOI' ? 'towardPOI' : 'smoothTransition'}), dan bentuk itu belum pernah terlihat di file yang terbukti diterima DJI Fly — semua contoh yang kita punya memakai followWayline. Kalau drone mengelilingi tugu tapi kameranya tidak menghadap ke dalam, inilah tersangkanya; coba mode satunya sebelum mengejar sebab lain.`
+    );
+
+    // Cincin terbawah sengaja rendah — di situlah dinding bawah tugu. Tapi
+    // "sengaja" bukan berarti aman.
+    const floorM = lim.takeOffSecurityHeightM ?? 20;
+    if (low.heightM < 8) {
+      add(
+        'bad',
+        'orbit-ring-too-low',
+        `Cincin terbawah cuma ${low.heightM.toFixed(1)} m — drone mengelilingi tugu di ketinggian pohon, tiang lampu, dan kabel. Sensor rintangan tidak bisa diandalkan untuk benda tipis seperti kabel atau ranting. Naikkan sudut terkecil, atau terbangkan cincin ini manual sambil dilihat.`
+      );
+    } else if (low.heightM < floorM) {
+      add(
+        'warn',
+        'orbit-ring-low',
+        `Cincin terbawah ${low.heightM.toFixed(1)} m, di bawah ketinggian aman lepas landas (${floorM} m). Pastikan lingkaran selebar ${(2 * orb.radiusM).toFixed(0)} m di sekeliling tugu benar-benar kosong di ketinggian itu — termasuk pohon dan kabel.`
+      );
+    }
+
+    // Cincin yang dinaikkan ke lantai ketinggian. Pitch-nya jadi lebih curam
+    // dari yang diminta, dan pengguna harus tahu kenapa — kalau tidak, angka
+    // di tabel terlihat seperti setelannya tidak dipakai.
+    const raised = orb.rings.filter((r) => r.raisedToFloor);
+    if (raised.length) {
+      add(
+        'info',
+        'orbit-ring-raised',
+        `${raised.length === 1 ? 'Cincin terbawah' : `${raised.length} cincin terbawah`} dinaikkan ke lantai ketinggian supaya tidak mengelilingi objek di ketinggian pohon dan kabel. Titik bidiknya tidak digeser — drone naik dan kameranya menunduk lebih curam (${raised.map((r) => r.pitchDeg + '°').join(', ')}), jadi pita bawah objek tetap terpotret.`
+      );
+    }
+
+    // Jarak ke objek. Sensor rintangan DJI mengukur ke benda besar dan
+    // bertekstur; tugu yang ramping di latar langit sering tidak terbaca.
+    if (orb.radiusM < 10) {
+      add(
+        'bad',
+        'orbit-too-close',
+        `Radius orbit ${orb.radiusM.toFixed(0)} m terlalu dekat. Di jarak ini kesalahan GPS beberapa meter saja sudah cukup untuk menabrak, dan sensor rintangan sering tidak melihat struktur ramping dengan langit di belakangnya. Minimal 12-15 m untuk tugu.`
+      );
+    } else if (orb.radiusM < 15) {
+      add(
+        'warn',
+        'orbit-close',
+        `Radius ${orb.radiusM.toFixed(0)} m cukup dekat. GSD-nya bagus, tapi sisakan ruang untuk hanyutan GPS dan angin — dan jangan terbangkan ini kalau anginnya kencang.`
+      );
+    }
+
+    // Kaki tugu: bagian yang drone memang tidak bisa ambil dengan benar.
+    const gapM = low.aimHeightM;
+    if (gapM > 1) {
+      add(
+        'info',
+        'orbit-base-gap',
+        `Cincin terbawah membidik ketinggian ${gapM.toFixed(1)} m di tugu, jadi bagian 0-${gapM.toFixed(1)} m — kaki dan alasnya — cuma kena serempet. Itu memang batas drone, bukan salah setelan: keliling dengan kamera tangan atau HP untuk bagian itu, 40-60 foto, lalu gabungkan di software yang sama.`
+      );
+    }
+
+    // Loncatan sudut: alasan model orbit gagal menyambung meski overlap
+    // frame-nya kelihatan sehat.
+    const worstStep = Math.max(...orb.rings.map((r) => r.angleStepDeg));
+    if (worstStep > 15) {
+      add(
+        'warn',
+        'orbit-angle-step',
+        `Antara dua foto berurutan, sudut pandang ke tugu meloncat ${worstStep.toFixed(0)}°. Di atas 15° software sering gagal mencocokkan dinding yang sama, berapa pun overlap frame-nya. Rapatkan langkah sudut.`
+      );
+    }
+
+    // GSD tidak seragam: cincin atas duduk lebih jauh dari dinding.
+    if (high.gsdCm > low.gsdCm * 1.6) {
+      add(
+        'warn',
+        'orbit-gsd-spread',
+        `Ketelitian tidak seragam: ${low.gsdCm.toFixed(2)} cm/px di cincin bawah tapi ${high.gsdCm.toFixed(2)} cm/px di cincin atas, karena cincin yang curam duduk lebih jauh dari dinding. Puncak tugu akan terlihat lebih kasar dari kakinya. Turunkan sudut terbesar, atau rapatkan radius.`
+      );
+    }
+
+    if (!orb.cap) {
+      add(
+        'info',
+        'orbit-no-cap',
+        'Petak nadir di atas dimatikan. Puncak tugu dan tanah di sekelilingnya tidak akan terpotret — dan tanah itulah yang biasanya mengikat skala seluruh model.'
+      );
+    }
+
+    // Ikut kontur dinyalakan tapi tidak berlaku di orbit. Mematikannya
+    // diam-diam sama saja menyembunyikan bahwa centangan itu tidak berefek.
+    if (plan.terrainRequested) {
+      add(
+        'info',
+        'orbit-terrain-na',
+        'Ikut kontur tanah tidak dipakai di orbit: ketinggian tiap cincin diturunkan dari sudut bidik ke objek, bukan dari permukaan di bawah drone. Centangannya diabaikan untuk pola ini.'
+      );
+    }
+
+    add(
+      'info',
+      'orbit-ground-truth',
+      'Ukur satu jarak nyata di lapangan — lebar sisi alas, misalnya — lalu pakai sebagai acuan skala waktu mengolah. Tanpa itu model 3D-nya benar bentuknya tapi ukurannya mengambang.'
     );
   }
 
@@ -273,7 +391,9 @@ export function evaluateSafety(plan, profile, o = {}) {
   // ---- Buffer ----
 
   const overhead = plan.gridArea / plan.area - 1;
-  if (plan.bufferM > 0 && overhead > 0.6) {
+  if (plan.pattern === 'orbit') {
+    // Buffer itu konsep tepi lahan; orbit tidak punya tepi lahan.
+  } else if (plan.bufferM > 0 && overhead > 0.6) {
     add(
       'info',
       'buffer-cost',
@@ -281,7 +401,7 @@ export function evaluateSafety(plan, profile, o = {}) {
     );
   }
 
-  if (plan.bufferM === 0) {
+  if (plan.bufferM === 0 && plan.pattern !== 'orbit') {
     add(
       'info',
       'buffer-off',

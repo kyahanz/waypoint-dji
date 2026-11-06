@@ -9,6 +9,38 @@
  * tidak ada kaca buram, tidak ada gradien. Kalau ada yang menonjol, itu
  * karena memang penting, bukan karena dekorasi.
  */
+/* Tabel rencana tiap cincin orbit. Dibuat padat karena tempatnya di panel
+   setelan yang sempit, dan angkanya dibaca berdampingan — bukan dibaca satu
+   per satu. */
+.ring-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  margin: 0.4rem 0;
+}
+
+.ring-table th,
+.ring-table td {
+  padding: 0.25rem 0.35rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ring-table th:first-child,
+.ring-table td:first-child {
+  text-align: left;
+}
+
+.ring-table thead th {
+  font-weight: 600;
+  opacity: 0.7;
+  border-bottom: 1px solid currentColor;
+}
+
+.ring-table tbody tr + tr td {
+  border-top: 1px solid rgba(128, 128, 128, 0.25);
+}
+
 :root {
   color-scheme: light;
 

@@ -290,10 +290,21 @@ export const PATTERNS = {
   single: { id: 'single', name: 'Peta datar', passes: 1, gimbalPitch: -90 },
   cross: { id: 'cross', name: 'Silang', passes: 2, gimbalPitch: -90 },
   crossOblique: { id: 'crossOblique', name: 'Silang + miring', passes: 2, gimbalPitch: -45 },
+  // Orbit tidak punya "lintasan" dan tidak punya satu sudut gimbal: tiap
+  // cincin punya pitch-nya sendiri. Dia ada di daftar ini supaya UI bisa
+  // menamainya seperti pola lain, tapi jalurnya dibuat generateOrbit —
+  // yang butuh profil kamera dan titik pusat, dua hal yang tidak dimiliki
+  // generatePattern.
+  orbit: { id: 'orbit', name: 'Orbit objek', passes: 0, gimbalPitch: -45, object: true },
 };
 
 export function generatePattern(polyXY, o) {
   const { pattern = 'single', angleDeg = 0, ...rest } = o;
+  if (PATTERNS[pattern]?.object) {
+    throw new Error(
+      `Pola "${pattern}" mengelilingi objek, bukan melintasi lahan — pakai generateOrbit(cam, centerXY, ...), bukan generatePattern().`
+    );
+  }
   const spec = PATTERNS[pattern] ?? PATTERNS.single;
   const angles = spec.passes === 1 ? [angleDeg] : [angleDeg, angleDeg + 90];
 
@@ -388,7 +399,11 @@ export function missionDuration(waypoints, o) {
     const a = waypoints[i - 1];
     const b = waypoints[i];
     const d = Math.hypot(b.xy[0] - a.xy[0], b.xy[1] - a.xy[1]);
-    const isTurn = !stopAtEach && a.heading !== b.heading;
+    // `arc` menandai titik di jalur melingkar: arah hadapnya memang berubah
+    // terus, tapi drone tidak pernah berhenti dan berbelok — dia memutar mulus
+    // sambil melaju. Tanpa pengecualian ini, orbit kena denda belokan di tiap
+    // titik dan estimasi waktunya jadi berlipat-lipat dari kenyataan.
+    const isTurn = !stopAtEach && !b.arc && a.heading !== b.heading;
     t += legTime(d, speed, accel, stopAtEach || isTurn);
     if (isTurn) t += turnPenalty(speed, accel);
   }
@@ -426,7 +441,7 @@ export function splitByBattery(waypoints, o) {
       const prev = current[current.length - 1];
       const d = Math.hypot(wp.xy[0] - prev.xy[0], wp.xy[1] - prev.xy[1]);
       // Pergantian arah hadap menandakan ujung jalur — di situ drone berbelok.
-      const isTurn = !stopAtEach && prev.heading !== wp.heading;
+      const isTurn = !stopAtEach && !wp.arc && prev.heading !== wp.heading;
       cost += legTime(d, speed, accel, stopAtEach || isTurn);
       if (isTurn) cost += turnPenalty(speed, accel);
     }
@@ -476,4 +491,303 @@ export function sortieSummary(sortie, homeXY, o) {
       return this.surveyS + this.transitS;
     },
   };
+}
+
+// ---------- Orbit: objek tegak ----------
+//
+// Pola grid di atas hanya cocok untuk permukaan yang terhampar: dia terbang
+// MELINTAS di atas lahan dengan kamera menunduk. Tugu, menara, patung, cerobong
+// — objek yang sempit tapi tinggi — informasinya ada di dinding vertikal, dan
+// dinding itu nyaris tidak pernah menghadap kamera yang menunduk dari atas.
+//
+// Yang dibutuhkan objek begitu adalah MENGELILINGI: drone memutari satu sumbu,
+// kamera selalu menghadap ke dalam, diulang di beberapa tingkat ketinggian.
+// Tiap cincin membidik pita ketinggian yang berbeda di objek, dari dekat kaki
+// sampai dekat puncak.
+//
+// Dua hal yang berubah mendasar dibanding grid, dan keduanya sumber kesalahan
+// kalau diabaikan:
+//
+//   1. GSD tidak lagi ditentukan ketinggian terbang, melainkan JARAK MIRING
+//      dari kamera ke permukaan objek. Cincin yang tinggi dan curam duduk
+//      lebih jauh dari dinding daripada angka radiusnya, jadi GSD-nya lebih
+//      kasar meski radius orbitnya sama.
+//
+//   2. Arah hadap drone tidak bisa followWayline. Di grid, menghadap arah
+//      jalur itu persis yang benar. Di orbit, menghadap arah jalur berarti
+//      kamera menyorot tangensial — objeknya lewat di pinggir frame, bukan di
+//      tengah. Tiap titik butuh sudut hadapnya sendiri.
+
+const DEG = Math.PI / 180;
+
+export const ORBIT_DEFAULTS = {
+  rings: 4,
+  overlap: 0.8,
+  // Langkah sudut: inilah yang sebenarnya menentukan kerapatan di orbit.
+  // 10 derajat = 36 foto per cincin, angka yang lazim dipakai orang memindai
+  // patung dan menara.
+  maxAngleStepDeg: 10,
+  aimLowFrac: 0.15,
+  aimHighFrac: 0.9,
+  minPitchDeg: 5,
+  maxPitchDeg: 45,
+  // Lantai ketinggian cincin. Pada objek pendek, sudut bidik yang hampir
+  // mendatar menaruh cincin terbawah di 4-5 m — ketinggian pohon, tiang
+  // lampu, dan kabel, tempat sensor rintangan paling tidak bisa diandalkan.
+  minRingHeightM: 8,
+  minPhotosPerRing: 12,
+  maxPhotosPerRing: 90,
+  cap: true,
+  capOverlap: 0.8,
+};
+
+/**
+ * Geometri satu cincin orbit.
+ *
+ * Drone duduk di ketinggian `height`, kamera dimiringkan `pitchDeg`, dan garis
+ * bidiknya memotong sumbu objek di ketinggian `aimHeightM`. Ketiganya saling
+ * terkunci — begitu pitch dan titik bidik dipilih, ketinggian drone tidak lagi
+ * bebas:
+ *
+ *     height = aimHeight + radius * tan(|pitch|)
+ *
+ * Tanpa kunci ini, cincin yang curam akan membidik langit di atas puncak tugu
+ * atau tanah di depan kakinya, dan tidak ada yang memberitahu di layar.
+ */
+export function orbitRing(cam, { radiusM, aimHeightM, pitchDeg, overlap = 0.8, minHeightM = 0 }) {
+  let rise = radiusM * Math.tan(Math.abs(pitchDeg) * DEG);
+  let height = aimHeightM + rise;
+  let pitch = pitchDeg;
+
+  // Lantai ketinggian. Yang dinaikkan drone-nya, BUKAN titik bidiknya: kalau
+  // titik bidik ikut naik, pita terbawah objek tidak pernah terpotret oleh
+  // cincin mana pun. Jadi drone naik dan kameranya menunduk lebih curam,
+  // tetap menatap pita yang sama.
+  if (height < minHeightM) {
+    height = minHeightM;
+    rise = height - aimHeightM;
+    pitch = -(Math.atan2(rise, radiusM) / DEG);
+  }
+
+  const slantM = Math.hypot(radiusM, rise);
+
+  const gsdCm = gsdFromAltitude(cam, slantM);
+  const fp = footprint(cam, slantM);
+
+  // Lebar frame menyapu mendatar sepanjang keliling, jadi yang menentukan
+  // jarak antar jepretan adalah sisi lebar foto — bukan sisi tingginya.
+  const stepM = fp.w * (1 - overlap);
+
+  return {
+    radiusM,
+    aimHeightM,
+    pitchDeg: pitch,
+    raisedToFloor: pitch !== pitchDeg,
+    rise,
+    height,
+    slantM,
+    gsdCm,
+    footprint: fp,
+    stepM,
+  };
+}
+
+/**
+ * Jalur orbit bertingkat mengelilingi satu titik.
+ *
+ * @param {object} cam profil kamera (lihat cameraOf)
+ * @param {[number,number]} centerXY sumbu objek dalam meter
+ * @param {object} o
+ * @param {number} o.radiusM jarak mendatar drone ke sumbu objek
+ * @param {number} o.objectHeightM tinggi objek dari dasar
+ * @param {number} o.rings jumlah cincin
+ * @param {number} o.overlap overlap antar foto berurutan dalam satu cincin
+ * @param {boolean} o.cap tambahkan petak nadir di atas untuk puncak dan tanah
+ */
+export function generateOrbit(cam, centerXY, o) {
+  const {
+    radiusM,
+    objectHeightM,
+    rings = ORBIT_DEFAULTS.rings,
+    overlap = ORBIT_DEFAULTS.overlap,
+    aimLowFrac = ORBIT_DEFAULTS.aimLowFrac,
+    aimHighFrac = ORBIT_DEFAULTS.aimHighFrac,
+    minPitchDeg = ORBIT_DEFAULTS.minPitchDeg,
+    maxPitchDeg = ORBIT_DEFAULTS.maxPitchDeg,
+    minRingHeightM = ORBIT_DEFAULTS.minRingHeightM,
+    maxAngleStepDeg = ORBIT_DEFAULTS.maxAngleStepDeg,
+    minPhotosPerRing = ORBIT_DEFAULTS.minPhotosPerRing,
+    maxPhotosPerRing = ORBIT_DEFAULTS.maxPhotosPerRing,
+    cap = ORBIT_DEFAULTS.cap,
+    capOverlap = ORBIT_DEFAULTS.capOverlap,
+  } = o;
+
+  const waypoints = [];
+  const ringInfo = [];
+  const circles = [];
+  let photos = 0;
+
+  for (let i = 0; i < rings; i++) {
+    const t = rings === 1 ? 0.5 : i / (rings - 1);
+    const aimHeightM = objectHeightM * (aimLowFrac + (aimHighFrac - aimLowFrac) * t);
+    const pitchDeg = -(minPitchDeg + (maxPitchDeg - minPitchDeg) * t);
+
+    const g = orbitRing(cam, {
+      radiusM,
+      aimHeightM,
+      pitchDeg,
+      overlap,
+      minHeightM: minRingHeightM,
+    });
+
+    const circumference = 2 * Math.PI * radiusM;
+
+    // Dua batas, dan yang mengikat hampir selalu yang kedua.
+    //
+    // Pertama, overlap frame: foto berikutnya harus masih bertampalan dengan
+    // yang sebelumnya. Ini batas yang sama seperti di grid.
+    //
+    // Kedua — dan ini yang sering terlewat — SUDUT PANDANG. Begitu drone
+    // bergeser sejauh s di keliling, sudut dia memandang objek berubah s/R
+    // radian. Kalau perubahan sudut itu terlalu besar, dinding yang sama
+    // terlihat terlalu berbeda di dua foto berurutan dan software tidak bisa
+    // mencocokkannya, berapa pun overlap frame-nya.
+    //
+    // Di objek sempit, frame jauh lebih lebar daripada objeknya: pada radius
+    // 18 m frame-nya 27 m sementara tugunya cuma 5 m. Overlap frame 80% di
+    // situ cuma menghasilkan 21 foto per cincin dengan loncatan sudut 17
+    // derajat — angka di layar kelihatan sehat, hasilnya tetap gagal
+    // menyambung. Jadi batas sudutlah yang dipegang.
+    const byOverlap = Math.ceil(circumference / g.stepM);
+    const byAngle = Math.ceil(360 / maxAngleStepDeg);
+    const count = Math.min(
+      maxPhotosPerRing,
+      Math.max(minPhotosPerRing, byOverlap, byAngle)
+    );
+
+    const ringPts = [];
+    for (let k = 0; k < count; k++) {
+      const ang = (2 * Math.PI * k) / count; // 0 = utara dari pusat
+      const xy = [
+        centerXY[0] + radiusM * Math.sin(ang),
+        centerXY[1] + radiusM * Math.cos(ang),
+      ];
+      // Menghadap ke dalam: kebalikan dari arah pusat ke drone.
+      const heading = (ang / DEG + 180) % 360;
+
+      ringPts.push(xy);
+      waypoints.push({
+        xy,
+        heading,
+        height: g.height,
+        gimbalPitch: Number(g.pitchDeg.toFixed(1)),
+        takePhoto: true,
+        photos: 1,
+        ring: i,
+        // Dipakai estimasi waktu: di orbit arah hadap berubah di SETIAP titik,
+        // dan itu bukan belokan — drone memutar mulus sambil melaju. Tanpa
+        // penanda ini, tiap titik kena denda belokan dan estimasinya meledak.
+        arc: true,
+        poi: true,
+      });
+    }
+
+    photos += count;
+    circles.push(ringPts);
+    ringInfo.push({
+      index: i,
+      photos: count,
+      heightM: g.height,
+      aimHeightM: g.aimHeightM,
+      pitchDeg: Number(g.pitchDeg.toFixed(1)),
+      raisedToFloor: g.raisedToFloor,
+      slantM: g.slantM,
+      gsdCm: g.gsdCm,
+      stepM: g.stepM,
+      spacingM: circumference / count,
+      angleStepDeg: 360 / count,
+      overlapActual: 1 - circumference / count / g.footprint.w,
+      limitedBy: byAngle >= byOverlap ? 'sudut' : 'overlap',
+    });
+  }
+
+  // Petak nadir di atas: puncak objek dan tanah di sekelilingnya. Dua-duanya
+  // tidak pernah tertangkap cincin yang membidik mendatar, dan tanah itulah
+  // yang mengikat skala seluruh model.
+  let capInfo = null;
+  if (cap) {
+    const capHeight = objectHeightM + radiusM;
+    const capGsd = gsdFromAltitude(cam, capHeight);
+    const fp = footprint(cam, capHeight);
+    const half = radiusM;
+    const square = [
+      [centerXY[0] - half, centerXY[1] - half],
+      [centerXY[0] + half, centerXY[1] - half],
+      [centerXY[0] + half, centerXY[1] + half],
+      [centerXY[0] - half, centerXY[1] + half],
+    ];
+
+    const grid = generateGrid(square, {
+      angleDeg: 0,
+      sideSpacing: fp.w * (1 - capOverlap),
+      frontSpacing: fp.h * (1 - capOverlap),
+      mode: 'stopAndShoot',
+    });
+
+    for (const w of grid.waypoints) {
+      w.height = capHeight;
+      w.gimbalPitch = -90;
+      w.ring = 'cap';
+    }
+
+    waypoints.push(...grid.waypoints);
+    photos += grid.photos;
+    capInfo = {
+      heightM: capHeight,
+      gsdCm: capGsd,
+      photos: grid.photos,
+      sideM: 2 * half,
+      lines: grid.lines,
+    };
+  }
+
+  const gsds = ringInfo.map((r) => r.gsdCm);
+
+  return {
+    waypoints,
+    photos,
+    rings: ringInfo,
+    circles,
+    cap: capInfo,
+    centerXY,
+    radiusM,
+    objectHeightM,
+    gsdBestCm: Math.min(...gsds),
+    gsdWorstCm: Math.max(...gsds),
+    // Bentuknya disamakan dengan generatePattern supaya pemanggil (plan,
+    // safety, export) tidak perlu bercabang di mana-mana.
+    lines: circles.map((c) => [...c, c[0]]),
+    pattern: 'orbit',
+    passes: ringInfo.map((r) => ({
+      index: r.index,
+      angleDeg: 0,
+      photos: r.photos,
+      waypoints: r.photos,
+      lines: [],
+    })),
+    gimbalPitch: ringInfo.length ? ringInfo[0].pitchDeg : -45,
+  };
+}
+
+/**
+ * Radius orbit yang dibutuhkan untuk mencapai GSD tertentu di dinding objek.
+ *
+ * Dipakai terbalik dari grid: di sana pengguna memilih GSD lalu kami hitung
+ * ketinggian; di sini pengguna memilih GSD lalu kami hitung jarak. Yang
+ * dihitung jarak MIRING, lalu diproyeksikan balik jadi radius mendatar pada
+ * sudut pitch tertentu.
+ */
+export function orbitRadiusForGsd(cam, gsdCm, pitchDeg = 20) {
+  const slant = altitudeFromGsd(cam, gsdCm);
+  return slant * Math.cos(Math.abs(pitchDeg) * DEG);
 }

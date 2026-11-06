@@ -1,7 +1,7 @@
 # waypoint-dji
 
-Mission planner untuk drone DJI consumer (Mini, Air, Mavic, Lito) — fokus
-mapping / ortofoto.
+Mission planner untuk drone DJI consumer (Mini, Air, Mavic, Lito) — memetakan
+lahan dari atas, dan mengelilingi objek tegak.
 
 **Status: prototipe.** Ada web app (`web/`) dan CLI (`src/cli.js`). Yang masih
 terbuka tetap pertanyaan yang sama sejak awal: apakah file yang kita bikin
@@ -132,6 +132,13 @@ Generate mission test (3 waypoint melingkar di sekitar satu titik):
 
 ```bash
 npm run gen -- --lat -6.2549323363466 --lng 107.11993938381485 --alt 30 --radius 40 --points 3 --photo --hover 2 --gimbal -90
+```
+
+Orbit mengelilingi objek tegak — tugu setinggi 20 m, drone berputar 18 m dari
+sumbunya:
+
+```bash
+npm run gen -- --lat -6.2549323363466 --lng 107.11993938381485 --orbit --objheight 20 --radius 18
 ```
 
 Lihat semua opsi:
@@ -352,8 +359,9 @@ selalu siap ambil alih manual saat menerbangkannya.
 - **Preset Cepat / Standar / Detail** — menyimpan ketelitian yang dituju, bukan
   ketinggian mati, jadi artinya tetap sama waktu drone diganti. Geser slider
   apa pun dan presetnya berubah jadi Custom.
-- **Pola terbang** — peta datar, silang (double grid), atau silang + miring
-  untuk model 3D. Biayanya ditampilkan sebelum berangkat, bukan setelah.
+- **Pola terbang** — peta datar, silang (double grid), silang + miring untuk
+  model 3D, atau orbit untuk objek tegak. Biayanya ditampilkan sebelum
+  berangkat, bukan setelah.
 - **Ikuti kontur tanah** — plus peringatan kalau lereng menuntut laju naik di
   atas kemampuan drone.
 - **Peta 2D / 3D / objek** — medan timbul dari DEM, dan bangunan OSM sebagai
@@ -363,6 +371,50 @@ selalu siap ambil alih manual saat menerbangkannya.
 - **Gerbang keselamatan** — satu pintu yang semua rencana harus lewati.
   Aplikasi tidak pernah diam-diam membetulkan angka; kalau ada yang berbahaya,
   dia bilang.
+
+## Dua cara melihat objek
+
+Tiga pola pertama — peta datar, silang, silang + miring — semuanya **memetakan
+area**: drone terbang MELINTAS di atas lahan dengan kamera menunduk. Silang +
+miring memang menghasilkan model 3D, dan untuk bangunan, lereng, atau kompleks
+candi itu pola yang benar.
+
+Objek yang **sempit tapi tinggi** — tugu, menara, patung, cerobong — adalah
+masalah yang lain. Informasinya ada di dinding vertikal, bukan di tanah, dan
+dinding itu nyaris tidak pernah menghadap kamera yang menunduk dari atas.
+Pola **orbit** untuk itu: drone memutari satu sumbu di beberapa tingkat
+ketinggian, kamera selalu menghadap ke dalam.
+
+Tiga hal berubah mendasar dibanding grid, dan ketiganya sumber kesalahan
+kalau diabaikan:
+
+**GSD ditentukan jarak miring, bukan ketinggian.** Cincin yang curam duduk
+lebih jauh dari dinding daripada angka radiusnya. Pada radius 18 m, cincin
+terbawah menghasilkan 0.68 cm/px tapi cincin teratas — dari 36 m dengan
+gimbal -45° — cuma 0.93 cm/px, karena jarak miringnya 25.5 m.
+
+**Yang mengikat kerapatan adalah langkah sudut, bukan overlap frame.** Begitu
+drone bergeser sejauh s di keliling, sudut dia memandang objek berubah s/R.
+Di objek sempit, frame jauh lebih lebar daripada objeknya: pada radius 18 m
+frame-nya 27 m sementara tugunya cuma 5 m. Overlap frame 80% di situ cuma
+menghasilkan 21 foto per cincin dengan loncatan sudut 17° — angka di layar
+kelihatan sehat, hasilnya tetap gagal menyambung. Bawaannya 10° per langkah,
+jadi 36 foto per cincin.
+
+**Arah hadap tidak bisa followWayline.** Di grid, menghadap arah jalur itu
+persis yang benar. Di orbit, menghadap arah jalur berarti kamera menyorot
+tangensial dan objeknya lewat di pinggir frame. Tiap titik butuh sudut
+hadapnya sendiri — lihat "Yang belum diverifikasi" di bawah.
+
+Tinggi tiap cincin tidak bebas: dia terkunci ke titik bidiknya,
+`tinggi = bidik + radius × tan(|pitch|)`. Tanpa kunci itu, cincin curam akan
+membidik langit di atas puncak atau tanah di depan kaki, dan tidak ada yang
+memberitahu di layar.
+
+Satu hal yang drone memang tidak bisa: **kaki objek**, kira-kira 0-3 m
+terbawah. Cincin terendah pun membidik di atas itu, dan menurunkannya berarti
+mengelilingi tugu di ketinggian pohon dan kabel. Keliling bagian itu dengan
+kamera tangan, lalu gabungkan di software olah yang sama.
 
 ## Dua mode
 
@@ -394,6 +446,14 @@ Jujur soal ini lebih berguna daripada daftar fitur:
   laporan orang lain, bukan dari file yang kita pegang. Sepuluh model lainnya
   meminjam nilai yang sama. Satu-satunya cara menaikkannya jadi pasti: export
   KMZ asli dari DJI Fly lalu impor di aplikasi.
+- **Arah hadap per titik di orbit.** Semua file acuan yang kita punya —
+  buatan DJI Fly maupun generator pihak ketiga — memakai `followWayline`,
+  yang justru salah untuk orbit. Dua bentuk disediakan dan dua-duanya belum
+  terbukti: `smoothTransition` dengan sudut mutlak dihitung per titik
+  (bawaan, karena yang diminta ke drone paling sederhana), dan `towardPOI`
+  dengan satu titik pusat di `waypointPoiPoint`. Kalau drone mengelilingi
+  objek tapi kameranya tidak menghadap ke dalam, coba bentuk satunya sebelum
+  mengejar sebab lain.
 - **Aksi foto dan hover** (`takePhoto`, `hover`, `multipleDistance`,
   `actionTriggerParam`, `hoverTime`) adalah satu-satunya bagian
   yang belum bisa dicocokkan dengan file asli, karena misi contoh yang kita

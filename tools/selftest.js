@@ -14,6 +14,9 @@ import {
   altitudeFromGsd,
   gsdFromAltitude,
   generatePattern,
+  generateOrbit,
+  ORBIT_DEFAULTS,
+  missionDuration,
   climbDemand,
   makeProjector,
   splitByBattery,
@@ -110,6 +113,105 @@ ok(cross.passes[1].angleDeg === 90, 'lintasan kedua menyilang 90°', `${cross.pa
 ok(cross.photos > single.photos * 1.8, 'silang hampir melipatgandakan foto', `${single.photos} -> ${cross.photos}`);
 ok(oblique.gimbalPitch === -45, 'silang + miring memiringkan gimbal ke -45°');
 ok(single.gimbalPitch === -90, 'peta datar tetap nunduk lurus');
+
+// ------------------------------------------------------------------- orbit
+
+console.log('\nOrbit objek tegak');
+{
+  const p5 = resolveProfile(registry, { droneId: 'mini5pro' });
+  const orb = generateOrbit(p5.camera, [0, 0], {
+    radiusM: 18,
+    objectHeightM: 20,
+    rings: 4,
+  });
+
+  ok(orb.rings.length === 4, 'empat cincin terbentuk');
+  ok(
+    orb.photos === orb.rings.reduce((a, r) => a + r.photos, 0) + orb.cap.photos,
+    'jumlah foto = semua cincin + petak nadir',
+    `${orb.photos} foto`
+  );
+
+  // Kamera harus MENGHADAP PUSAT di tiap titik. Ini inti orbit: kalau salah,
+  // drone tetap mengelilingi tugu dengan rapi tapi tidak satu pun foto
+  // memuat tugunya di tengah frame.
+  let worstHeading = 0;
+  let worstRadius = 0;
+  for (const w of orb.waypoints) {
+    if (!w.poi) continue;
+    const want = ((Math.atan2(-w.xy[0], -w.xy[1]) * 180) / Math.PI + 360) % 360;
+    worstHeading = Math.max(worstHeading, Math.abs(((w.heading - want + 540) % 360) - 180));
+    worstRadius = Math.max(worstRadius, Math.abs(Math.hypot(w.xy[0], w.xy[1]) - 18));
+  }
+  ok(worstHeading < 1e-9, 'tiap titik menghadap tepat ke sumbu objek');
+  ok(worstRadius < 1e-9, 'tiap titik berjarak tepat satu radius dari sumbu');
+
+  // Geometri terkunci: tinggi = bidik + radius * tan(pitch). Kalau ini lepas,
+  // cincin curam akan membidik langit di atas puncak atau tanah di depan kaki.
+  let worstGeom = 0;
+  for (const r of orb.rings) {
+    const want = r.aimHeightM + 18 * Math.tan((Math.abs(r.pitchDeg) * Math.PI) / 180);
+    worstGeom = Math.max(worstGeom, Math.abs(r.heightM - want));
+  }
+  ok(worstGeom < 0.05, 'tinggi tiap cincin terkunci ke sudut bidiknya');
+
+  const low = orb.rings[0];
+  const high = orb.rings[orb.rings.length - 1];
+  ok(high.heightM > low.heightM, 'cincin naik dari bawah ke atas', `${low.heightM.toFixed(1)} -> ${high.heightM.toFixed(1)} m`);
+  ok(high.aimHeightM > low.aimHeightM, 'titik bidik naik menyusuri objek');
+  ok(high.pitchDeg < low.pitchDeg, 'cincin atas lebih curam');
+
+  // Lantai ketinggian: drone yang naik, titik bidiknya TIDAK. Kalau titik
+  // bidik ikut naik, pita terbawah objek tidak terpotret cincin mana pun.
+  ok(low.heightM >= ORBIT_DEFAULTS.minRingHeightM - 1e-9, 'cincin terbawah tidak jatuh di bawah lantai ketinggian', `${low.heightM.toFixed(1)} m`);
+  ok(low.raisedToFloor && low.aimHeightM === 20 * 0.15, 'yang dinaikkan drone-nya, bukan titik bidiknya', `bidik tetap ${low.aimHeightM.toFixed(1)} m`);
+  {
+    const tinggi = generateOrbit(p5.camera, [0, 0], { radiusM: 18, objectHeightM: 60 });
+    ok(!tinggi.rings[0].raisedToFloor, 'objek tinggi tidak perlu dinaikkan', `cincin bawah ${tinggi.rings[0].heightM.toFixed(1)} m`);
+  }
+
+  // Cincin curam duduk lebih jauh dari dinding, jadi GSD-nya WAJIB lebih
+  // kasar. Kalau terbalik, berarti GSD dihitung dari ketinggian terbang —
+  // bukan dari jarak miring ke dinding.
+  ok(high.gsdCm > low.gsdCm, 'cincin atas lebih kasar karena duduk lebih jauh', `${low.gsdCm.toFixed(2)} -> ${high.gsdCm.toFixed(2)} cm/px`);
+  ok(high.slantM > low.slantM, 'jarak miring cincin atas lebih jauh dari radiusnya');
+
+  // Langkah sudut yang mengikat, bukan overlap frame: di objek sempit, frame
+  // jauh lebih lebar dari objeknya, jadi overlap frame selalu terlihat sehat.
+  const worstStep = Math.max(...orb.rings.map((r) => r.angleStepDeg));
+  ok(worstStep <= ORBIT_DEFAULTS.maxAngleStepDeg + 1e-9, 'langkah sudut tidak melebihi batas', `${worstStep.toFixed(1)}°`);
+  ok(orb.rings.every((r) => r.limitedBy === 'sudut'), 'pada radius 18 m, sudut yang mengikat — bukan overlap');
+
+  // Petak nadir menatap lurus ke bawah; cincin tidak pernah begitu.
+  ok(orb.cap.photos > 0 && orb.waypoints.some((w) => w.gimbalPitch === -90), 'petak nadir menunduk lurus');
+  ok(
+    generateOrbit(p5.camera, [0, 0], { radiusM: 18, objectHeightM: 20, cap: false }).cap === null,
+    'petak nadir bisa dimatikan'
+  );
+
+  // Arah hadap berubah di tiap titik orbit, tapi itu bukan belokan. Tanpa
+  // penanda arc, estimasi waktunya kena denda belokan di setiap titik.
+  const arcS = missionDuration(orb.waypoints, { speed: 5, stopAtEach: false });
+  const asTurns = missionDuration(
+    orb.waypoints.map((w) => ({ ...w, arc: false })),
+    { speed: 5, stopAtEach: false }
+  );
+  ok(asTurns > arcS * 2, 'jalur melingkar tidak kena denda belokan tiap titik', `${arcS.toFixed(0)}s vs ${asTurns.toFixed(0)}s kalau dihitung belokan`);
+
+  // generatePattern tidak boleh diam-diam melayani orbit dengan pola grid.
+  let tolak = false;
+  try {
+    generatePattern(square, { ...gridOpts, pattern: 'orbit' });
+  } catch {
+    tolak = true;
+  }
+  ok(tolak, 'generatePattern menolak pola orbit, tidak diam-diam jadi grid');
+
+  // Radius kecil -> GSD halus, radius besar -> GSD kasar. Hubungan lurus.
+  const dekat = generateOrbit(p5.camera, [0, 0], { radiusM: 12, objectHeightM: 20 });
+  const jauh = generateOrbit(p5.camera, [0, 0], { radiusM: 36, objectHeightM: 20 });
+  ok(dekat.gsdBestCm < jauh.gsdBestCm, 'radius lebih rapat berarti GSD lebih halus', `${dekat.gsdBestCm.toFixed(2)} vs ${jauh.gsdBestCm.toFixed(2)} cm/px`);
+}
 
 // ---------------------------------------------------------------- laju naik
 
@@ -414,6 +516,149 @@ console.log('\nEdit file WPML di tempat');
   ok(
     E.getTag(E.writeMissionConfig(xml, { finishAction: 'hover' }), 'finishAction') === 'hover',
     'setelan misi bisa diubah'
+  );
+}
+
+
+// ------------------------------------------------- orbit: file WPML & gerbang
+
+console.log('\nOrbit: isi file dan gerbang keselamatan');
+{
+  const p5 = resolveProfile(registry, { droneId: 'mini5pro' });
+  const orb = generateOrbit(p5.camera, [0, 0], { radiusM: 18, objectHeightM: 20, rings: 3 });
+  const proj = makeProjector(-6.25, 107.12);
+
+  const mission = {
+    ...MISSION_DEFAULTS,
+    headingMode: 'smoothTransition',
+    poi: { lat: -6.25, lng: 107.12, height: 10 },
+    waypoints: orb.waypoints.map((w) => {
+      const [lng, lat] = proj.toLL(w.xy);
+      return {
+        lat,
+        lng,
+        height: w.height,
+        heading: w.heading,
+        gimbalPitch: w.gimbalPitch,
+        takePhoto: true,
+        hoverTime: 2,
+      };
+    }),
+  };
+
+  const xml = buildWaylinesWpml(mission, p5);
+
+  const sudut = [...xml.matchAll(/<wpml:waypointHeadingAngle>([^<]+)</g)].map((m) => m[1]);
+  ok(new Set(sudut).size > 10, 'sudut hadap berbeda-beda di tiap titik', `${new Set(sudut).size} nilai berbeda`);
+  ok(
+    xml.includes('<wpml:waypointHeadingAngleEnable>1<'),
+    'sudut hadap diaktifkan — kalau 0, angkanya diabaikan drone'
+  );
+  ok(
+    xml.includes('<wpml:waypointPoiPoint>-6.25,107.12,10<'),
+    'titik pusat ikut tertulis, bukan 0,0,0'
+  );
+
+  const pitch = new Set(
+    [...xml.matchAll(/<wpml:gimbalPitchRotateAngle>([^<]+)</g)].map((m) => m[1])
+  );
+  ok(pitch.size === 4, 'tiga cincin + petak nadir = empat sudut gimbal', [...pitch].join(', '));
+  ok(pitch.has('-90'), 'petak nadir menunduk lurus di file');
+
+  // Misi grid tidak boleh ikut berubah: poiPoint-nya tetap 0,0,0 seperti
+  // file acuan yang terbukti diterima.
+  const polos = buildWaylinesWpml(
+    { ...MISSION_DEFAULTS, waypoints: [{ lat: -6.25, lng: 107.12, height: 50, takePhoto: true }] },
+    p5
+  );
+  ok(
+    polos.includes('<wpml:waypointPoiPoint>0.000000,0.000000,0.000000<') &&
+      polos.includes('<wpml:waypointHeadingMode>followWayline<'),
+    'misi grid tidak ikut berubah bentuknya'
+  );
+
+  // Gerbang keselamatan khusus orbit.
+  const orbitPlan = (over = {}, orbOver = {}) => {
+    const g = generateOrbit(p5.camera, [0, 0], {
+      radiusM: 18,
+      objectHeightM: 20,
+      rings: 3,
+      ...orbOver,
+    });
+    return {
+      proj,
+      altitude: Math.max(...g.rings.map((r) => r.heightM)),
+      area: 2000,
+      gridArea: 2000,
+      bufferM: 0,
+      params: {
+        gsd: g.gsdWorstCm,
+        recommendedSpeed: 5,
+        maxSpeedInterval: 5,
+        sideSpacing: 5,
+        frontSpacing: 3,
+      },
+      speed: 4,
+      stopAtEach: true,
+      maxDist: 40,
+      pattern: 'orbit',
+      patternName: 'Orbit objek',
+      gimbalPitch: g.rings[0].pitchDeg,
+      grid: g,
+      orbit: g,
+      orbitHeadingMode: 'smoothTransition',
+      sorties: [g.waypoints],
+      terrain: { on: false },
+      reliefHint: null,
+      advanced: {
+        rcLostAction: 'goBack',
+        finishAction: 'goHome',
+        gimbalPitch: -45,
+        safeHeightM: 20,
+        rcLostActionLabel: 'RTH',
+        finishActionLabel: 'RTH',
+      },
+      ...over,
+    };
+  };
+
+  const codes = (plan) => evaluateSafety(plan, p5).findings.map((f) => f.code);
+
+  ok(
+    codes(orbitPlan()).includes('orbit-heading-unproven'),
+    'arah hadap per titik ditandai belum terbukti'
+  );
+  ok(
+    codes(orbitPlan()).includes('orbit-base-gap'),
+    'kaki objek yang tidak terjangkau drone disebut'
+  );
+  ok(
+    !evaluateSafety(orbitPlan(), p5).blockers.length,
+    'setelan bawaan orbit tidak menahan export'
+  );
+  ok(
+    codes(orbitPlan()).includes('orbit-ring-raised'),
+    'cincin yang dinaikkan ke lantai dijelaskan'
+  );
+  ok(
+    codes(orbitPlan({}, { radiusM: 8 })).includes('orbit-too-close'),
+    'radius 8 m ditahan sebagai terlalu dekat'
+  );
+  ok(
+    evaluateSafety(orbitPlan({}, { radiusM: 8 }), p5).blockers.some((b) => b.code === 'orbit-too-close'),
+    'dan itu menahan export, bukan cuma peringatan'
+  );
+  ok(
+    codes(orbitPlan({}, { radiusM: 40, maxAngleStepDeg: 25 })).includes('orbit-angle-step'),
+    'loncatan sudut 25° diperingatkan'
+  );
+  ok(
+    !codes(orbitPlan()).includes('pattern-cost') && !codes(orbitPlan()).includes('buffer-off'),
+    'pesan khusus grid tidak ikut muncul di orbit'
+  );
+  ok(
+    codes(orbitPlan({ terrainRequested: true })).includes('orbit-terrain-na'),
+    'ikut kontur yang dinyalakan tapi tidak dipakai, dibilang'
   );
 }
 

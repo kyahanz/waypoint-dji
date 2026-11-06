@@ -207,6 +207,23 @@ function intervalActionGroup(m, lastIndex, id) {
  *
  * Untuk jalur bolak-balik, followWayline juga memang yang benar: arah hadap
  * mengikuti jalur dengan sendirinya, tidak perlu disuapi sudut per titik.
+ *
+ * ORBIT MEMBALIK ITU. Mengelilingi tugu dengan followWayline berarti kamera
+ * menyorot tangensial — objeknya lewat di pinggir frame, bukan di tengah.
+ * Tiap titik harus punya sudut hadapnya sendiri, dan ada dua cara menuliskan
+ * itu. Keduanya BELUM pernah terlihat di file yang terbukti diterima DJI Fly,
+ * jadi dua-duanya disediakan dan pengguna diberi tahu:
+ *
+ *   smoothTransition  Sudut mutlak ditulis per titik, dihitung sendiri di
+ *                     sini. Drone tinggal memutar ke angka itu — tidak perlu
+ *                     paham konsep POI sama sekali. Ini bawaan untuk orbit,
+ *                     karena yang diminta ke drone paling sederhana.
+ *   towardPOI         Satu titik pusat ditulis di waypointPoiPoint dan drone
+ *                     yang menghitung sendiri arah hadapnya. Lebih rapi, tapi
+ *                     bergantung pada DJI Fly benar-benar membaca tag itu.
+ *
+ * waypointPoiPoint selama ini selalu ditulis 0,0,0 karena memang tidak ada
+ * yang memakainya. Sekarang diisi kalau misinya punya pusat.
  */
 function headingParam(wp, m, i = 0) {
   const mode = wp.headingMode ?? m.headingMode;
@@ -214,12 +231,21 @@ function headingParam(wp, m, i = 0) {
   // File buatan DJI Fly memasang 1 di titik pertama, tapi generator pihak
   // ketiga memasang 0 di semua titik — dan file kita yang meniru DJI Fly
   // justru ditolak. Jadi yang diikuti contoh yang dipakai orang memetakan.
+  //
+  // Pengecualiannya orbit: di sana sudut per titik BUKAN hiasan, dia
+  // satu-satunya yang membuat kamera menghadap objek. Kalau enable 0, sudut
+  // yang susah payah dihitung itu diabaikan drone.
   const enable = mode === 'smoothTransition' ? 1 : 0;
+
+  const poi = wp.poiPoint ?? m.poi;
+  const poiPoint = poi
+    ? `${num(poi.lat, 6)},${num(poi.lng, 6)},${num(poi.height ?? 0, 6)}`
+    : '0.000000,0.000000,0.000000';
 
   return `        <wpml:waypointHeadingParam>
           <wpml:waypointHeadingMode>${mode}</wpml:waypointHeadingMode>
           <wpml:waypointHeadingAngle>${num(angle, 1)}</wpml:waypointHeadingAngle>
-          <wpml:waypointPoiPoint>0.000000,0.000000,0.000000</wpml:waypointPoiPoint>
+          <wpml:waypointPoiPoint>${poiPoint}</wpml:waypointPoiPoint>
           <wpml:waypointHeadingAngleEnable>${enable}</wpml:waypointHeadingAngleEnable>
           <wpml:waypointHeadingPathMode>followBadArc</wpml:waypointHeadingPathMode>
           <wpml:waypointHeadingPoiIndex>0</wpml:waypointHeadingPoiIndex>
@@ -424,7 +450,10 @@ export const MISSION_DEFAULTS = {
   // 2.5 sementara kecepatan rencana bisa 7.6, dan itulah yang terbaca
   // sebagai "kecepatan tidak kepakai" di lapangan.
   transitionalSpeed: null,
-  headingMode: 'followWayline', // followWayline | manually | fixed | smoothTransition
+  headingMode: 'followWayline', // followWayline | manually | fixed | smoothTransition | towardPOI
+  // Titik pusat untuk misi orbit: { lat, lng, height }. Dibiarkan kosong untuk
+  // misi grid, dan waypointPoiPoint tetap ditulis 0,0,0 seperti file acuan.
+  poi: null,
   turnMode: 'toPointAndPassWithContinuityCurvature',
   turnDampingDist: 0,
   useStraightLine: 0,

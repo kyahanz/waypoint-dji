@@ -198,7 +198,7 @@
               </p>
             </div>
 
-            <div class="field">
+            <div class="field" id="field-alt">
               <div class="field-head">
                 <label for="alt">Ketinggian</label>
                 <output id="alt-out">100 m</output>
@@ -227,7 +227,7 @@
               </label>
             </div>
 
-            <div class="grid-2">
+            <div class="grid-2" id="field-overlap">
               <div class="field">
                 <div class="field-head">
                   <label for="front">Overlap depan</label>
@@ -250,6 +250,7 @@
                 <button class="seg-btn active" data-pattern="single">Peta datar</button>
                 <button class="seg-btn" data-pattern="cross">Silang</button>
                 <button class="seg-btn" data-pattern="crossOblique">Silang + miring</button>
+                <button class="seg-btn" data-pattern="orbit">Orbit objek</button>
               </div>
               <p class="sub" id="pattern-hint">
                 Satu arah, kamera nunduk lurus. Untuk ortofoto dan ukur luas.
@@ -259,7 +260,103 @@
               </div>
             </div>
 
-            <div class="field">
+            <div id="orbit-fields" hidden>
+              <div class="field">
+                <p class="sub">
+                  Pusat orbit diambil dari tengah area yang kamu gambar — buat
+                  kotak kecil mengelilingi tugunya saja, tidak perlu lahan luas.
+                </p>
+              </div>
+
+              <div class="grid-2">
+                <div class="field">
+                  <div class="field-head">
+                    <label for="obj-height">Tinggi objek</label>
+                    <output id="obj-height-out">20 m</output>
+                  </div>
+                  <input id="obj-height" type="range" min="3" max="80" step="1" value="20" />
+                </div>
+                <div class="field">
+                  <div class="field-head">
+                    <label for="orbit-radius">Radius orbit</label>
+                    <output id="orbit-radius-out">18 m</output>
+                  </div>
+                  <input id="orbit-radius" type="range" min="8" max="80" step="1" value="18" />
+                </div>
+              </div>
+              <p class="sub">
+                Ketelitian di dinding <strong id="orbit-gsd">—</strong>. Radius
+                menentukan GSD seperti ketinggian menentukannya di peta datar —
+                tapi yang dihitung jarak miring ke dinding, bukan jarak mendatar.
+              </p>
+
+              <div class="grid-2">
+                <div class="field">
+                  <div class="field-head">
+                    <label for="orbit-rings">Jumlah cincin</label>
+                    <output id="orbit-rings-out">4</output>
+                  </div>
+                  <input id="orbit-rings" type="range" min="2" max="6" step="1" value="4" />
+                </div>
+                <div class="field">
+                  <div class="field-head">
+                    <label for="orbit-step">Langkah sudut</label>
+                    <output id="orbit-step-out">10°</output>
+                  </div>
+                  <input id="orbit-step" type="range" min="5" max="20" step="1" value="10" />
+                </div>
+              </div>
+              <p class="sub">
+                Langkah sudut, bukan overlap, yang menentukan kerapatan di orbit:
+                di atas 15° software sering gagal mencocokkan dinding yang sama.
+              </p>
+
+              <div class="field">
+                <div class="field-head">
+                  <label for="orbit-maxpitch">Kemiringan cincin teratas</label>
+                  <output id="orbit-maxpitch-out">45°</output>
+                </div>
+                <input id="orbit-maxpitch" type="range" min="25" max="70" step="5" value="45" />
+                <p class="sub">
+                  Makin curam, makin bagus puncaknya terpotret — tapi drone duduk
+                  makin jauh dari dinding, jadi ketelitiannya turun.
+                </p>
+              </div>
+
+              <div class="field">
+                <label class="switch-row" for="orbit-cap">
+                  <input id="orbit-cap" type="checkbox" checked />
+                  <span class="switch-body">
+                    <span class="switch-label">Petak nadir di atas</span>
+                    <span class="switch-note">
+                      Puncak objek dan tanah di sekelilingnya. Tanah itulah yang
+                      mengikat skala seluruh model.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div class="field">
+                <label class="block-label">Cara kamera menghadap objek</label>
+                <div class="seg" id="orbit-heading-seg">
+                  <button class="seg-btn active" data-heading="smoothTransition">Sudut per titik</button>
+                  <button class="seg-btn" data-heading="towardPOI">Titik pusat</button>
+                </div>
+                <p class="sub" id="orbit-heading-hint">
+                  Sudut hadap dihitung di sini dan ditulis di tiap titik — drone
+                  tidak perlu paham konsep titik pusat. Belum ada contoh file
+                  nyata untuk dua-duanya; kalau kamera tidak menghadap ke dalam,
+                  coba yang satunya.
+                </p>
+              </div>
+
+              <div class="field">
+                <label class="block-label">Rencana tiap cincin</label>
+                <div id="orbit-rings-table" class="sub">—</div>
+              </div>
+            </div>
+
+            <div class="field" id="field-buffer">
               <div class="field-head">
                 <label for="buffer">Buffer tepi</label>
                 <output id="buffer-out">1.0× jalur</output>

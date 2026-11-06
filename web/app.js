@@ -8,6 +8,9 @@ import {
   computeSurveyParams,
   generateGrid,
   generatePattern,
+  generateOrbit,
+  ORBIT_DEFAULTS,
+  maxSpeedForBlur,
   PATTERNS,
   offsetPolygon,
   pathLengthXY,
@@ -91,6 +94,17 @@ const state = {
   speedMs: 10,
   speedAuto: true,
   pattern: 'single',
+  // Setelan pola orbit. Dipisah dari `advanced` karena ini bukan setelan
+  // lanjutan yang jarang disentuh — di mode orbit, inilah rencananya.
+  orbit: {
+    objectHeightM: 20,
+    radiusM: 18,
+    rings: ORBIT_DEFAULTS.rings,
+    stepDeg: ORBIT_DEFAULTS.maxAngleStepDeg,
+    maxPitchDeg: ORBIT_DEFAULTS.maxPitchDeg,
+    cap: true,
+    headingMode: 'smoothTransition',
+  },
   advanced: { ...SAFE_ADVANCED },
   gateAck: false,
   resume: null, // { index, lngLat }
@@ -482,6 +496,25 @@ const els = {
   speedNote: $('speed-note'),
   patternSeg: $('pattern-seg'),
   patternHint: $('pattern-hint'),
+  orbitFields: $('orbit-fields'),
+  objHeight: $('obj-height'),
+  objHeightOut: $('obj-height-out'),
+  orbitRadius: $('orbit-radius'),
+  orbitRadiusOut: $('orbit-radius-out'),
+  orbitRings: $('orbit-rings'),
+  orbitRingsOut: $('orbit-rings-out'),
+  orbitStep: $('orbit-step'),
+  orbitStepOut: $('orbit-step-out'),
+  orbitMaxPitch: $('orbit-maxpitch'),
+  orbitMaxPitchOut: $('orbit-maxpitch-out'),
+  orbitCap: $('orbit-cap'),
+  orbitHeadingSeg: $('orbit-heading-seg'),
+  orbitHeadingHint: $('orbit-heading-hint'),
+  orbitRingsTable: $('orbit-rings-table'),
+  orbitGsd: $('orbit-gsd'),
+  fieldAlt: $('field-alt'),
+  fieldOverlap: $('field-overlap'),
+  fieldBuffer: $('field-buffer'),
   patternCost: $('pattern-cost'),
   patternCostVal: $('pattern-cost-val'),
   gimbal: $('gimbal'),
@@ -810,13 +843,84 @@ els.speedAuto.onchange = () => {
 
 // ---------- Pola terbang ----------
 
+function wireOrbitInputs() {
+  const bind = (el, key, parse = Number) => {
+    el.oninput = () => {
+      state.orbit[key] = parse(el.value);
+      render();
+    };
+  };
+  bind(els.objHeight, 'objectHeightM');
+  bind(els.orbitRadius, 'radiusM');
+  bind(els.orbitRings, 'rings');
+  bind(els.orbitStep, 'stepDeg');
+  bind(els.orbitMaxPitch, 'maxPitchDeg');
+  els.orbitCap.onchange = () => {
+    state.orbit.cap = els.orbitCap.checked;
+    render();
+  };
+  els.orbitHeadingSeg.querySelectorAll('[data-heading]').forEach((btn) => {
+    btn.onclick = () => {
+      els.orbitHeadingSeg
+        .querySelectorAll('[data-heading]')
+        .forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.orbit.headingMode = btn.dataset.heading;
+      els.orbitHeadingHint.textContent = ORBIT_HEADING_HINT[state.orbit.headingMode];
+      render();
+    };
+  });
+}
+wireOrbitInputs();
+
+/** Kembalikan kontrol orbit ke isi state — dipakai saat memuat project/link. */
+function syncOrbitInputs() {
+  const o = state.orbit;
+  els.objHeight.value = String(o.objectHeightM);
+  els.orbitRadius.value = String(o.radiusM);
+  els.orbitRings.value = String(o.rings);
+  els.orbitStep.value = String(o.stepDeg);
+  els.orbitMaxPitch.value = String(o.maxPitchDeg);
+  els.orbitCap.checked = !!o.cap;
+  els.orbitHeadingSeg.querySelectorAll('[data-heading]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.heading === o.headingMode);
+  });
+  els.orbitHeadingHint.textContent = ORBIT_HEADING_HINT[o.headingMode];
+  syncPatternFields();
+}
+
 const PATTERN_HINT = {
   single: 'Satu arah, kamera nunduk lurus. Untuk ortofoto dan ukur luas.',
   cross:
     'Dua arah menyilang 90°. Objek tegak terpotret dari dua sisi, jadi model 3D-nya tidak bolong. Foto dan waktu jadi dua kali lipat.',
   crossOblique:
     'Dua arah menyilang, kamera dimiringkan. Ini yang menangkap dinding tegak — untuk model bangunan. Dua kali lipat juga.',
+  orbit:
+    'Mengelilingi satu objek tegak di beberapa tingkat ketinggian, kamera selalu menghadap ke dalam. Untuk tugu, menara, patung — benda yang sempit tapi tinggi, yang isinya ada di dinding, bukan di tanah.',
 };
+
+const ORBIT_HEADING_HINT = {
+  smoothTransition:
+    'Sudut hadap dihitung di sini dan ditulis di tiap titik — drone tidak perlu paham konsep titik pusat. Belum ada contoh file nyata untuk dua-duanya; kalau kamera tidak menghadap ke dalam, coba yang satunya.',
+  towardPOI:
+    'Satu titik pusat ditulis di file, drone yang menghitung sendiri arah hadapnya. Lebih rapi, tapi bergantung pada DJI Fly benar-benar membaca tag itu — dan itu belum terbukti.',
+};
+
+/**
+ * Field mana yang berlaku untuk pola mana.
+ *
+ * Orbit tidak punya ketinggian tunggal (tiap cincin punya sendiri), tidak
+ * punya overlap jalur (yang mengikat langkah sudut), dan tidak punya tepi
+ * lahan (jadi buffer tidak berarti apa-apa). Menyembunyikannya lebih jujur
+ * daripada membiarkan slider yang tidak terpakai tetap terlihat berfungsi.
+ */
+function syncPatternFields() {
+  const orbit = state.pattern === 'orbit';
+  els.orbitFields.hidden = !orbit;
+  els.fieldAlt.hidden = orbit;
+  els.fieldOverlap.hidden = orbit;
+  els.fieldBuffer.hidden = orbit;
+}
 
 els.patternSeg.querySelectorAll('[data-pattern]').forEach((btn) => {
   btn.onclick = () => {
@@ -824,11 +928,18 @@ els.patternSeg.querySelectorAll('[data-pattern]').forEach((btn) => {
     btn.classList.add('active');
     state.pattern = btn.dataset.pattern;
     els.patternHint.textContent = PATTERN_HINT[state.pattern];
+    syncPatternFields();
 
-    // Gimbal mengikuti pola, karena itulah yang membedakan silang biasa dari
-    // silang yang benar-benar berguna untuk 3D. Tetap bisa diubah manual.
-    state.advanced.gimbalPitch = PATTERNS[state.pattern].gimbalPitch;
-    els.gimbal.value = String(state.advanced.gimbalPitch);
+    // Di orbit, gimbal TIDAK boleh ikut satu angka: tiap cincin punya
+    // pitch-nya sendiri, dihitung dari sudut bidiknya. Memasang satu nilai di
+    // sini akan menimpa semuanya dan mengembalikan orbit jadi lingkaran datar
+    // yang menyorot ke satu arah.
+    if (state.pattern !== 'orbit') {
+      // Gimbal mengikuti pola, karena itulah yang membedakan silang biasa dari
+      // silang yang benar-benar berguna untuk 3D. Tetap bisa diubah manual.
+      state.advanced.gimbalPitch = PATTERNS[state.pattern].gimbalPitch;
+      els.gimbal.value = String(state.advanced.gimbalPitch);
+    }
     render();
   };
 });
@@ -1381,9 +1492,149 @@ const labelOf = (select) => select.options[select.selectedIndex]?.textContent.tr
 
 // ---------- Perencanaan ----------
 
+/**
+ * Rencana orbit mengelilingi satu objek tegak.
+ *
+ * Bentuk yang dikembalikan sengaja dibuat sama persis dengan buildPlan()
+ * supaya seluruh sisa aplikasi — penggambaran peta, ringkasan, pembagian
+ * baterai, gerbang keselamatan, export — tidak perlu tahu bedanya. Yang
+ * berbeda cuma dari mana waypoint-nya datang dan apa arti angkanya.
+ *
+ * Pusat orbit diambil dari titik tengah poligon yang digambar. Jadi pengguna
+ * tidak perlu alat gambar baru: cukup kotak kecil mengelilingi tugunya.
+ */
+function buildOrbitPlan() {
+  const { profile, polygon, home } = state;
+  const o = state.orbit;
+
+  const [lng0, lat0] = centroid(polygon);
+  const proj = makeProjector(lat0, lng0);
+  const polyXY = polygon.map(proj.toXY);
+  const homeXY = proj.toXY(home ?? polygon[0]);
+  const area = polygonArea(polyXY);
+  const lim = profile.limits;
+
+  // Titik tengah poligon jadi titik asal proyeksi, jadi sumbu objeknya [0,0].
+  const centerXY = [0, 0];
+
+  const grid = generateOrbit(profile.camera, centerXY, {
+    radiusM: o.radiusM,
+    objectHeightM: o.objectHeightM,
+    rings: o.rings,
+    maxAngleStepDeg: o.stepDeg,
+    maxPitchDeg: o.maxPitchDeg,
+    cap: o.cap,
+  });
+  if (!grid.waypoints.length) return null;
+
+  // Orbit selalu berhenti di tiap titik. Pada jarak sekitar 3 m antar foto,
+  // melintas terus berarti kamera tidak sempat menjepret — dan ini bukan
+  // pilihan yang masuk akal untuk ditawarkan, jadi tidak ditawarkan.
+  const stopAtEach = true;
+  const accel = lim.accelMs2 ?? 2.5;
+  const topHeight = Math.max(...grid.rings.map((r) => r.heightM));
+  const minSpacing = Math.min(...grid.rings.map((r) => r.spacingM));
+  const ringGapM =
+    grid.rings.length > 1 ? grid.rings[1].aimHeightM - grid.rings[0].aimHeightM : 0;
+
+  const vBlur = maxSpeedForBlur(grid.gsdBestCm, 1 / 500, 1);
+  const vInterval = minSpacing / profile.camera.minIntervalSec;
+
+  // Bentuk params disamakan dengan computeSurveyParams supaya gerbang
+  // keselamatan membaca field yang sama — tapi isinya diturunkan dari
+  // geometri orbit, bukan dari ketinggian terbang.
+  const params = {
+    altitude: topHeight,
+    gsd: grid.gsdWorstCm,
+    footprint: { w: 0, h: 0 },
+    sideSpacing: ringGapM,
+    frontSpacing: minSpacing,
+    maxSpeedBlur: vBlur,
+    maxSpeedInterval: vInterval,
+    recommendedSpeed: Math.min(vBlur, vInterval),
+  };
+
+  // Dekat struktur, kecepatan jelajah penuh tidak pernah terpakai (jarak antar
+  // titik cuma beberapa meter) tapi tetap menaikkan risiko kalau drone
+  // terlanjur melaju saat ada yang salah. Jadi batas atasnya sendiri.
+  const ORBIT_CRUISE_MAX = 5;
+  const autoSpeed = Math.min(ORBIT_CRUISE_MAX, lim.maxSpeedMs);
+  const speed = state.speedAuto ? autoSpeed : Math.min(state.speedMs, lim.maxSpeedMs);
+
+  const hoverPerPhoto = HOVER_SEC;
+  const maxDist = maxDistanceFrom(homeXY, grid.waypoints);
+  const transitReserveSec = (2 * maxDist) / speed + 60;
+
+  const sorties = splitByBattery(grid.waypoints, {
+    speed,
+    accel,
+    stopAtEach,
+    usableFlightMin: lim.usableFlightMin,
+    hoverPerPhotoSec: hoverPerPhoto,
+    transitReserveSec,
+    maxWaypoints: lim.maxWaypoints,
+  });
+
+  const summaries = sorties.map((s) =>
+    sortieSummary(s, homeXY, { speed, accel, hoverPerPhotoSec: hoverPerPhoto, stopAtEach })
+  );
+
+  return {
+    proj,
+    polyXY,
+    gridPoly: polyXY,
+    gridArea: area,
+    bufferM: 0,
+    bufferCost: null,
+    // Ikut kontur tidak berlaku di orbit: ketinggian tiap cincin diturunkan
+    // dari sudut bidik ke objek, bukan dari permukaan di bawah drone.
+    terrain: { on: false, ready: false, relief: null, missing: 0 },
+    terrainRequested: state.terrain,
+    reliefHint: null,
+    homeXY,
+    area,
+    params,
+    grid,
+    orbit: grid,
+    orbitHeadingMode: o.headingMode,
+    mode: 'stopAndShoot',
+    pattern: 'orbit',
+    patternName: PATTERNS.orbit.name,
+    // Satu angka gimbal tidak mewakili orbit — tiap cincin punya sendiri.
+    // Yang ditampilkan rentangnya.
+    gimbalPitch: grid.rings[0].pitchDeg,
+    gimbalRange: [
+      grid.rings[0].pitchDeg,
+      grid.rings[grid.rings.length - 1].pitchDeg,
+    ],
+    advanced: {
+      ...state.advanced,
+      angleDeg: 0,
+      autoAngle: false,
+      rcLostActionLabel: labelOf(els.rcLost),
+      finishActionLabel: labelOf(els.finish),
+    },
+    // Lanjutkan-misi memotong jalur berdasar nomor waypoint, dan di orbit
+    // nomor itu tidak menandai petak mana yang sudah selesai. Dimatikan,
+    // bukan dibiarkan memberi hasil yang kelihatan benar.
+    resume: null,
+    autoSpeed,
+    stopAtEach,
+    speed,
+    maxDist,
+    distance: pathLengthXY(grid.waypoints.map((w) => w.xy)),
+    duration: summaries.reduce((acc, x) => acc + x.durationS, 0),
+    sorties,
+    summaries,
+    altitude: topHeight,
+  };
+}
+
 function buildPlan() {
   const { profile, polygon, home } = state;
   if (!profile || polygon.length < 3) return null;
+
+  if (state.pattern === 'orbit') return buildOrbitPlan();
 
   const [lng0, lat0] = centroid(polygon);
   const proj = makeProjector(lat0, lng0);
@@ -1810,6 +2061,7 @@ function render() {
   renderWarnings(checkWarnings(plan));
   renderGate();
   renderPatternCost(plan);
+  renderOrbitRings(plan);
   renderResume(plan);
 
   els.sheetSummary.textContent =
@@ -1840,6 +2092,13 @@ function updateDerived(plan) {
 
   const mult = Number(els.buffer.value);
   els.bufferOut.textContent = mult === 0 ? 'mati' : `${mult.toFixed(1)}× jalur`;
+
+  const o = state.orbit;
+  els.objHeightOut.textContent = `${o.objectHeightM} m`;
+  els.orbitRadiusOut.textContent = `${o.radiusM} m`;
+  els.orbitRingsOut.textContent = String(o.rings);
+  els.orbitStepOut.textContent = `${o.stepDeg}°`;
+  els.orbitMaxPitchOut.textContent = `${o.maxPitchDeg}°`;
 
   if (!state.profile) return;
 
@@ -1918,7 +2177,111 @@ function renderEnumBadge() {
       : `Kode drone ${p.droneEnumValue}/${p.droneSubEnumValue} · ${info.label.toLowerCase()}`;
 }
 
+/**
+ * Ringkasan orbit.
+ *
+ * Tiga angka di ringkasan grid tidak punya arti di sini dan karena itu
+ * diganti, bukan dibiarkan menampilkan angka yang kebetulan ada:
+ *
+ *   "Ketinggian"              -> rentang cincin, karena tidak ada satu angka
+ *   "Jarak antar jalur/foto"  -> langkah sudut, karena itu yang mengikat
+ *   "Ketelitian" satu angka   -> rentang, karena cincin atas lebih kasar
+ */
+function renderOrbitStats(plan) {
+  const orb = plan.orbit;
+  const low = orb.rings[0];
+  const high = orb.rings[orb.rings.length - 1];
+  const step = Math.max(...orb.rings.map((r) => r.angleStepDeg));
+
+  els.stats.className = 'stats';
+  els.stats.innerHTML = `
+    <div class="stat hero">
+      <span class="k">Total waktu</span>
+      <span class="v">${fmtDur(plan.duration)}</span>
+    </div>
+    <div class="stat hero">
+      <span class="k">Baterai</span>
+      <span class="v">${plan.sorties.length}<small>×</small></span>
+    </div>
+    <div class="stat">
+      <span class="k">Radius orbit</span>
+      <span class="v">${orb.radiusM.toFixed(0)}<small>m</small></span>
+    </div>
+    <div class="stat">
+      <span class="k">Ketelitian di dinding</span>
+      <span class="v">${orb.gsdBestCm.toFixed(2)}–${orb.gsdWorstCm.toFixed(2)}<small>cm/px</small></span>
+    </div>
+    <div class="stat">
+      <span class="k">Jumlah foto</span>
+      <span class="v">${orb.photos}</span>
+    </div>
+    <div class="stat">
+      <span class="k">Ruang kartu</span>
+      <span class="v">${fmtSize(orb.photos * (state.profile.mode.approxPhotoMB ?? 8))}</span>
+    </div>
+    <div class="stat">
+      <span class="k">Kecepatan</span>
+      <span class="v">${plan.speed.toFixed(1)}<small>m/s</small></span>
+    </div>
+    <div class="stat">
+      <span class="k">Waypoint</span>
+      <span class="v">${plan.grid.waypoints.length}</span>
+    </div>
+    <div class="stat">
+      <span class="k">Cincin</span>
+      <span class="v">${low.heightM.toFixed(0)}–${high.heightM.toFixed(0)}<small>m</small></span>
+    </div>
+    <div class="stat">
+      <span class="k">Titik terjauh</span>
+      <span class="v">${plan.maxDist.toFixed(0)}<small>m</small></span>
+    </div>
+    <div class="stat full">
+      <span class="k">Langkah sudut · kemiringan gimbal</span>
+      <span class="v">${step.toFixed(0)}<small>°</small> · ${low.pitchDeg}<small>°</small> → ${high.pitchDeg}<small>°</small></span>
+    </div>
+    <div class="stat full">
+      <span class="k">Drone · lensa · pola</span>
+      <span class="v sm">${esc(state.profile.name)} · ${esc(state.profile.lens.name)} ${esc(state.profile.mode.label)} · ${esc(plan.patternName)}, ${orb.rings.length} cincin${orb.cap ? ' + petak nadir' : ''}</span>
+    </div>`;
+}
+
+/** Tabel rencana tiap cincin, di panel setelan orbit. */
+function renderOrbitRings(plan) {
+  if (!plan || plan.pattern !== 'orbit') return;
+  const orb = plan.orbit;
+
+  els.orbitGsd.textContent = `${orb.gsdBestCm.toFixed(2)}–${orb.gsdWorstCm.toFixed(2)} cm/px`;
+
+  const rows = orb.rings
+    .map(
+      (r) => `<tr>
+        <td>${r.index + 1}</td>
+        <td>${r.heightM.toFixed(1)} m</td>
+        <td>${r.aimHeightM.toFixed(1)} m</td>
+        <td>${r.pitchDeg}°</td>
+        <td>${r.gsdCm.toFixed(2)}</td>
+        <td>${r.photos}</td>
+      </tr>`
+    )
+    .join('');
+
+  els.orbitRingsTable.innerHTML = `
+    <table class="ring-table">
+      <thead>
+        <tr><th>#</th><th>Tinggi</th><th>Bidik</th><th>Pitch</th><th>GSD</th><th>Foto</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${
+      orb.cap
+        ? `<p class="sub">Petak nadir: ${orb.cap.photos} foto di ${orb.cap.heightM.toFixed(0)} m, GSD ${orb.cap.gsdCm.toFixed(2)} cm/px.</p>`
+        : '<p class="sub">Petak nadir mati — puncak objek tidak akan terpotret.</p>'
+    }
+    <p class="sub">Kaki objek 0–${orb.rings[0].aimHeightM.toFixed(1)} m tidak terjangkau drone. Keliling bagian itu dengan kamera tangan, lalu gabungkan di software olah yang sama.</p>`;
+}
+
 function renderStats(plan) {
+  if (plan.pattern === 'orbit') return renderOrbitStats(plan);
   els.stats.className = 'stats';
   // Urutannya mengikuti keputusan di lapangan, bukan urutan hitungannya:
   // yang pertama ditanya orang sebelum berangkat adalah "berapa lama" dan
@@ -2268,6 +2631,7 @@ function onSave() {
     speedMs: state.speedMs,
     speedAuto: state.speedAuto,
     pattern: state.pattern,
+    orbit: { ...state.orbit },
     advanced: { ...state.advanced },
     terrain: state.terrain,
     front: Number(els.front.value),
@@ -2333,6 +2697,9 @@ function openProject(id) {
   state.lensId = p.lensId ?? '';
   state.modeId = p.modeId ?? '';
   state.pattern = p.pattern ?? 'single';
+  // Project lama tidak punya setelan orbit sama sekali — bawaan yang dipakai,
+  // bukan undefined yang bikin generator meledak.
+  state.orbit = { ...state.orbit, ...(p.orbit ?? {}) };
   state.speedAuto = p.speedAuto ?? true;
   state.advanced = { ...SAFE_ADVANCED, ...(p.advanced ?? {}) };
   syncProfile();
@@ -2350,6 +2717,7 @@ function openProject(id) {
     b.classList.toggle('active', b.dataset.pattern === state.pattern);
   });
   els.patternHint.textContent = PATTERN_HINT[state.pattern];
+  syncOrbitInputs();
 
   if (p.migratedFrom) {
     toast(
@@ -2381,6 +2749,7 @@ function openProject(id) {
 // ---------- Export ----------
 
 function planWaypointsToMission(plan, sortie) {
+  const orbit = plan.pattern === 'orbit';
   return sortie.map((w) => {
     const [lng, lat] = plan.proj.toLL(w.xy);
     return {
@@ -2392,8 +2761,14 @@ function planWaypointsToMission(plan, sortie) {
       // followWayline: arah hadap mengikuti jalur dengan sendirinya. Ini yang
       // dipakai file asli DJI Fly, dan untuk jalur bolak-balik memang itu
       // yang benar.
-      headingMode: 'followWayline',
-      gimbalPitch: plan.gimbalPitch,
+      //
+      // Orbit membalik keduanya. Arah hadap di sana justru HARUS dilawan dari
+      // arah jalur — kalau tidak, kamera menyorot tangensial dan objeknya
+      // lewat di pinggir frame. Dan gimbal tidak boleh satu angka untuk semua
+      // titik: tiap cincin punya pitch-nya sendiri, dan di petak nadir di atas
+      // kameranya nunduk lurus.
+      headingMode: orbit ? (w.poi ? plan.orbitHeadingMode : 'followWayline') : 'followWayline',
+      gimbalPitch: orbit ? (w.gimbalPitch ?? plan.gimbalPitch) : plan.gimbalPitch,
       takePhoto: true,
       // Jeda sejenak hanya di mode stop & shoot. Di mode jalan terus drone
       // melintas sambil menjepret, dan itulah bedanya sekarang — bukan lagi
@@ -2437,7 +2812,7 @@ async function exportKmz() {
     const base =
       (els.projName.value.trim() || 'survei').replace(/[^\w\-]+/g, '-') +
       (plan.resume ? '-lanjut' : '') +
-      (plan.pattern === 'single' ? '' : '-silang');
+      (plan.pattern === 'orbit' ? '-orbit' : plan.pattern === 'single' ? '' : '-silang');
     const stamp = new Date().toISOString().slice(0, 10);
 
     // buildKmz sekarang asinkron karena kompresinya memakai CompressionStream.
@@ -2447,6 +2822,17 @@ async function exportKmz() {
           waypoints: planWaypointsToMission(plan, sortie),
           height: plan.altitude,
           speed: plan.speed,
+
+          // Titik pusat orbit. Dipakai mode towardPOI, dan tetap ditulis di
+          // mode satunya supaya file-nya tetap menyimpan ke mana sebenarnya
+          // misi ini menghadap.
+          poi:
+            plan.pattern === 'orbit'
+              ? (() => {
+                  const [lng, lat] = plan.proj.toLL(plan.orbit.centerXY);
+                  return { lat, lng, height: plan.orbit.objectHeightM / 2 };
+                })()
+              : null,
 
           // Setelan lanjutan ikut masuk file, bukan cuma jadi tampilan.
           finishAction: plan.advanced.finishAction,
@@ -2578,6 +2964,7 @@ function encodeState() {
     l: state.lensId,
     pm: state.modeId,
     pt: state.pattern,
+    ob: state.pattern === 'orbit' ? state.orbit : null,
     sp: state.speedAuto ? null : state.speedMs,
     tf: state.terrain ? 1 : 0,
     adv: state.advanced,
@@ -2628,6 +3015,7 @@ function applyStateFromUrl() {
     state.lensId = d.l ?? '';
     state.modeId = d.pm ?? '';
     state.pattern = d.pt ?? 'single';
+    state.orbit = { ...state.orbit, ...(d.ob ?? {}) };
     state.terrain = !!d.tf;
     els.terrain.checked = state.terrain;
     state.advanced = { ...SAFE_ADVANCED, ...(d.adv ?? {}) };
@@ -2643,6 +3031,7 @@ function applyStateFromUrl() {
       b.classList.toggle('active', b.dataset.pattern === state.pattern);
     });
     els.patternHint.textContent = PATTERN_HINT[state.pattern];
+    syncOrbitInputs();
     modeSegButtons().forEach((b) => {
       b.classList.toggle('active', b.dataset.mode === state.mode);
     });
@@ -2656,7 +3045,8 @@ function applyStateFromUrl() {
     map.fitBounds(bounds(d.p), { padding: 70, duration: 0 });
     render();
     return true;
-  } catch {
+  } catch (err) {
+    console.error('Gagal memulihkan rencana dari link:', err);
     toast('Link rencana tidak terbaca.', 'err');
     return false;
   }
