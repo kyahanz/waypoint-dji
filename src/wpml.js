@@ -72,17 +72,25 @@ function missionConfig(m, p) {
         <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>
       </wpml:payloadInfo>`;
 
-  const takeOff = djifly
-    ? ''
-    : `
+  // Dikembalikan setelah terlihat di file buatan generator pihak ketiga yang
+  // dipakai orang untuk Mini 5 Pro: DJI Fly menerima keduanya, meski file
+  // buatan DJI Fly sendiri tidak menulisnya. Dan keduanya setelan keselamatan
+  // yang nyata — ketinggian naik sebelum transit, dan ketinggian RTH.
+  const takeOff = `
       <wpml:takeOffSecurityHeight>${num(m.takeOffSecurityHeight, 1)}</wpml:takeOffSecurityHeight>`;
+
+  const rthHeight =
+    m.rthHeight == null
+      ? ''
+      : `
+      <wpml:globalRTHHeight>${num(m.rthHeight, 1)}</wpml:globalRTHHeight>`;
 
   return `    <wpml:missionConfig>
       <wpml:flyToWaylineMode>${m.flyToWaylineMode}</wpml:flyToWaylineMode>
       <wpml:finishAction>${m.finishAction}</wpml:finishAction>
       <wpml:exitOnRCLost>${m.exitOnRCLost}</wpml:exitOnRCLost>
       <wpml:executeRCLostAction>${m.executeRCLostAction}</wpml:executeRCLostAction>${takeOff}
-      <wpml:globalTransitionalSpeed>${num(m.transitionalSpeed, 1)}</wpml:globalTransitionalSpeed>
+      <wpml:globalTransitionalSpeed>${num(m.transitionalSpeed, 1)}</wpml:globalTransitionalSpeed>${rthHeight}
       <wpml:droneInfo>
         <wpml:droneEnumValue>${p.droneEnumValue}</wpml:droneEnumValue>
         <wpml:droneSubEnumValue>${p.droneSubEnumValue}</wpml:droneSubEnumValue>
@@ -95,7 +103,7 @@ function missionConfig(m, p) {
  * mulai dari 1; kami ikut, karena satu-satunya contoh yang terbukti diterima
  * drone berbentuk begitu.
  */
-function actionGroup({ id, startIndex, endIndex, actions }) {
+function actionGroup({ id = 1, startIndex, endIndex, actions }) {
   if (!actions.length) return '';
 
   return `
@@ -103,7 +111,7 @@ function actionGroup({ id, startIndex, endIndex, actions }) {
           <wpml:actionGroupId>${id}</wpml:actionGroupId>
           <wpml:actionGroupStartIndex>${startIndex}</wpml:actionGroupStartIndex>
           <wpml:actionGroupEndIndex>${endIndex}</wpml:actionGroupEndIndex>
-          <wpml:actionGroupMode>parallel</wpml:actionGroupMode>
+          <wpml:actionGroupMode>sequence</wpml:actionGroupMode>
           <wpml:actionTrigger>
             <wpml:actionTriggerType>reachPoint</wpml:actionTriggerType>
           </wpml:actionTrigger>
@@ -111,21 +119,22 @@ ${actions.join('\n')}
         </wpml:actionGroup>`;
 }
 
-function gimbalRotateAction(id, pitch) {
+/**
+ * Putar gimbal ke sudut tetap.
+ *
+ * Bentuk pendek `gimbalEvenlyRotate` dipakai, bukan `gimbalRotate` yang
+ * panjang. Dua-duanya muncul di file asli DJI Fly, tapi generator pihak
+ * ketiga yang dipakai orang untuk Mini 5 Pro memakai yang pendek di SETIAP
+ * titik — dan itu contoh yang lebih dekat dengan apa yang kita butuhkan,
+ * karena dia memang untuk pemetaan.
+ */
+function gimbalAction(id, pitch) {
   return `          <wpml:action>
             <wpml:actionId>${id}</wpml:actionId>
-            <wpml:actionActuatorFunc>gimbalRotate</wpml:actionActuatorFunc>
+            <wpml:actionActuatorFunc>gimbalEvenlyRotate</wpml:actionActuatorFunc>
             <wpml:actionActuatorFuncParam>
-              <wpml:gimbalHeadingYawBase>aircraft</wpml:gimbalHeadingYawBase>
-              <wpml:gimbalRotateMode>absoluteAngle</wpml:gimbalRotateMode>
-              <wpml:gimbalPitchRotateEnable>1</wpml:gimbalPitchRotateEnable>
               <wpml:gimbalPitchRotateAngle>${num(pitch, 1)}</wpml:gimbalPitchRotateAngle>
-              <wpml:gimbalRollRotateEnable>1</wpml:gimbalRollRotateEnable>
               <wpml:gimbalRollRotateAngle>0</wpml:gimbalRollRotateAngle>
-              <wpml:gimbalYawRotateEnable>0</wpml:gimbalYawRotateEnable>
-              <wpml:gimbalYawRotateAngle>0</wpml:gimbalYawRotateAngle>
-              <wpml:gimbalRotateTimeEnable>0</wpml:gimbalRotateTimeEnable>
-              <wpml:gimbalRotateTime>0</wpml:gimbalRotateTime>
               <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>
             </wpml:actionActuatorFuncParam>
           </wpml:action>`;
@@ -136,6 +145,7 @@ function takePhotoAction(id, index) {
             <wpml:actionId>${id}</wpml:actionId>
             <wpml:actionActuatorFunc>takePhoto</wpml:actionActuatorFunc>
             <wpml:actionActuatorFuncParam>
+              <wpml:fileSuffix>${index + 1}</wpml:fileSuffix>
               <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>
             </wpml:actionActuatorFuncParam>
           </wpml:action>`;
@@ -201,8 +211,10 @@ function intervalActionGroup(m, lastIndex, id) {
 function headingParam(wp, m, i = 0) {
   const mode = wp.headingMode ?? m.headingMode;
   const angle = wp.heading ?? 0;
-  const enable =
-    mode === 'followWayline' ? (i === 0 ? 1 : 0) : mode === 'smoothTransition' ? 1 : 0;
+  // File buatan DJI Fly memasang 1 di titik pertama, tapi generator pihak
+  // ketiga memasang 0 di semua titik — dan file kita yang meniru DJI Fly
+  // justru ditolak. Jadi yang diikuti contoh yang dipakai orang memetakan.
+  const enable = mode === 'smoothTransition' ? 1 : 0;
 
   return `        <wpml:waypointHeadingParam>
           <wpml:waypointHeadingMode>${mode}</wpml:waypointHeadingMode>
@@ -223,41 +235,33 @@ function turnParam(m) {
 
 /** Placemark untuk waylines.wpml — satu-satunya tempat waypoint hidup. */
 function waylinePlacemark(wp, i, m, total) {
-  const groups = [];
-  let groupId = 1;
-
-  // Gimbal dipasang sekali di titik pertama, lalu dikunci lewat
-  // waypointGimbalHeadingParam di tiap titik — persis pola file asli.
-  if (i === 0 && wp.gimbalPitch !== undefined && wp.gimbalPitch !== null) {
-    groups.push(
-      actionGroup({
-        id: groupId++,
-        startIndex: 0,
-        endIndex: 0,
-        actions: [gimbalRotateAction(1, wp.gimbalPitch)],
-      })
-    );
-  }
-
-  const perPoint = [];
+  // Satu action group per titik, berisi gimbal lalu hover lalu foto — urutan
+  // dan susunan ini menyalin generator pihak ketiga yang memang dipakai orang
+  // untuk memetakan dengan Mini 5 Pro. Sebelumnya gimbal cuma dipasang sekali
+  // di titik pertama dan pemotretan diserahkan ke perintah interval; file
+  // seperti itu ditolak DJI Fly.
+  const actions = [];
   let actionId = 1;
-  if (wp.hoverTime) perPoint.push(hoverAction(actionId++, wp.hoverTime));
-  if (wp.takePhoto) perPoint.push(takePhotoAction(actionId++, i));
 
-  if (perPoint.length) {
-    groups.push(
-      actionGroup({ id: groupId++, startIndex: i, endIndex: i, actions: perPoint })
-    );
+  if (wp.gimbalPitch !== undefined && wp.gimbalPitch !== null) {
+    actions.push(gimbalAction(actionId++, wp.gimbalPitch));
   }
+  if (wp.hoverTime) actions.push(hoverAction(actionId++, wp.hoverTime));
+  if (wp.takePhoto) actions.push(takePhotoAction(actionId++, i));
 
-  if (i === 0) groups.push(intervalActionGroup(m, total - 1, 900));
+  const groups = [actionGroup({ id: 1, startIndex: i, endIndex: i, actions })];
 
-  const gimbalHeading =
-    wp.gimbalPitch === undefined || wp.gimbalPitch === null
-      ? ''
-      : `
+  // Perintah jepret-per-jarak hanya ditulis kalau diminta secara eksplisit.
+  // Tidak ada satu pun contoh nyata yang memakainya, jadi ini jalur yang
+  // belum terbukti — bukan bawaan.
+  if (i === 0 && m.intervalShooting) groups.push(intervalActionGroup(m, total - 1, 900));
+
+  // Sudut di sini ditulis 0 mengikuti contoh yang ada: yang benar-benar
+  // menggerakkan gimbal adalah aksi di atas, dan nilai di sini rupanya
+  // diperlakukan sebagai offset, bukan sudut mutlak.
+  const gimbalHeading = `
         <wpml:waypointGimbalHeadingParam>
-          <wpml:waypointGimbalPitchAngle>${num(wp.gimbalPitch, 1)}</wpml:waypointGimbalPitchAngle>
+          <wpml:waypointGimbalPitchAngle>0</wpml:waypointGimbalPitchAngle>
           <wpml:waypointGimbalYawAngle>0</wpml:waypointGimbalYawAngle>
         </wpml:waypointGimbalHeadingParam>`;
 
@@ -344,23 +348,19 @@ ${wps}
 }
 
 export function buildWaylinesWpml(mission, profile) {
-  const djifly = dialectOf(profile) === 'djifly';
   const total = mission.waypoints.length;
 
   // DJI Fly menulis 0 untuk keduanya dan menghitung sendiri saat memuat.
   // Angka hasil hitungan kita dulu ditulis di sini; kalau ternyata dipakai
   // mentah-mentah oleh drone, angka yang meleset lebih berbahaya daripada
   // nol yang jujur.
-  let distance = 0;
-  let duration = 0;
-
-  if (!djifly) {
-    const pts = mission.waypoints.map((w) => ({ lat: w.lat, lng: w.lng }));
-    distance = pathLength(pts);
-    const hover = mission.waypoints.reduce((s, w) => s + (w.hoverTime || 0), 0);
-    const shots = mission.waypoints.filter((w) => w.takePhoto).length * 2;
-    duration = distance / mission.speed + hover + shots;
-  }
+  // DJI Fly sendiri menulis 0 di sini, tapi generator pihak ketiga yang
+  // dipakai orang menulis angka hasil hitungan — dan itu yang kita ikuti,
+  // karena angka yang benar lebih berguna daripada nol kalau ternyata dibaca.
+  const pts = mission.waypoints.map((w) => ({ lat: w.lat, lng: w.lng }));
+  const distance = pathLength(pts);
+  const hover = mission.waypoints.reduce((s, w) => s + (w.hoverTime || 0), 0);
+  const duration = distance / mission.speed + hover;
 
   const wps = mission.waypoints
     .map((wp, i) => waylinePlacemark(wp, i, mission, total))
@@ -416,10 +416,11 @@ export const MISSION_DEFAULTS = {
   finishAction: 'goHome', // goHome | noAction | autoLand | gotoFirstWaypoint
   exitOnRCLost: 'executeLostAction', // goContinue | executeLostAction
   executeRCLostAction: 'goBack', // goBack | landing | hover
-  takeOffSecurityHeight: 20, // hanya dipakai dialek enterprise
+  takeOffSecurityHeight: 20, // naik ke sini dulu sebelum menuju titik awal
+  rthHeight: 100, // ketinggian pulang otomatis
   transitionalSpeed: 2.5, // m/s menuju waypoint pertama
   headingMode: 'followWayline', // followWayline | manually | fixed | smoothTransition
-  turnMode: 'toPointAndStopWithContinuityCurvature',
+  turnMode: 'toPointAndPassWithContinuityCurvature',
   turnDampingDist: 0,
   useStraightLine: 0,
 };

@@ -248,23 +248,24 @@ export function generateGrid(polyXY, o) {
     const dir = unrot([b[0] - a[0], 0]);
     const heading = (((Math.atan2(dir[0], dir[1]) * 180) / Math.PI) + 360) % 360;
 
-    if (mode === 'stopAndShoot') {
-      // Satu waypoint per foto — presisi, tapi lambat dan boros waypoint.
-      for (let i = 0; i < shotsOnLine; i++) {
-        const t = i / (shotsOnLine - 1);
-        waypoints.push({
-          xy: unrot([a[0] + (b[0] - a[0]) * t, seg.y]),
-          heading,
-          takePhoto: true,
-          photos: 1,
-        });
-      }
-    } else {
-      // Dua waypoint per jalur — pemotretan dipicu per jarak oleh drone.
-      // Jatah foto dibebankan ke titik akhir jalur, supaya jumlah foto per
-      // sortie tetap bisa dihitung setelah jalur dipecah per baterai.
-      waypoints.push({ xy: unrot(a), heading, takePhoto: false, photos: 0 });
-      waypoints.push({ xy: unrot(b), heading, takePhoto: false, photos: shotsOnLine });
+    // Satu waypoint per foto, untuk kedua mode.
+    //
+    // Dulu mode "jalan terus" cuma menaruh dua waypoint per jalur dan
+    // menyerahkan pemotretan ke perintah jepret-per-jarak. File seperti itu
+    // ditolak DJI Fly, dan tidak ada satu pun contoh nyata — baik file buatan
+    // DJI Fly sendiri maupun generator pihak ketiga — yang memakai perintah
+    // interval. Yang dipakai keduanya: aksi ambil foto di setiap titik.
+    //
+    // Bedanya dua mode sekarang bukan jumlah waypoint, melainkan apakah drone
+    // berhenti sejenak di tiap titik (hoverTime) atau melintas terus.
+    for (let i = 0; i < shotsOnLine; i++) {
+      const t = i / (shotsOnLine - 1);
+      waypoints.push({
+        xy: unrot([a[0] + (b[0] - a[0]) * t, seg.y]),
+        heading,
+        takePhoto: true,
+        photos: 1,
+      });
     }
   }
 
@@ -406,6 +407,11 @@ export function splitByBattery(waypoints, o) {
     transitReserveSec = 120,
     accel = 2.5,
     stopAtEach = false,
+    // Batas jumlah waypoint per misi. Sejak tiap foto butuh waypoint-nya
+    // sendiri, inilah yang lebih dulu kena di lahan luas — bukan baterai.
+    // Melewatinya berarti file ditolak, jadi pembagiannya ikut memotong di
+    // sini, bukan cuma memperingatkan setelah terlanjur.
+    maxWaypoints = Infinity,
   } = o;
 
   const budget = usableFlightMin * 60 - transitReserveSec;
@@ -426,7 +432,7 @@ export function splitByBattery(waypoints, o) {
     }
     if (wp.takePhoto) cost += hoverPerPhotoSec;
 
-    if (current.length && elapsed + cost > budget) {
+    if (current.length && (elapsed + cost > budget || current.length >= maxWaypoints)) {
       sorties.push(current);
       current = [];
       elapsed = 0;

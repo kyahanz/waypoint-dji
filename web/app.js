@@ -1471,6 +1471,7 @@ function buildPlan() {
     usableFlightMin: profile.limits.usableFlightMin,
     hoverPerPhotoSec: hoverPerPhoto,
     transitReserveSec,
+    maxWaypoints: lim.maxWaypoints,
   });
 
   // ---- Terrain following ----
@@ -2369,7 +2370,10 @@ function planWaypointsToMission(plan, sortie) {
       // yang benar.
       headingMode: 'followWayline',
       gimbalPitch: plan.gimbalPitch,
-      takePhoto: plan.stopAtEach,
+      takePhoto: true,
+      // Jeda sejenak hanya di mode stop & shoot. Di mode jalan terus drone
+      // melintas sambil menjepret, dan itulah bedanya sekarang — bukan lagi
+      // soal berapa waypoint yang ditulis.
       hoverTime: plan.stopAtEach ? 2 : 0,
     };
   });
@@ -2430,9 +2434,12 @@ async function exportKmz() {
           takeOffSecurityHeight: plan.advanced.safeHeightM,
           flyToWaylineMode: 'safely',
 
-          intervalShooting: plan.stopAtEach
-            ? null
-            : { mode: 'distance', value: plan.params.frontSpacing },
+          rthHeight: plan.advanced.safeHeightM,
+
+          // Tidak ada perintah jepret-per-jarak: tidak ada satu pun contoh
+          // nyata yang memakainya, dan file yang memakainya ditolak DJI Fly.
+          // Setiap titik membawa aksi ambil fotonya sendiri.
+          intervalShooting: null,
         },
         state.profile
       );

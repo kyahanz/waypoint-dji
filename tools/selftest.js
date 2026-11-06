@@ -239,8 +239,8 @@ console.log('\nIsi file WPML');
   const mission = {
     ...MISSION_DEFAULTS,
     waypoints: [
-      { lat: -6.25, lng: 107.12, height: 80, speed: 8, heading: 90, headingMode: 'followWayline', gimbalPitch: -45, takePhoto: false, hoverTime: 0 },
-      { lat: -6.251, lng: 107.121, height: 85, speed: 8, heading: 90, headingMode: 'followWayline', gimbalPitch: -45, takePhoto: false, hoverTime: 0 },
+      { lat: -6.25, lng: 107.12, height: 80, speed: 8, heading: 90, headingMode: 'followWayline', gimbalPitch: -45, takePhoto: true, hoverTime: 1 },
+      { lat: -6.251, lng: 107.121, height: 85, speed: 8, heading: 90, headingMode: 'followWayline', gimbalPitch: -45, takePhoto: true, hoverTime: 1 },
     ],
     height: 80,
     speed: 8,
@@ -263,12 +263,14 @@ console.log('\nIsi file WPML');
   // Tag khas Enterprise TIDAK boleh muncul di dialek DJI Fly: file asli
   // tidak memuatnya, dan tag asing ke parser yang menolak tanpa pesan error
   // adalah cara tercepat bikin impor gagal tanpa ketahuan sebabnya.
-  for (const tag of ['payloadInfo', 'takeOffSecurityHeight', 'templateType', 'globalHeight']) {
+  for (const tag of ['payloadInfo', 'templateType', 'globalHeight']) {
     ok(!kml.includes(`wpml:${tag}`) && !wpml.includes(`wpml:${tag}`), `tanpa ${tag}`);
   }
   ok(!kml.includes('<Placemark>'), 'template.kml tanpa Placemark, seperti file asli');
   ok(kml.includes('<wpml:author>fly</wpml:author>'), 'author fly');
-  ok(wpml.includes('<wpml:distance>0</wpml:distance>'), 'distance 0, dihitung drone sendiri');
+  ok(kml.includes('<wpml:takeOffSecurityHeight>'), 'takeOffSecurityHeight ditulis');
+  ok(kml.includes('<wpml:globalRTHHeight>'), 'globalRTHHeight ditulis');
+  ok(!/<wpml:distance>0<\/wpml:distance>/.test(wpml), 'distance dihitung, bukan nol');
 
   // Sejak template.kml jadi minimal, tiap tag harus diperiksa di berkas yang
   // memang memuatnya — bukan di dua-duanya.
@@ -283,9 +285,10 @@ console.log('\nIsi file WPML');
 
   for (const [label, want] of [
     ['gimbal -45', '<wpml:gimbalPitchRotateAngle>-45</wpml:gimbalPitchRotateAngle>'],
-    ['gimbal dikunci tiap titik', '<wpml:waypointGimbalPitchAngle>-45</wpml:waypointGimbalPitchAngle>'],
-    ['belok mulus seperti DJI Fly', 'toPointAndStopWithContinuityCurvature'],
-    ['action group paralel', '<wpml:actionGroupMode>parallel</wpml:actionGroupMode>'],
+    ['gimbal diputar tiap titik', '<wpml:actionActuatorFunc>gimbalEvenlyRotate</wpml:actionActuatorFunc>'],
+    ['belok lewat, bukan berhenti', 'toPointAndPassWithContinuityCurvature'],
+    ['action group berurutan', '<wpml:actionGroupMode>sequence</wpml:actionGroupMode>'],
+    ['fileSuffix ikut ditulis', '<wpml:fileSuffix>'],
     ['useStraightLine 0', '<wpml:useStraightLine>0</wpml:useStraightLine>'],
     ['poi index ikut ditulis', '<wpml:waypointHeadingPoiIndex>0</wpml:waypointHeadingPoiIndex>'],
     ['arah hadap followWayline', '<wpml:waypointHeadingMode>followWayline</wpml:waypointHeadingMode>'],
