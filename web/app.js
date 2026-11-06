@@ -2431,8 +2431,9 @@ async function exportKmz() {
       (plan.pattern === 'single' ? '' : '-silang');
     const stamp = new Date().toISOString().slice(0, 10);
 
-    const files = plan.sorties.map((sortie, i) => {
-      const bytes = buildKmz(
+    // buildKmz sekarang asinkron karena kompresinya memakai CompressionStream.
+    const files = await Promise.all(plan.sorties.map(async (sortie, i) => {
+      const bytes = await buildKmz(
         {
           waypoints: planWaypointsToMission(plan, sortie),
           height: plan.altitude,
@@ -2463,7 +2464,7 @@ async function exportKmz() {
           ? `${base}-${stamp}_${i + 1}dari${plan.sorties.length}.kmz`
           : `${base}-${stamp}.kmz`;
       return { bytes, name };
-    });
+    }));
 
     if (canShareFiles()) {
       try {

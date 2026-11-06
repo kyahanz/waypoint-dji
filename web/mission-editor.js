@@ -9,7 +9,7 @@
 // itu tidak punya arti dan menampilkannya cuma akan menyesatkan.
 
 import { readZip } from './unzip.js';
-import { createZip } from '../src/zip-core.js';
+import { createZipAsync } from './zip-browser.js';
 import {
   parseWaylines,
   serializeWaylines,
@@ -22,47 +22,6 @@ import {
 } from '../src/wpml-edit.js';
 
 const EMPTY = { type: 'FeatureCollection', features: [] };
-
-/**
- * Deflate lewat API browser, supaya arsipnya semirip mungkin dengan buatan
- * DJI Fly — yang entrinya terkompresi, bukan disimpan mentah. Satu perbedaan
- * lagi yang dihilangkan dari daftar tersangka kalau nanti impor gagal.
- */
-async function deflateEntries(entries) {
-  if (typeof CompressionStream === 'undefined') return null;
-
-  // Entri diubah jadi byte LEBIH DULU, dan peta hasil kompresi dikunci pada
-  // instance byte itu juga. Penulis ZIP memanggil deflate() dengan byte hasil
-  // konversinya sendiri, jadi kalau kuncinya berupa string, pencarian selalu
-  // meleset — dan meleset di sini berarti data mentah ditulis dengan penanda
-  // "terkompresi". Arsipnya jadi rusak tanpa ada yang error.
-  const prepared = entries.map((e) =>
-    e.dir || e.data == null
-      ? e
-      : {
-          ...e,
-          data: typeof e.data === 'string' ? new TextEncoder().encode(e.data) : e.data,
-        }
-  );
-
-  const map = new Map();
-  for (const e of prepared) {
-    if (e.dir || e.data == null) continue;
-    const stream = new Blob([e.data]).stream().pipeThrough(new CompressionStream('deflate-raw'));
-    map.set(e.data, new Uint8Array(await new Response(stream).arrayBuffer()));
-  }
-
-  return {
-    entries: prepared,
-    deflate: (bytes) => {
-      const hit = map.get(bytes);
-      // Lebih baik gagal terang-terangan daripada menghasilkan arsip rusak
-      // yang baru ketahuan waktu DJI Fly menolaknya tanpa pesan.
-      if (!hit) throw new Error('Kompresi meleset — file tidak jadi dibuat.');
-      return hit;
-    },
-  };
-}
 
 export function createMissionEditor({ map, toast, $, onModeChange }) {
   const state = {
@@ -354,12 +313,7 @@ export function createMissionEditor({ map, toast, $, onModeChange }) {
         else entries.push({ name, data: bytes });
       }
 
-      // Tanpa CompressionStream, entri disimpan mentah (method 0). Itu tetap
-      // ZIP yang sah — cuma lebih besar dan sedikit kurang mirip arsip DJI.
-      const packed = await deflateEntries(entries);
-      const bytes = packed
-        ? createZip(packed.entries, { deflate: packed.deflate })
-        : createZip(entries);
+      const bytes = await createZipAsync(entries);
 
       const base = state.name.replace(/\.kmz$/i, '');
       downloadBlob(bytes, `${base}-diedit.kmz`);

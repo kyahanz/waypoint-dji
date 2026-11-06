@@ -22,6 +22,7 @@ const WEB_FILES = [
   'unzip.js',
   'exif.js',
   'mission-editor.js',
+  'zip-browser.js',
   'view3d.js',
   'offline.js',
   'sw.js',
