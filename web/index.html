@@ -53,7 +53,100 @@
             <div id="search-results" class="results" hidden></div>
           </header>
 
-          <section class="step">
+          <section class="step" id="step-open">
+            <div class="step-head">
+              <span class="num">⇪</span>
+              <h2>Buka KMZ yang sudah ada</h2>
+            </div>
+            <p class="hint">
+              Punya file dari DJI Fly? Buka di sini untuk menggeser titiknya,
+              mengubah ketinggian, atau memperbaiki setelan — tanpa membuat
+              ulang file. Apa pun yang tidak kamu sentuh tetap persis seperti
+              tulisan DJI Fly.
+            </p>
+            <label class="btn wide" for="mission-file">Pilih file KMZ</label>
+            <input id="mission-file" type="file" accept=".kmz" hidden />
+            <div id="mission-open-note" class="note bad" hidden>
+              <span class="ic">!</span><span id="mission-open-text"></span>
+            </div>
+          </section>
+
+          <section class="step" id="step-edit" hidden>
+            <div class="step-head">
+              <span class="num">✎</span>
+              <h2>Edit misi</h2>
+            </div>
+
+            <div class="readout">
+              <span id="edit-name">—</span><strong id="edit-count">—</strong>
+            </div>
+            <p class="sub" id="edit-origin">—</p>
+
+            <div class="field">
+              <div class="field-head">
+                <label for="edit-alt">Ketinggian semua titik</label>
+                <output id="edit-alt-out">— m</output>
+              </div>
+              <input id="edit-alt" type="range" min="5" max="500" step="1" value="50" />
+            </div>
+
+            <div class="field">
+              <div class="field-head">
+                <label for="edit-speed">Kecepatan semua titik</label>
+                <output id="edit-speed-out">— m/s</output>
+              </div>
+              <input id="edit-speed" type="range" min="1" max="15" step="0.5" value="2.5" />
+            </div>
+
+            <div class="field">
+              <div class="field-head">
+                <label for="edit-gimbal">Gimbal pitch</label>
+                <output id="edit-gimbal-out">—°</output>
+              </div>
+              <input id="edit-gimbal" type="range" min="-90" max="0" step="5" value="-90" />
+            </div>
+
+            <div class="field">
+              <label class="block-label" for="edit-finish">Setelah selesai</label>
+              <select id="edit-finish" class="pick">
+                <option value="goHome">RTH — pulang sendiri</option>
+                <option value="hover">Diam di titik terakhir</option>
+                <option value="gotoFirstWaypoint">Balik ke waypoint pertama</option>
+                <option value="autoLand">Mendarat di tempat</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label class="block-label" for="edit-rc">Sinyal hilang</label>
+              <select id="edit-rc" class="pick">
+                <option value="goBack">RTH — pulang sendiri</option>
+                <option value="hover">Diam di tempat</option>
+                <option value="landing">Mendarat di tempat</option>
+              </select>
+            </div>
+
+            <div class="readout" id="edit-sel-readout" hidden>
+              <span id="edit-sel-label">Titik terpilih</span>
+              <strong id="edit-sel-val">—</strong>
+            </div>
+            <div class="row tight split">
+              <button id="btn-edit-insert" class="btn" disabled>Sisipkan titik</button>
+              <button id="btn-edit-delete" class="btn ghost" disabled>Hapus titik</button>
+            </div>
+
+            <div id="edit-warnings"></div>
+
+            <button id="btn-edit-save" class="btn primary wide">Simpan jadi KMZ</button>
+            <div class="row tight split">
+              <button id="btn-edit-reset" class="btn ghost">Kembalikan ke aslinya</button>
+              <button id="btn-edit-close" class="btn ghost">Tutup</button>
+            </div>
+            <p class="sub">
+              Geser titik langsung di peta. Ketuk titik untuk memilihnya.
+            </p>
+          </section>
+
+          <section class="step" id="step-area">
             <div class="step-head">
               <span class="num" id="num-1">1</span>
               <h2>Area survei</h2>

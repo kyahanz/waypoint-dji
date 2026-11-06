@@ -1747,3 +1747,44 @@ input:focus-visible,
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- Editor misi ---------- */
+
+/* Mode edit dan perencana area memakai peta yang sama. Supaya tidak ada yang
+   bingung sedang memakai yang mana, bagian perencana disembunyikan seluruhnya
+   selama ada misi yang dibuka — bukan cuma diredupkan. */
+body.editing-mission #step-area,
+body.editing-mission #step-area ~ .step:not(#step-edit),
+body.editing-mission #map-help,
+body.editing-mission #legend {
+  display: none;
+}
+
+.mwp {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 2px solid #f0b429;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: grab;
+  box-shadow: var(--shadow-sm);
+}
+
+.mwp:active {
+  cursor: grabbing;
+}
+
+.mwp.sel {
+  background: #f0b429;
+  color: #2a1d02;
+  transform: scale(1.15);
+}
+
+#step-edit .readout strong {
+  font-variant-numeric: tabular-nums;
+}

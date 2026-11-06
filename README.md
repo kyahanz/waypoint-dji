@@ -364,6 +364,28 @@ selalu siap ambil alih manual saat menerbangkannya.
   Aplikasi tidak pernah diam-diam membetulkan angka; kalau ada yang berbahaya,
   dia bilang.
 
+## Dua mode
+
+**Rencanakan** — gambar lahan, aplikasi menghitung jalurnya. Ini mode yang
+dipakai untuk mapping: GSD, overlap, pola silang, pembagian baterai.
+
+**Edit KMZ** — buka file yang sudah ada, geser titiknya, ubah ketinggian,
+kecepatan, gimbal, atau setelan RTH, lalu simpan lagi.
+
+Mode edit sengaja tidak membangun ulang file. File diperlakukan sebagai teks
+dan hanya angka yang kamu sentuh yang diubah; sisanya — termasuk tag yang
+belum kita pahami — tetap di tempatnya huruf per huruf. Alasannya: file
+buatan DJI Fly adalah satu-satunya bentuk yang terbukti diterima drone, dan
+menulis ulang berarti mempertaruhkan jaminan itu demi kerapian yang tidak ada
+gunanya.
+
+Dibuktikan di `npm test`: membuka lalu menyimpan tanpa perubahan menghasilkan
+berkas yang identik, dan mengubah ketinggian 3 titik hanya menyentuh 6 baris.
+
+Mode edit tidak menampilkan GSD, overlap, atau jumlah baterai. Titik dalam
+file sembarang tidak punya pola jalur, jadi angka-angka itu tidak punya arti
+di sana.
+
 ## Yang belum diverifikasi
 
 Jujur soal ini lebih berguna daripada daftar fitur:

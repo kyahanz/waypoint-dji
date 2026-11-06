@@ -21,6 +21,7 @@ const WEB_FILES = [
   'kmz.js',
   'unzip.js',
   'exif.js',
+  'mission-editor.js',
   'view3d.js',
   'offline.js',
   'sw.js',
@@ -35,6 +36,7 @@ const SRC_FILES = [
   'zip-core.js',
   'terrain.js',
   'profiles.js',
+  'wpml-edit.js',
   'safety.js',
 ];
 

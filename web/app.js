@@ -30,6 +30,7 @@ import {
 } from '../src/profiles.js';
 import { evaluateSafety } from '../src/safety.js';
 import { readEnumsFromKmz } from './unzip.js';
+import { createMissionEditor } from './mission-editor.js';
 import { readLastPhoto } from './exif.js';
 import {
   installTerrainSources,
@@ -238,6 +239,7 @@ map.doubleClickZoom.disable();
 
 let editor = null;
 let homeMarker = null;
+let missionEditor = null;
 
 // Peta siap dipasangi sumber dan layer begitu style-nya termuat. Sengaja
 // tidak menunggu event 'load', karena 'load' baru menyala setelah render
@@ -353,8 +355,24 @@ const initMapInner = () => {
   loadProfile();
   refreshProjectList();
 
+  missionEditor = createMissionEditor({
+    map,
+    toast,
+    $,
+    // Saat misi dibuka, perencana area disembunyikan: dua mode yang bekerja
+    // di peta yang sama akan saling menimpa kalau dibiarkan hidup bersama.
+    onModeChange: (editing) => {
+      if (editing) {
+        editor.clear();
+        state.resume = null;
+        state.resumePicking = false;
+      }
+      render();
+    },
+  });
+
   // Pegangan untuk inspeksi dari konsol saat mengembangkan prototipe.
-  window.__wp = { map, editor, state };
+  window.__wp = { map, editor, state, missionEditor };
 };
 
 map.on('style.load', initMap);

@@ -1,7 +1,7 @@
 // Service worker: membuat aplikasi dan tile peta tetap bisa dipakai tanpa
 // sinyal. Dipasang dari app.js, hanya jalan di konteks aman (https/localhost).
 
-const SHELL = 'wpdji-shell-v4';
+const SHELL = 'wpdji-shell-v5';
 const TILES = 'wpdji-tiles-v1';
 const DATA = 'wpdji-data-v1';
 
@@ -16,6 +16,7 @@ const SHELL_FILES = [
   './kmz.js',
   './unzip.js',
   './exif.js',
+  './mission-editor.js',
   './view3d.js',
   './offline.js',
   '../src/survey.js',
@@ -24,6 +25,7 @@ const SHELL_FILES = [
   '../src/zip-core.js',
   '../src/terrain.js',
   '../src/profiles.js',
+  '../src/wpml-edit.js',
   '../src/safety.js',
   '../profiles/drones.json',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js',

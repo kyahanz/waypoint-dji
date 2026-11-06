@@ -348,5 +348,72 @@ console.log('\nBaca posisi dari foto');
   }
 }
 
+// ---------------------------------------------------------------- edit KMZ
+
+console.log('\nEdit file WPML di tempat');
+{
+  const E = await import('../src/wpml-edit.js');
+  const { buildWaylinesWpml, MISSION_DEFAULTS } = await import('../src/wpml.js');
+
+  const prof2 = resolveProfile(registry, { droneId: 'mini5pro' });
+  const wps = [0, 1, 2].map((i) => ({
+    lat: -6.25 - i * 0.001,
+    lng: 107.1 + i * 0.001,
+    height: 50,
+    speed: 2.5,
+    heading: 0,
+    headingMode: 'followWayline',
+    gimbalPitch: -90,
+    takePhoto: true,
+    hoverTime: 2,
+  }));
+  const xml = buildWaylinesWpml(
+    { ...MISSION_DEFAULTS, waypoints: wps, height: 50, speed: 2.5 },
+    prof2
+  );
+
+  const doc = E.parseWaylines(xml);
+  ok(doc.waypoints.length === 3, 'tiga titik terbaca');
+
+  // Syarat paling keras: tanpa diedit, berkas keluar identik huruf per huruf.
+  ok(E.serializeWaylines(doc) === xml, 'tanpa perubahan, berkas keluar identik');
+
+  const naik = {
+    ...doc,
+    placemarks: doc.placemarks.map((m) => E.writeWaypoint(m, { height: 73, speed: 6 })),
+  };
+  const naikXml = E.serializeWaylines(naik);
+  const d2 = E.parseWaylines(naikXml);
+  ok(
+    d2.waypoints.every((w) => w.height === 73 && w.speed === 6),
+    'ketinggian & kecepatan semua titik terubah'
+  );
+
+  // Hanya baris yang memang diubah yang boleh beda — inilah seluruh alasan
+  // pendekatan edit-di-tempat dipilih.
+  const a = xml.split('\n');
+  const b = naikXml.split('\n');
+  const beda = a.filter((line, i) => line !== b[i]).length;
+  ok(beda === 6, 'cuma 6 baris berubah, 2 per titik', beda + ' baris');
+
+  const w = E.readWaypoint(E.writeWaypoint(doc.placemarks[0], { lng: 107.5, lat: -6.5 }));
+  ok(w.lng === 107.5 && w.lat === -6.5, 'koordinat tergeser');
+
+  const kurang = E.renumber(doc.placemarks.slice(1));
+  const kurangXml = E.serializeWaylines({ ...doc, placemarks: kurang });
+  ok(
+    E.parseWaylines(kurangXml).waypoints.map((x) => x.index).join(',') === '0,1',
+    'penomoran rapat lagi setelah titik dihapus'
+  );
+
+  const cfg = E.readMissionConfig(xml);
+  ok(cfg.finishAction === 'goHome' && cfg.droneEnumValue === 68, 'setelan misi terbaca');
+  ok(
+    E.getTag(E.writeMissionConfig(xml, { finishAction: 'hover' }), 'finishAction') === 'hover',
+    'setelan misi bisa diubah'
+  );
+}
+
+
 console.log(failed ? `\n${failed} pemeriksaan GAGAL\n` : '\nSemua pemeriksaan lolos\n');
 process.exit(failed ? 1 : 0);
