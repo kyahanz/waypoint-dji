@@ -16,6 +16,7 @@ import {
   generatePattern,
   peakSpeedOverLeg,
   medianLegM,
+  resumeIndexFor,
   PATTERNS,
   surfaceGsd,
   slantRange,
@@ -1023,6 +1024,44 @@ console.log('\nGerbang keselamatan: ketinggian pulang otomatis');
     !codes(lama).includes('rth-height'),
     'rencana tanpa setelan RTH dilewati, bukan error'
   );
+}
+
+
+// ------------------------------------------- lanjutkan misi: titik mulai
+
+console.log('\nLanjutkan misi: dari waypoint mana jalur dipotong');
+{
+  // Fungsi ini dulu hidup di web/app.js, di luar jangkauan npm test — dan di
+  // situlah cabang paritasnya selamat jauh setelah asumsinya tidak berlaku.
+  const wps = Array.from({ length: 10 }, (_, i) => ({ xy: [i * 10, 0], pass: i < 5 ? 0 : 1 }));
+
+  ok(resumeIndexFor(wps, 0) === 0, 'titik pertama tidak bisa mundur lagi');
+  ok(resumeIndexFor(wps, -3) === 0, 'nomor negatif tidak menghasilkan indeks negatif');
+  ok(resumeIndexFor(wps, 1) === 0, 'dari titik kedua, mundur ke titik pertama');
+  ok(resumeIndexFor(wps, 7) === 6, 'selalu mundur tepat satu foto', '7 -> 6');
+
+  // Inti perbaikannya: hasilnya tidak lagi bergantung ganjil-genap nomor urut,
+  // dan tidak lagi berbeda antar mode — karena kedua mode memang sudah menaruh
+  // satu waypoint per foto.
+  const selisih = [];
+  for (let i = 1; i < wps.length; i++) selisih.push(i - resumeIndexFor(wps, i));
+  ok(
+    new Set(selisih).size === 1 && selisih[0] === 1,
+    'mundurnya seragam di semua titik, bukan selang-seling 0 dan 1',
+    `selisih: ${[...new Set(selisih)].join(',')}`
+  );
+
+  // Dan tidak peduli lagi pada batas lintasan, yang dulu dipakai menghitung
+  // paritas per-pass.
+  ok(
+    resumeIndexFor(wps, 5) === 4,
+    'titik pertama lintasan kedua tetap mundur satu, bukan melompat ke pangkal lintasan'
+  );
+
+  // Mundur satu foto harus benar-benar menghasilkan satu foto diulang.
+  const nearest = 6;
+  const best = resumeIndexFor(wps, nearest);
+  ok(wps.slice(best).length - wps.slice(nearest).length === 1, 'tepat satu foto diulang');
 }
 
 

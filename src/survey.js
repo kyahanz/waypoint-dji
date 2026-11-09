@@ -492,6 +492,37 @@ export function generatePattern(polyXY, o) {
 }
 
 /**
+ * Dari waypoint terdekat ke titik terakhir yang diketahui, mundur ke titik
+ * mulai yang aman.
+ *
+ * Kenapa harus mundur: titik terakhir yang diketahui — entah dari EXIF foto
+ * atau dari ketukan di peta — jatuh di suatu tempat SETELAH jepretan terakhir
+ * yang berhasil. Kalau jalur dipotong tepat di waypoint terdekat, ada
+ * kemungkinan satu petak tidak pernah terpotret dan juga tidak diulang. Lubang
+ * itu baru ketahuan waktu olah data di rumah, saat drone sudah dikemas.
+ * Mengulang satu foto itu murah; lubang di ortofoto tidak.
+ *
+ * SEJARAH, karena ini sumber bug yang nyata. Dulu fungsi ini bercabang: mode
+ * "jalan terus" cuma menaruh DUA waypoint per jalur (pangkal dan ujung) dan
+ * menyerahkan pemotretan ke perintah jepret-per-jarak, jadi mundurnya dihitung
+ * dengan paritas — ganjil berarti ujung jalur, mundur ke pangkalnya.
+ *
+ * Perintah jepret-per-jarak sudah dibuang: file yang memakainya ditolak DJI
+ * Fly, dan sekarang KEDUA mode menaruh satu waypoint per foto (lihat catatan
+ * di generateGrid). Tapi cabang paritasnya tidak ikut dibuang. Akibatnya di
+ * mode tanpa jeda, mundurnya jadi 0 atau 1 waypoint tergantung ganjil-genap
+ * nomor urut — angka yang tidak lagi berarti apa-apa, dan tidak ketahuan
+ * karena fungsi ini hidup di web/app.js, di luar jangkauan npm test.
+ *
+ * Sekarang: satu waypoint = satu foto di kedua mode, jadi mundurnya satu
+ * waypoint di kedua mode. Tidak ada lagi yang perlu dibedakan.
+ */
+export function resumeIndexFor(waypoints, nearest) {
+  if (nearest <= 0) return 0;
+  return nearest - 1;
+}
+
+/**
  * Laju naik-turun yang dituntut jalur, dalam m/s.
  *
  * Kenapa ini penting: saat mengikuti kontur, ketinggian perintah berubah tiap

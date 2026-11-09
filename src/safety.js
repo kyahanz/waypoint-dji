@@ -654,7 +654,7 @@ export function evaluateSafety(plan, profile, o = {}) {
       'info',
       'resume-transit',
       `Misi lanjutan dimulai dari waypoint #${plan.resume.index + 1}${
-        plan.resume.backedOff > 0 ? ', satu jalur mundur dari titik terakhir supaya tidak ada petak yang bolong' : ''
+        plan.resume.backedOff > 0 ? ', mundur satu foto dari titik terakhir supaya tidak ada petak yang bolong' : ''
       }. Drone naik dulu ke ketinggian aman, baru menyeberang ke titik itu — bukan terbang rendah melintasi area yang belum tentu kosong.`
     );
 

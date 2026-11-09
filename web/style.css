@@ -1788,7 +1788,14 @@ input:focus-visible,
 body.editing-mission #step-area,
 body.editing-mission #step-area ~ .step:not(#step-edit),
 body.editing-mission #map-help,
-body.editing-mission #legend {
+body.editing-mission #legend,
+/* Pemilih drone, lensa, dan resolusi foto milik perencana. Mode edit tidak
+   menerima profil sama sekali (createMissionEditor tidak dikirimi profile):
+   dia menulis ulang angka di dalam file yang dibuka, dan kode drone yang
+   ditampilkannya dibaca DARI FILE ITU. Jadi mengganti drone di sini tidak
+   mengubah apa pun pada file yang disimpan — sementara baris di bawahnya tetap
+   menyebut kode drone dari file, yang terbaca seperti aplikasi salah. */
+body.editing-mission #drone-group {
   display: none;
 }
 

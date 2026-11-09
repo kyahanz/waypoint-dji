@@ -17,6 +17,7 @@ import {
   missionDuration,
   peakSpeedOverLeg,
   medianLegM,
+  resumeIndexFor,
   splitByBattery,
   sortieSummary,
   maxDistanceFrom,
@@ -1868,7 +1869,7 @@ function buildPlan() {
       }
     });
 
-    const best = resumeIndexFor(grid.waypoints, nearest, stopAtEach);
+    const best = resumeIndexFor(grid.waypoints, nearest);
     const skipped = grid.waypoints.slice(0, best);
     grid.waypoints = grid.waypoints.slice(best);
     grid.photos = grid.waypoints.reduce((n, w) => n + (w.photos || 0), 0);
@@ -2715,38 +2716,6 @@ function renderPatternCost(plan) {
 
 // ---------- Lanjutkan misi ----------
 
-/**
- * Dari waypoint terdekat, mundur ke titik mulai yang aman.
- *
- * Kenapa harus mundur: titik terakhir yang diketahui — entah dari foto atau
- * dari ketukan di peta — jatuh di suatu tempat SETELAH jepretan terakhir yang
- * berhasil. Kalau jalur dipotong tepat di waypoint terdekat, ada kemungkinan
- * satu petak yang tidak pernah terpotret dan juga tidak diulang. Lubang itu
- * baru ketahuan waktu olah data di rumah, saat drone sudah dikemas.
- *
- * Mengulang satu-dua foto itu murah. Lubang di ortofoto tidak.
- *
- *   stop & shoot — satu waypoint satu foto, jadi mundur satu waypoint.
- *   jalan terus  — waypoint cuma ujung-ujung jalur dan pemotretan dipicu per
- *                  jarak di antaranya, jadi mundur ke pangkal jalur itu:
- *                  satu jalur penuh diulang, dan itu memang satuan terkecil
- *                  yang masuk akal di mode ini.
- */
-function resumeIndexFor(waypoints, nearest, stopAtEach) {
-  if (nearest <= 0) return 0;
-
-  if (stopAtEach) return nearest - 1;
-
-  // Waypoint datang berpasangan (pangkal, ujung) per jalur. Pasangan dihitung
-  // dari awal lintasannya, karena pola silang menggabungkan dua lintasan jadi
-  // satu daftar dan penomoran globalnya tidak lagi genap-ganjil.
-  const pass = waypoints[nearest].pass ?? 0;
-  const passStart = waypoints.findIndex((w) => (w.pass ?? 0) === pass);
-  const isLineEnd = (nearest - passStart) % 2 === 1;
-
-  return isLineEnd ? nearest - 1 : nearest;
-}
-
 function renderResume(plan) {
   const r = plan.resume;
   els.resumeReadout.hidden = !r;
@@ -2766,7 +2735,7 @@ function renderResume(plan) {
 
   // Mundurnya jalur bukan detail teknis — itu foto yang sengaja diulang,
   // dan pengguna berhak tahu dia membayarnya.
-  const backed = r.backedOff > 0 ? ' · mundur 1 jalur biar tidak bolong' : '';
+  const backed = r.backedOff > 0 ? ' · mundur 1 foto biar tidak bolong' : '';
   els.resumeVal.textContent = `${r.skippedPhotos} foto dilewati · geser ${r.snapDistM.toFixed(0)} m${backed}`;
 }
 
