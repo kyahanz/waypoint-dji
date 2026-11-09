@@ -902,6 +902,78 @@ const PATTERN_SUFFIX = {
   orbit: '-orbit',
 };
 
+/**
+ * Pola yang tidak lagi ditawarkan di layar, tapi masih dipahami engine.
+ *
+ * Kenapa dicabut dari pilihan: peringatan keselamatannya sendiri menyuruh
+ * pengguna pindah. 'cross' disuruh ke silang + miring untuk bangunan, dan
+ * 'crossOblique' disuruh ke 3D bangunan karena kehilangan lintasan nadirnya.
+ * Menu dengan dua item yang peringatannya menunjuk item lain bukan pilihan —
+ * itu jebakan yang diberi label pilihan.
+ *
+ * Kenapa TIDAK dihapus dari PATTERNS: project tersimpan dan link rencana yang
+ * sudah dibagikan menyimpan nama pola sebagai teks. Menghapusnya membuat
+ * PATTERNS[pattern].name dan .gimbalPitch jadi undefined, dan rencana lama
+ * gagal terbuka — bukan sekadar berubah. Jadi engine tetap paham lima, layar
+ * cuma menawarkan tiga, dan rencana lama tetap jalan apa adanya.
+ */
+const PATTERN_RETIRED = {
+  cross: {
+    label: 'Silang',
+    saran: '3D bangunan',
+    alasan:
+      'dua lintasan nadir memperbaiki medan, tapi dinding tegak tetap tipis terpotret',
+  },
+  crossOblique: {
+    label: 'Silang + miring',
+    saran: '3D bangunan',
+    alasan:
+      'semua fotonya -45°, jadi tidak ada frame nadir yang mengikat atap dan skala tanah',
+  },
+};
+
+/**
+ * Setel tombol pola ke isi state, dan kalau polanya sudah tidak ditawarkan,
+ * munculkan tombolnya sendiri supaya yang aktif tetap kelihatan.
+ *
+ * Dulu blok penyetelan ini disalin di tiga tempat (tombol, muat project, muat
+ * link) dan gampang lupa disamakan. Sekarang satu pintu.
+ */
+function syncPatternButtons() {
+  const seg = els.patternSeg;
+
+  // Tombol pola lama hanya ada selama pola itu yang sedang dipakai.
+  seg.querySelector('[data-retired]')?.remove();
+
+  if (PATTERN_RETIRED[state.pattern] && !seg.querySelector(`[data-pattern="${state.pattern}"]`)) {
+    const btn = document.createElement('button');
+    btn.className = 'seg-btn';
+    btn.dataset.pattern = state.pattern;
+    btn.dataset.retired = '1';
+    btn.textContent = `${PATTERN_RETIRED[state.pattern].label} (lama)`;
+    btn.onclick = () => {};
+    seg.appendChild(btn);
+  }
+
+  seg.querySelectorAll('[data-pattern]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.pattern === state.pattern);
+  });
+
+  els.patternHint.textContent = PATTERN_HINT[state.pattern] ?? '';
+  syncPatternFields();
+}
+
+/** Beri tahu sekali kalau rencana yang dibuka memakai pola yang sudah dicabut. */
+function noticeRetiredPattern() {
+  const r = PATTERN_RETIRED[state.pattern];
+  if (!r) return;
+  toast(
+    `Rencana ini memakai pola "${r.label}", yang sudah tidak ditawarkan lagi — ${r.alasan}. Rencananya tetap jalan apa adanya. Kalau mau dibuat ulang, pakai ${r.saran}.`,
+    'info',
+    9000
+  );
+}
+
 const PATTERN_HINT = {
   single: 'Satu arah, kamera nunduk lurus. Untuk ortofoto dan ukur luas.',
   cross:
@@ -942,8 +1014,7 @@ els.patternSeg.querySelectorAll('[data-pattern]').forEach((btn) => {
     els.patternSeg.querySelectorAll('[data-pattern]').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     state.pattern = btn.dataset.pattern;
-    els.patternHint.textContent = PATTERN_HINT[state.pattern];
-    syncPatternFields();
+    syncPatternButtons();
 
     // Pola yang mencampur sudut gimbal TIDAK boleh ikut satu angka: tiap
     // lintasan (atau tiap cincin, di orbit) punya pitch-nya sendiri. Memasang
@@ -952,7 +1023,7 @@ els.patternSeg.querySelectorAll('[data-pattern]').forEach((btn) => {
     if (state.pattern !== 'orbit' && !PATTERNS[state.pattern]?.mixedGimbal) {
       // Gimbal mengikuti pola, karena itulah yang membedakan silang biasa dari
       // silang yang benar-benar berguna untuk 3D. Tetap bisa diubah manual.
-      state.advanced.gimbalPitch = PATTERNS[state.pattern].gimbalPitch;
+      state.advanced.gimbalPitch = PATTERNS[state.pattern]?.gimbalPitch ?? -90;
       els.gimbal.value = String(state.advanced.gimbalPitch);
     }
     render();
@@ -987,7 +1058,10 @@ els.finish.onchange = () => {
 };
 
 els.resetAdv.onclick = () => {
-  state.advanced = { ...SAFE_ADVANCED, gimbalPitch: PATTERNS[state.pattern].gimbalPitch };
+  state.advanced = {
+    ...SAFE_ADVANCED,
+    gimbalPitch: PATTERNS[state.pattern]?.gimbalPitch ?? SAFE_ADVANCED.gimbalPitch,
+  };
   syncAdvancedInputs();
   render();
   toast('Setelan lanjutan dikembalikan: RTH saat sinyal hilang, RTH setelah selesai.', 'ok');
@@ -1849,7 +1923,7 @@ function buildPlan() {
     grid,
     mode,
     pattern: state.pattern,
-    patternName: PATTERNS[state.pattern].name,
+    patternName: PATTERNS[state.pattern]?.name ?? state.pattern,
     gimbalPitch: state.advanced.gimbalPitch,
     advanced: {
       ...state.advanced,
@@ -2780,10 +2854,8 @@ function openProject(id) {
 
   syncAdvancedInputs();
   els.speedAuto.checked = state.speedAuto;
-  els.patternSeg.querySelectorAll('[data-pattern]').forEach((b) => {
-    b.classList.toggle('active', b.dataset.pattern === state.pattern);
-  });
-  els.patternHint.textContent = PATTERN_HINT[state.pattern];
+  syncPatternButtons();
+  noticeRetiredPattern();
   syncOrbitInputs();
 
   if (p.migratedFrom) {
@@ -3097,10 +3169,8 @@ function applyStateFromUrl() {
     state.speedAuto = d.sp == null;
     state.speedMs = d.sp ?? state.speedMs;
     els.speedAuto.checked = state.speedAuto;
-    els.patternSeg.querySelectorAll('[data-pattern]').forEach((b) => {
-      b.classList.toggle('active', b.dataset.pattern === state.pattern);
-    });
-    els.patternHint.textContent = PATTERN_HINT[state.pattern];
+    syncPatternButtons();
+    noticeRetiredPattern();
     syncOrbitInputs();
     modeSegButtons().forEach((b) => {
       b.classList.toggle('active', b.dataset.mode === state.mode);
