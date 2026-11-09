@@ -26,6 +26,50 @@ export function polygonArea(xy) {
   return Math.abs(a) / 2;
 }
 
+/**
+ * Apakah batas poligonnya memotong dirinya sendiri?
+ *
+ * Ini bukan kerewelan geometri, melainkan satu-satunya penjelasan untuk angka
+ * yang pernah muncul di layar tanpa sebab: lahan "dasi kupu-kupu" — urutan
+ * titiknya menyilang — membuat shoelace MENIADAKAN kedua lobusnya, jadi
+ * luasnya dilaporkan NOL sementara jalur terbangnya tetap terbentuk belasan
+ * titik. Semua angka per hektar sesudah itu ikut ngawur, dan tidak ada satu
+ * pun peringatan yang menyala.
+ *
+ * Di layar sentuh ini gampang terjadi tanpa sadar: cukup satu ketukan titik
+ * sudut yang urutannya kebalik.
+ *
+ * O(n²) dan itu tidak jadi soal — lahan digambar dengan beberapa belas titik,
+ * bukan beberapa ribu.
+ */
+export function selfIntersects(xy) {
+  const n = xy?.length ?? 0;
+  if (n < 4) return false;
+
+  // Orientasi tiga titik: >0 belok kiri, <0 belok kanan, 0 segaris.
+  const arah = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+
+  const potong = (p1, p2, p3, p4) => {
+    const d1 = arah(p3, p4, p1);
+    const d2 = arah(p3, p4, p2);
+    const d3 = arah(p1, p2, p3);
+    const d4 = arah(p1, p2, p4);
+    return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
+  };
+
+  for (let i = 0; i < n; i++) {
+    const a1 = xy[i];
+    const a2 = xy[(i + 1) % n];
+    for (let j = i + 1; j < n; j++) {
+      // Ruas yang bersebelahan memang berbagi satu titik ujung, dan ruas
+      // pertama dengan ruas terakhir juga. Itu bukan persilangan.
+      if (j === i || (j + 1) % n === i || (i + 1) % n === j) continue;
+      if (potong(a1, a2, xy[j], xy[(j + 1) % n])) return true;
+    }
+  }
+  return false;
+}
+
 export function centroid(coords) {
   const n = coords.length;
   return [

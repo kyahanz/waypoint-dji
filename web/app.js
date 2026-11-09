@@ -2736,6 +2736,24 @@ function renderStats(plan) {
 }
 
 /**
+ * Tanggal hari ini menurut JAM SETEMPAT, bentuk YYYY-MM-DD.
+ *
+ * Dulu di sini ada `new Date().toISOString().slice(0, 10)`, dan itu salah
+ * dengan cara yang tidak kelihatan sampai jam-jamnya pas. toISOString memberi
+ * tanggal UTC, sementara WIB tujuh jam di depannya — jadi setiap export antara
+ * tengah malam dan jam tujuh pagi diberi tanggal KEMARIN. Dan jam tujuh pagi
+ * ke bawah bukan jam yang aneh untuk alat ini: itu justru jam terbang terbaik,
+ * waktu cahayanya rata dan anginnya belum bangun.
+ *
+ * Bukan pakai toLocaleDateString('id-ID') karena formatnya DD/MM/YYYY — garis
+ * miring tidak boleh ada di nama file, dan urutan terbalik merusak pengurutan
+ * di folder. 'sv-SE' kebetulan memberi persis YYYY-MM-DD.
+ */
+function tanggalLokal() {
+  return new Date().toLocaleDateString('sv-SE');
+}
+
+/**
  * Nama file KMZ untuk sortie ke-i.
  *
  * Satu fungsi, dipakai dua tempat: panel "file yang akan terunduh" dan export
@@ -2747,7 +2765,7 @@ function namaFileKmz(plan, i) {
     (els.projName.value.trim() || 'survei').replace(/[^\w\-]+/g, '-') +
     (plan.resume ? '-lanjut' : '') +
     PATTERN_SUFFIX[plan.pattern];
-  const stamp = new Date().toISOString().slice(0, 10);
+  const stamp = tanggalLokal();
   // Nomor urut di depan karena itu URUTAN TERBANG, peran ditempel di belakang
   // supaya di folder HP kelihatan mana nadir mana miring tanpa dibuka.
   const peran = plan.sortieMeta?.[i]?.role;

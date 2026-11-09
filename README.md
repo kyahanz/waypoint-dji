@@ -48,6 +48,14 @@ bukan kosmetik:
 | `waypointTurnMode` | `...WithContinuityCurvature` | `...WithDiscontinuityCurvature` |
 | `useStraightLine` | `0` | `1` |
 | `actionGroupMode` | `parallel`, actionId mulai 1 | `sequence`, mulai 0 |
+
+**Satu penyimpangan yang disengaja:** generator ini menulis `actionGroupMode`
+`sequence`, bukan `parallel` seperti file DJI Fly. Sebabnya file asli DJI Fly
+yang kita bongkar **tidak memuat satu pun aksi foto**, jadi dia bukan contoh
+untuk bagian itu — dan versi kita yang memakai `parallel` sudah diuji di
+perangkat lalu **ditolak**. Yang dicontoh untuk bagian pemotretan adalah
+generator pihak ketiga yang filenya memang dipakai orang memetakan, dan dia
+memakai `sequence`. Jangan "dibetulkan" balik ke `parallel`.
 | `distance` / `duration` | ditulis `0`, drone menghitung sendiri | dihitung di file |
 
 Plus dua tag yang hanya ada di file DJI Fly: `waypointHeadingPoiIndex` dan

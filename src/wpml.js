@@ -27,7 +27,9 @@
 //                      flyToWaylineMode=safely, bukan oleh angka ini.
 //   waypointTurnMode   ...WithContinuityCurvature, bukan ...Discontinuity...
 //   useStraightLine    0, bukan 1
-//   actionGroupMode    parallel, bukan sequence; actionId mulai dari 1
+//   actionGroupMode    file DJI Fly sendiri memakai parallel, TAPI yang kita
+//                      tulis sequence — lihat catatan di actionGroup()
+//   actionId           mulai dari 1
 //   distance/duration  ditulis 0 — DJI Fly menghitungnya sendiri
 //
 // Dua tag yang dulu tidak kita tulis sama sekali dan ada di file asli:
@@ -99,9 +101,19 @@ function missionConfig(m, p) {
 }
 
 /**
- * Satu action group. DJI Fly memakai mode `parallel` dan menomori actionId
- * mulai dari 1; kami ikut, karena satu-satunya contoh yang terbukti diterima
- * drone berbentuk begitu.
+ * Satu action group — aksi foto di satu titik.
+ *
+ * JANGAN diganti ke `parallel` meski file DJI Fly sendiri memakai parallel.
+ * Ini satu-satunya tempat di berkas ini yang SENGAJA menyimpang dari file
+ * asli, dan alasannya mahal: file asli DJI Fly yang kita bongkar TIDAK memuat
+ * satu pun aksi foto, jadi dia bukan contoh untuk bagian ini. Versi kita yang
+ * dulu memakai parallel sudah diuji di perangkat dan DITOLAK.
+ *
+ * Yang dicontoh di sini adalah generator pihak ketiga yang filenya memang
+ * dipakai orang memetakan dengan Mini 5 Pro — satu-satunya referensi yang
+ * punya aksi foto DAN terbukti terimpor. Dia memakai `sequence`.
+ *
+ * actionId mulai dari 1, dan itu ada di kedua referensi.
  */
 function actionGroup({ id = 1, startIndex, endIndex, actions }) {
   if (!actions.length) return '';

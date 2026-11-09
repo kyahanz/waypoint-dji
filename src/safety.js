@@ -12,7 +12,7 @@
 // dibatasi, itu harus muncul di sini sebagai kalimat, bukan dipotong di
 // belakang layar.
 
-import { climbDemand } from './survey.js';
+import { climbDemand, selfIntersects } from './survey.js';
 
 const pct = (v) => `${Math.round(v * 100)}%`;
 
@@ -68,6 +68,18 @@ export function evaluateSafety(plan, profile, o = {}) {
   const adv = plan.advanced ?? {};
 
   const add = (level, code, text) => out.push({ level, code, text });
+
+  // ---- Bentuk lahannya sendiri ----
+  //
+  // Didahulukan dari semua pemeriksaan lain karena kalau yang ini menyala,
+  // angka-angka di bawahnya dihitung dari luas yang tidak berarti apa-apa.
+  if (selfIntersects(plan.polyXY)) {
+    add(
+      'bad',
+      'aoi-menyilang',
+      'Garis batas lahannya menyilang sendiri, jadi luasnya tidak bisa dihitung — yang tampil di layar 0 m², dan semua angka per hektar ikut ngawur. Jalurnya tetap terbentuk, tapi entah menutupi apa. Geser titik sudutnya supaya batasnya tidak saling memotong.'
+    );
+  }
 
   // ---- Identitas drone & format file ----
 
@@ -246,7 +258,7 @@ export function evaluateSafety(plan, profile, o = {}) {
     add(
       'warn',
       'wp-limit',
-      `Satu sortie butuh ${wpMax} waypoint, melewati perkiraan batas DJI Fly (${lim.maxWaypoints}). Perkecil area atau pakai mode jalan terus.`
+      `Satu file butuh ${wpMax} waypoint, melewati perkiraan batas DJI Fly (${lim.maxWaypoints}). Perkecil area atau pakai mode jalan terus.`
     );
   }
 
@@ -254,7 +266,7 @@ export function evaluateSafety(plan, profile, o = {}) {
     add(
       'warn',
       'many-sorties',
-      `Butuh ${plan.sorties.length} baterai. Posisi matahari dan cuaca bisa berubah banyak selama itu — pertimbangkan membagi lahan jadi beberapa hari.`
+      `Butuh ${plan.sorties.length} file, berarti ${plan.sorties.length} penerbangan dan ${plan.sorties.length} baterai. Posisi matahari dan cuaca bisa berubah banyak selama itu — pertimbangkan membagi lahan jadi beberapa hari.`
     );
   }
 

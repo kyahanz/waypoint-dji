@@ -29,6 +29,8 @@ import {
   splitByBattery,
   splitByRole,
   offsetPolygon,
+  polygonArea,
+  selfIntersects,
 } from '../src/survey.js';
 import { evaluateSafety, JARINGAN_LISTRIK } from '../src/safety.js';
 import { buildTemplateKml, buildWaylinesWpml, MISSION_DEFAULTS } from '../src/wpml.js';
@@ -1208,6 +1210,63 @@ console.log('\nPemecahan file: per peran dulu, baru per baterai');
       ro.sorties.length < orb.rings.length,
       'orbit tidak dipecah per cincin meski tiap cincin beda sudut gimbal',
       ro.sorties.length + ' file untuk ' + orb.rings.length + ' cincin'
+    );
+  }
+}
+
+// ------------------------------------------------- bentuk lahan menyilang
+//
+// Lahan "dasi kupu-kupu" membuat shoelace meniadakan kedua lobusnya: luasnya
+// dilaporkan nol sementara jalurnya tetap terbentuk. Dulu tidak ada satu pun
+// peringatan untuk itu, dan semua angka per hektar diam-diam jadi ngawur.
+
+console.log('\nBentuk lahan');
+{
+  const kotak = [[0, 0], [100, 0], [100, 100], [0, 100]];
+  const dasi = [[0, 0], [100, 100], [100, 0], [0, 100]];
+  const huruf_L = [[0, 0], [100, 0], [100, 40], [40, 40], [40, 100], [0, 100]];
+  const searahJarumJam = [[0, 0], [0, 100], [100, 100], [100, 0]];
+  const segiDuaBelas = Array.from({ length: 12 }, (_, k) => [
+    50 + 40 * Math.cos((k * Math.PI) / 6),
+    50 + 40 * Math.sin((k * Math.PI) / 6),
+  ]);
+
+  ok(!selfIntersects(kotak), 'bujursangkar tidak dianggap menyilang');
+  ok(!selfIntersects(huruf_L), 'lahan cekung (huruf L) tidak dianggap menyilang');
+  ok(!selfIntersects(searahJarumJam), 'urutan searah jarum jam tidak dianggap menyilang');
+  ok(!selfIntersects(segiDuaBelas), 'poligon 12 titik tidak dianggap menyilang');
+  ok(!selfIntersects([[0, 0], [100, 0], [50, 80]]), 'segitiga tidak dianggap menyilang');
+  ok(selfIntersects(dasi), 'dasi kupu-kupu ketahuan menyilang');
+  ok(
+    polygonArea(dasi) < 1 && polygonArea(kotak) > 9999,
+    'dan itu memang kasus yang luasnya jadi nol',
+    `dasi ${polygonArea(dasi).toFixed(0)} m² vs kotak ${polygonArea(kotak).toFixed(0)} m²`
+  );
+
+  // Gerbang keselamatan harus menahannya, bukan cuma fungsi geometrinya tahu.
+  {
+    const p5 = resolveProfile(registry, { droneId: 'mini5pro' });
+    const rencana = {
+      polyXY: dasi,
+      altitude: 80,
+      speed: 10,
+      accel: 2.5,
+      stopAtEach: true,
+      sorties: [[{ xy: [0, 0] }]],
+      summaries: [],
+      grid: { waypoints: [{ xy: [0, 0], height: 80 }], photos: 1 },
+      params: { maxSpeedBlur: 99, maxSpeedInterval: 99, gsd: 2.93, sideSpacing: 36 },
+      advanced: {},
+      pattern: 'single',
+    };
+    const temuan = evaluateSafety(rencana, p5);
+    const blokir = temuan.blockers.find((t) => t.code === 'aoi-menyilang');
+    ok(!!blokir, 'gerbang keselamatan menahan lahan yang menyilang');
+    ok(
+      !evaluateSafety({ ...rencana, polyXY: kotak }, p5).blockers.some(
+        (t) => t.code === 'aoi-menyilang'
+      ),
+      'dan tidak menahan lahan yang bentuknya wajar'
     );
   }
 }
