@@ -303,6 +303,14 @@ export function evaluateSafety(plan, profile, o = {}) {
   // Pola miring tanpa nadir: atap cuma kena dari serong, dan tidak ada frame
   // yang mengikat skala tanah. Kebalikan dari pesan 'pattern-nadir' di atas,
   // dan selama ini tidak pernah dikatakan.
+  if (plan.resumeBlocked === 'multiPass') {
+    add(
+      'info',
+      'resume-multipass',
+      'Titik lanjut diabaikan untuk pola banyak lintasan: filenya sudah dipecah per lintasan, jadi tidak ada satu jawaban untuk "lanjut dari mana". Kalau satu lintasan gagal di tengah, terbangkan ulang file lintasan itu saja.'
+    );
+  }
+
   if (plan.pattern === 'crossOblique') {
     add(
       'warn',
@@ -320,13 +328,17 @@ export function evaluateSafety(plan, profile, o = {}) {
       `Tiga lintasan dalam satu file: ${nadir?.photos ?? 0} foto nadir -90° untuk atap dan skala tanah, lalu ${oblique.reduce((a, p) => a + p.photos, 0)} foto miring -45° dari dua arah menyilang untuk fasad. Sudut gimbal ditulis per titik, jadi slider gimbal manual tidak berlaku untuk pola ini.`
     );
 
-    // Satu file 200 waypoint adalah batas DJI Fly, dan di pola tiga lintasan
-    // batas itu kena jauh lebih cepat daripada baterai.
-    if (plan.grid.photos > lim.maxWaypoints) {
+    add(
+      'info',
+      'building3d-split',
+      `Export jadi ${plan.sorties.length} file, dipotong di batas lintasan — bukan di titik ke-${lim.maxWaypoints} yang kebetulan. Jadi satu file berisi nadir saja, dan sisanya miring saja; nama filenya menyebutkan yang mana. Terbangkan berurutan dengan titik lepas landas yang SAMA, lalu masukkan semua fotonya ke satu project waktu mengolah.`
+    );
+
+    if (plan.sorties.length > 2) {
       add(
-        'info',
-        'building3d-split',
-        `${plan.grid.photos} foto melewati batas ${lim.maxWaypoints} waypoint per file, jadi misinya terbagi ${plan.sorties.length} file. Itu bukan masalah, tapi matahari bergeser di antara baterai — kalau bisa, perkecil lahannya supaya muat satu file.`
+        'warn',
+        'building3d-sun',
+        `${plan.sorties.length} file berarti ${plan.sorties.length} siklus baterai, dan matahari bergeser di antaranya. Bayangan yang berubah antara lintasan nadir dan lintasan miring membuat tekstur modelnya belang. Terbangkan ketiganya berturut-turut, atau pilih langit mendung.`
       );
     }
   }

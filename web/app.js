@@ -18,7 +18,7 @@ import {
   peakSpeedOverLeg,
   medianLegM,
   resumeIndexFor,
-  splitByBattery,
+  splitByPass,
   sortieSummary,
   maxDistanceFrom,
   altitudeFromGsd,
@@ -883,8 +883,8 @@ function syncOrbitInputs() {
 const PATTERN_SUFFIX = {
   single: '',
   cross: '-silang',
-  crossOblique: '-3d',
-  building3d: '-3d-nadir',
+  crossOblique: '-miring',
+  building3d: '-3d',
   orbit: '-orbit',
 };
 
@@ -910,11 +910,11 @@ const PATTERN_RETIRED = {
     alasan:
       'dua lintasan nadir memperbaiki medan, tapi dinding tegak tetap tipis terpotret',
   },
-  building3d: {
-    label: '3D + nadir sekaligus',
-    saran: '3D bangunan lalu Peta datar terpisah',
+  crossOblique: {
+    label: 'Miring saja',
+    saran: '3D bangunan',
     alasan:
-      'tiga lintasan dalam satu misi berarti tiga kali foto dan tiga baterai sekaligus, terlalu berat untuk Mini',
+      'semua fotonya -45°, jadi atap dan skala tanah tidak pernah tertangkap — dan menerbangkan nadirnya sebagai rencana terpisah menyerahkan titik lepas landas yang sama ke ingatan',
   },
 };
 
@@ -965,9 +965,9 @@ const PATTERN_HINT = {
   cross:
     'Dua arah menyilang 90°. Objek tegak terpotret dari dua sisi, jadi model 3D-nya tidak bolong. Foto dan waktu jadi dua kali lipat.',
   crossOblique:
-    'Dua arah menyilang, kamera dimiringkan -45°: ini yang menangkap dinding tegak. Atapnya tidak ikut, jadi terbangkan Peta datar di lahan yang sama sebagai misi kedua — fotonya digabung waktu diolah. Dua misi pendek, bukan satu misi panjang.',
+    'Hanya lintasan miring -45°, tanpa nadir. Dipakai kalau foto nadirnya sudah kamu punya dari misi lain — kalau belum, pakai 3D bangunan supaya titik lepas landasnya dijamin sama.',
   building3d:
-    'Nadir dan miring digabung dalam satu misi: tiga lintasan, tiga kali lipat foto. Tidak ditawarkan lagi karena terlalu berat untuk baterai Mini — pakai 3D bangunan lalu Peta datar terpisah.',
+    'Satu lintasan nadir -90° untuk atap dan skala tanah, plus dua lintasan miring -45° menyilang untuk fasad. Satu rencana, tapi di-export jadi satu file per lintasan: tiap file muat satu baterai dan bisa diterbangkan ulang sendiri kalau gagal. Semua fotonya diolah bersama dalam satu project.',
   orbit:
     'Mengelilingi satu objek tegak di beberapa tingkat ketinggian, kamera selalu menghadap ke dalam. Untuk tugu, menara, patung — benda yang sempit tapi tinggi, yang isinya ada di dinding, bukan di tanah.',
 };
@@ -1722,7 +1722,7 @@ function buildOrbitPlan() {
   const maxDist = maxDistanceFrom(homeXY, grid.waypoints);
   const transitReserveSec = (2 * maxDist) / speed + 60;
 
-  const sorties = splitByBattery(grid.waypoints, {
+  const { sorties, meta: sortieMeta } = splitByPass(grid.waypoints, {
     speed,
     accel,
     stopAtEach,
@@ -1785,6 +1785,8 @@ function buildOrbitPlan() {
     distance: pathLengthXY(grid.waypoints.map((w) => w.xy)),
     duration: summaries.reduce((acc, x) => acc + x.durationS, 0),
     sorties,
+    sortieMeta,
+    resumeBlocked: null,
     summaries,
     altitude: topHeight,
   };
@@ -1861,8 +1863,18 @@ function buildPlan() {
   //
   // Titik yang dipilih di peta dipetakan ke waypoint terdekat, lalu jalur
   // dipotong dari situ. Yang sudah terpotret tidak diterbangkan lagi.
+  //
+  // TIDAK BERLAKU untuk pola banyak lintasan. Di sana export sudah dipecah
+  // satu file per lintasan, jadi "lanjut dari titik terakhir" tidak punya
+  // jawaban tunggal: lanjut di file yang mana? Dan memotong daftar waypoint
+  // global akan mengiris lintasan-lintasan berikutnya juga, yang belum tentu
+  // sudah diterbangkan sama sekali. Kalau satu lintasan gagal di tengah,
+  // terbangkan ulang file lintasan itu saja — itu memang gunanya dipecah.
+  const multiPass = (grid.passes?.length ?? 1) > 1;
   let resume = null;
-  if (state.resume) {
+  let resumeBlocked = state.resume && multiPass ? 'multiPass' : null;
+
+  if (state.resume && !multiPass) {
     const target = proj.toXY(state.resume.lngLat);
     let nearest = 0;
     let bestD = Infinity;
@@ -1943,7 +1955,13 @@ function buildPlan() {
   // bukan angka tetap: di lahan besar, transit saja bisa beberapa menit.
   const transitReserveSec = (2 * maxDist) / speed + 60;
 
-  const sorties = splitByBattery(grid.waypoints, {
+  // Peran tiap lintasan ikut dibawa supaya nama file bisa menyebut isinya,
+  // bukan cuma nomor urutnya.
+  const roleOfPass = Object.fromEntries(
+    (grid.passes ?? []).map((x) => [x.index, x.role ?? null])
+  );
+
+  const { sorties, meta: sortieMeta } = splitByPass(grid.waypoints, {
     speed,
     accel,
     stopAtEach,
@@ -1951,6 +1969,7 @@ function buildPlan() {
     hoverPerPhotoSec: hoverPerPhoto,
     transitReserveSec,
     maxWaypoints: lim.maxWaypoints,
+    roleOfPass,
   });
 
   // ---- Terrain following ----
@@ -2057,6 +2076,8 @@ function buildPlan() {
     distance: pathLengthXY(grid.waypoints.map((w) => w.xy)),
     duration: summaries.reduce((s, x) => s + x.durationS, 0),
     sorties,
+    sortieMeta,
+    resumeBlocked,
     summaries,
     altitude: params.altitude,
   };
@@ -2722,6 +2743,19 @@ function renderPatternCost(plan) {
 
 function renderResume(plan) {
   const r = plan.resume;
+
+  // Kalau titiknya sudah dipilih tapi polanya banyak lintasan, titik itu
+  // diabaikan — dan itu harus dikatakan, bukan dibiarkan terlihat terpasang.
+  if (plan.resumeBlocked === 'multiPass') {
+    els.resumeReadout.hidden = false;
+    els.resumeClear.hidden = false;
+    els.resumePick.classList.remove('active');
+    els.resumePick.textContent = 'Pilih di peta';
+    els.resumeStatus.textContent = 'Tidak dipakai untuk pola banyak lintasan';
+    els.resumeVal.textContent = 'file sudah dipecah per lintasan';
+    return;
+  }
+
   els.resumeReadout.hidden = !r;
   els.resumeClear.hidden = !r;
   els.resumePick.classList.toggle('active', state.resumePicking);
@@ -3108,10 +3142,15 @@ async function exportKmz() {
         },
         state.profile
       );
+      // Nomor urut tetap di depan karena itu URUTAN TERBANG, dan peran
+      // lintasannya ditempel supaya di folder HP kelihatan mana yang nadir dan
+      // mana yang miring tanpa harus dibuka satu-satu.
+      const peran = plan.sortieMeta?.[i]?.role;
+      const label = peran ? `-${peran}` : '';
       const name =
         plan.sorties.length > 1
-          ? `${base}-${stamp}_${i + 1}dari${plan.sorties.length}.kmz`
-          : `${base}-${stamp}.kmz`;
+          ? `${base}-${stamp}_${i + 1}dari${plan.sorties.length}${label}.kmz`
+          : `${base}-${stamp}${label}.kmz`;
       return { bytes, name };
     }));
 

@@ -365,8 +365,10 @@ selalu siap ambil alih manual saat menerbangkannya.
 - **Preset Cepat / Standar / Detail** — menyimpan ketelitian yang dituju, bukan
   ketinggian mati, jadi artinya tetap sama waktu drone diganti. Geser slider
   apa pun dan presetnya berubah jadi Custom.
-- **Pola terbang** — peta datar, 3D bangunan (miring -45°), atau orbit untuk
-  objek tegak. Biayanya ditampilkan sebelum berangkat, bukan setelah.
+- **Pola terbang** — peta datar, 3D bangunan (nadir + miring), atau orbit
+  untuk objek tegak. Biayanya ditampilkan sebelum berangkat, bukan setelah.
+- **Export dipecah per lintasan** — satu file per lintasan, bukan dipotong di
+  titik ke-200 yang kebetulan. Nama filenya menyebutkan isinya.
 - **Ketelitian yang jujur untuk kamera miring** — GSD dihitung dari jarak ke
   permukaan, bukan dari ketinggian terbang. Di gimbal -45° bedanya 41%.
 - **Ikuti kontur tanah** — plus peringatan kalau lereng menuntut laju naik di
@@ -403,34 +405,63 @@ Keduanya habis di sekitar **196 foto**. Itu unit alami kerjanya.
 |---|---|---|---|---|
 | Ortofoto, ukur luas, lihat kondisi | Peta datar | -90° | 2.5–3.5 cm | 75/65 |
 | Peta 3D kasar: volume, massing, bentuk atap | Silang | -90° | 3–4 cm | 80/70 |
-| Model 3D bangunan, fasad kebaca | **3D bangunan + Peta datar, dua misi** | -45° lalu -90° | 1.5–2.5 cm di fasad | 80/70 |
+| Model 3D bangunan, fasad kebaca | **3D bangunan** (satu rencana, 3 file) | -90° + -45° | 1.5–2.5 cm di fasad | 80/70 |
 | Objek tunggal: tugu, menara, patung | Orbit objek | per cincin | 0.5–1 cm | langkah sudut 10° |
 
-### Kenapa 3D dipisah dari nadir
+### Satu rencana, banyak file: yang dipecah itu filenya
 
 Model 3D yang utuh butuh dua-duanya: foto miring untuk fasad, foto nadir untuk
-atap dan untuk mengikat skala tanah. Pernah digabung jadi satu pola tiga
-lintasan. Yang membatalkannya bukan teori, tapi baterai:
+atap dan untuk mengikat skala tanah. Jadi pola 3D bangunan menerbangkan tiga
+lintasan — dan di lahan 3.49 ha itu 408 foto, 42 menit, tiga baterai.
 
-| Lahan 3.49 ha, GSD 2.5 cm | Foto | Waktu | Baterai |
-|---|---|---|---|
-| Peta datar (nadir saja) | 136 | 14m05s | 1 |
-| 3D bangunan (miring saja) | 272 | 28m21s | 2 |
-| Nadir + miring satu misi | 408 | 42m33s | 3 |
+Pernah dicoba memecahnya jadi dua POLA terpisah dengan alasan baterai. Itu
+keliru tempat, karena dua alasan.
 
-Tiga lintasan berarti tiga kali foto dan tiga kali waktu, dalam satu rencana
-yang harus diurus sekaligus. Mini bukan drone untuk itu.
+**Pertama, yang berat bukan rencananya — yang berat filenya.** Pemecah baterai
+memotong di mana pun jatah waktu atau batas 200 waypoint habis, dan di pola
+banyak lintasan potongan itu jatuh di tengah lintasan:
 
-Dan nadirnya memang tidak harus satu misi: **foto nadir dan foto miring
-digabung di software olah, bukan di file misi.** Jadi terbangkan Peta datar
-sendiri — yang sekalian memberi ortofoto sebagai hasil — lalu 3D bangunan untuk
-fasadnya, dengan titik lepas landas yang sama. Masukkan kedua set foto ke satu
-project waktu mengolah. Dua misi pendek yang masing-masing muat satu baterai
-dan bisa diulang sendiri kalau gagal, bukan satu misi panjang yang kalau
-terputus di tengah harus dipikir ulang seluruhnya.
+| | Dipotong per baterai | Dipotong per lintasan |
+|---|---|---|
+| file 1 | 200 titik, lintasan 0 **+ 1**, gimbal −90 **dan** −45 | 136 titik, nadir |
+| file 2 | 200 titik, lintasan 1 **+ 2** | 136 titik, miring |
+| file 3 | **8 titik** | 136 titik, miring |
 
-Gerbang keselamatan menyebutkan ini setiap kali pola 3D dipilih, karena
-melupakan misi keduanya menghasilkan model yang berdiri tapi atapnya meleleh.
+Dua-duanya buruk di kolom kiri. File pertama mencampur foto nadir dan foto
+miring, jadi tidak ada satu pun file yang bisa disebut "ini yang nadir" —
+padahal itulah satu-satunya alasan memecahnya. Dan file ketiga berisi delapan
+foto: satu siklus baterai penuh untuk terbang ke lokasi, menjepret delapan
+kali, lalu pulang.
+
+**Kedua, dua pola terpisah menyerahkan hal yang tidak boleh diserahkan.**
+Pengguna harus mengingat sendiri bahwa misi keduanya memakai area, ketinggian,
+overlap, dan **titik lepas landas** yang sama. Ketinggian WPML relatif terhadap
+titik lepas landas, jadi berdiri di tempat lain membuat kedua set foto tidak
+nyambung. Satu rencana menjamin semuanya identik; dua rencana memindahkan
+jaminan itu ke ingatan orang.
+
+Jadi yang dipecah sekarang **filenya**, bukan polanya: satu file per lintasan,
+dan lintasan yang masih terlalu besar untuk satu baterai dipecah lagi di dalam
+lintasannya sendiri. Nama filenya menyebutkan isinya —
+`survei-2026-11-09_1dari3-nadir.kmz`, `_2dari3-miring.kmz` — supaya di folder
+HP kelihatan mana yang mana tanpa dibuka satu-satu. Nomor urut tetap di depan
+karena itu urutan terbang.
+
+Foto nadir dan foto miring tetap digabung di **software olah**, bukan di file
+misi: semua foto dari ketiga file masuk satu project.
+
+Yang tidak berlaku untuk pola banyak lintasan: **Lanjutkan misi**. Kalau
+filenya sudah dipecah per lintasan, "lanjut dari titik terakhir" tidak punya
+jawaban tunggal — lanjut di file yang mana? Dan memotong daftar waypoint global
+akan mengiris lintasan berikutnya yang belum tentu sudah diterbangkan sama
+sekali. Kalau satu lintasan gagal di tengah, terbangkan ulang file lintasan itu
+saja; itu memang gunanya dipecah. Aplikasi mengatakan ini, bukan diam-diam
+mengabaikan titik yang sudah dipilih.
+
+Masih ada pola **Miring saja** untuk kasus nadirnya sudah dipunyai dari misi
+lain, tapi tidak ditawarkan di layar — gerbang keselamatannya mengingatkan
+bahwa tanpa nadir, modelnya berdiri tapi atapnya meleleh dan ukurannya
+mengambang.
 
 ### Berapa lama sebenarnya
 

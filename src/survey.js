@@ -377,16 +377,22 @@ export function generateGrid(polyXY, o) {
  * yang mengikat skala tanah. Jawaban pertamanya building3d — nadir dan miring
  * digabung jadi tiga lintasan dalam satu misi.
  *
- * Yang membatalkan itu bukan teori, tapi baterai. Tiga lintasan berarti tiga
- * kali foto dan tiga kali waktu: lahan 3.49 ha pada GSD 2.5 cm jadi 408 foto
- * dan 42 menit, tiga baterai, dalam satu rencana yang harus diurus sekaligus.
- * Mini bukan drone untuk itu.
+ * Pernah dicoba memecahnya jadi dua POLA terpisah, dengan alasan baterai:
+ * tiga lintasan berarti 408 foto dan 42 menit di lahan 3.49 ha. Itu keliru
+ * tempat. Yang berat bukan rencananya — yang berat filenya, karena dipotong
+ * di titik ke-200 yang kebetulan, bukan di batas lintasan.
  *
- * Dan nadirnya tidak harus satu misi: foto nadir dan foto miring digabung di
- * software olah, bukan di file misi. Jadi "Peta datar" diterbangkan sendiri —
- * yang sekalian memberi ortofoto sebagai hasil — lalu "3D bangunan" untuk
- * fasadnya, dan keduanya diolah bersama. Dua misi pendek, masing-masing muat
- * satu baterai, masing-masing bisa diulang sendiri kalau gagal.
+ * Dua pola terpisah juga menyerahkan hal yang tidak boleh diserahkan: pengguna
+ * harus mengingat sendiri bahwa misi keduanya memakai area, ketinggian,
+ * overlap, dan TITIK LEPAS LANDAS yang sama. Ketinggian WPML relatif terhadap
+ * titik lepas landas, jadi berdiri di tempat lain membuat kedua set foto tidak
+ * nyambung. Satu rencana menjamin semuanya identik; dua rencana memindahkan
+ * jaminan itu ke ingatan orang.
+ *
+ * Jadi yang dipecah sekarang bukan polanya, melainkan FILE-nya: satu file per
+ * lintasan (lihat splitByPass). Satu rencana, tiga file, masing-masing satu
+ * baterai, masing-masing bisa diterbangkan ulang sendiri kalau gagal. Foto
+ * nadir dan foto miring tetap digabung di software olah, bukan di file misi.
  *
  * `passSpecs` menggantikan pasangan (passes, gimbalPitch) yang lama: tiap
  * lintasan membawa pergeseran arahnya sendiri DAN sudut gimbalnya sendiri.
@@ -416,7 +422,7 @@ export const PATTERNS = {
   },
   crossOblique: {
     id: 'crossOblique',
-    name: '3D bangunan',
+    name: 'Miring saja',
     passes: 2,
     gimbalPitch: -45,
     passSpecs: [
@@ -426,7 +432,7 @@ export const PATTERNS = {
   },
   building3d: {
     id: 'building3d',
-    name: '3D + nadir sekaligus',
+    name: '3D bangunan',
     passes: 3,
     // Angka wakil untuk ditampilkan; yang benar-benar dipakai ada di passSpecs,
     // dan karena itulah pola ini mengunci slider gimbal manual.
@@ -700,6 +706,92 @@ export function splitByBattery(waypoints, o) {
   }
   if (current.length) sorties.push(current);
   return sorties;
+}
+
+/** Bagi daftar jadi n potongan sama besar, selisih maksimal satu elemen. */
+function bagiRata(arr, n) {
+  const out = [];
+  const dasar = Math.floor(arr.length / n);
+  const sisa = arr.length % n;
+  let i = 0;
+  for (let j = 0; j < n; j++) {
+    const ukuran = dasar + (j < sisa ? 1 : 0);
+    out.push(arr.slice(i, i + ukuran));
+    i += ukuran;
+  }
+  return out;
+}
+
+/**
+ * Pecah jalur jadi beberapa file: per LINTASAN dulu, baru per baterai.
+ *
+ * Kenapa urutannya begitu. splitByBattery memotong di mana pun jatah waktu
+ * atau batas 200 waypoint habis, dan di pola banyak lintasan potongan itu
+ * jatuh di tengah lintasan. Untuk lahan 3.49 ha dengan nadir + dua miring,
+ * hasilnya:
+ *
+ *   file 1   200 titik   lintasan 0 + 1   gimbal -90 DAN -45 tercampur
+ *   file 2   200 titik   lintasan 1 + 2
+ *   file 3     8 titik   lintasan 2
+ *
+ * Dua-duanya buruk. File pertama mencampur foto nadir dan foto miring, jadi
+ * tidak ada satu pun file yang bisa disebut "ini yang nadir" — padahal itulah
+ * satu-satunya alasan memecahnya. Dan file ketiga berisi 8 foto: satu siklus
+ * baterai penuh untuk terbang ke lokasi, menjepret delapan kali, lalu pulang.
+ *
+ * Dipotong per lintasan dulu, lahan yang sama jadi 136 / 136 / 136 — tiga file
+ * rapi, masing-masing satu lintasan, semuanya di bawah batas waypoint.
+ *
+ * Ini bukan pilihan yang ditawarkan ke pengguna. Tidak ada kasus di mana orang
+ * INGIN file yang mencampur dua sudut gimbal, atau file berisi delapan foto.
+ *
+ * Lintasan yang masih terlalu besar untuk satu baterai tetap dipecah lagi di
+ * dalam lintasannya sendiri, jadi batas baterai tidak pernah dilanggar.
+ *
+ * @returns {{sorties: Array<Array<object>>, meta: Array<{pass:number, role:string|null, part:number, parts:number}>}}
+ */
+export function splitByPass(waypoints, o) {
+  // Kelompokkan menurut lintasan, menjaga urutan kemunculannya.
+  const groups = [];
+  for (const w of waypoints) {
+    const key = w.pass ?? 0;
+    let g = groups[groups.length - 1];
+    if (!g || g.pass !== key) {
+      g = { pass: key, waypoints: [] };
+      groups.push(g);
+    }
+    g.waypoints.push(w);
+  }
+
+  const sorties = [];
+  const meta = [];
+  for (const g of groups) {
+    // splitByBattery itu rakus: dia mengisi sampai jatah waktu atau batas
+    // waypoint habis, baru memulai file berikutnya. Untuk batas BATERAI itu
+    // memang yang benar — kamu ingin memakai baterainya sampai habis.
+    //
+    // Untuk batas WAYPOINT tidak. Lintasan 215 titik dengan batas 200 jadi
+    // 200 + 15: file kedua berisi lima belas foto, satu siklus baterai penuh
+    // untuk terbang ke lokasi, menjepret lima belas kali, lalu pulang. Dan di
+    // pola tiga lintasan itu terjadi TIGA KALI.
+    //
+    // Jadi begitu sebuah lintasan ternyata butuh lebih dari satu file, isinya
+    // dibagi rata: 215 jadi 108 + 107. Aman terhadap jatah baterai karena tiap
+    // bagian rata selalu <= bagian pertama hasil pembagian rakus, dan bagian
+    // itu sudah muat.
+    const rakus = splitByBattery(g.waypoints, o);
+    const parts = rakus.length > 1 ? bagiRata(g.waypoints, rakus.length) : rakus;
+    parts.forEach((part, i) => {
+      sorties.push(part);
+      meta.push({
+        pass: g.pass,
+        role: o.roleOfPass?.[g.pass] ?? null,
+        part: i,
+        parts: parts.length,
+      });
+    });
+  }
+  return { sorties, meta };
 }
 
 /** Jarak terjauh dari titik home ke salah satu waypoint (meter). */
