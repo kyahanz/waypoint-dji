@@ -14,6 +14,8 @@ import {
   altitudeFromGsd,
   gsdFromAltitude,
   generatePattern,
+  peakSpeedOverLeg,
+  medianLegM,
   PATTERNS,
   surfaceGsd,
   slantRange,
@@ -901,6 +903,61 @@ console.log('\nGerbang keselamatan: kabel dan tiang listrik');
   const teks = evaluateSafety(fakePlan(), p5).findings.find((f) => f.code === 'kabel-lihat-sendiri').text;
   ok(teks.includes('SUTET'), 'menara transmisi disebut sebagai kasus yang berbeda');
   ok(teks.includes('mendatar'), 'dan solusinya jarak mendatar, bukan terbang di atasnya');
+}
+
+
+// ------------------------- kecepatan yang benar-benar tercapai
+
+console.log('\nKecepatan: jelajah vs yang tercapai');
+{
+  // Drone mempercepat sampai setengah jalan lalu mengerem, jadi puncaknya
+  // akar(a x d) — bukan kecepatan jelajah yang diperintahkan.
+  ok(near(peakSpeedOverLeg(15, 15, 2.5), Math.sqrt(2.5 * 15), 1e-9), 'puncak di ruas 15 m = akar(a x d)', `${peakSpeedOverLeg(15, 15, 2.5).toFixed(1)} m/s`);
+  ok(
+    peakSpeedOverLeg(15, 15, 2.5) < 7,
+    'jadi memerintahkan 15 m/s di ruas 15 m tidak mengubah apa-apa',
+    `cuma ${peakSpeedOverLeg(15, 15, 2.5).toFixed(1)} m/s yang tercapai`
+  );
+  ok(near(peakSpeedOverLeg(90, 15, 2.5), 15, 1e-9), 'baru di ruas 90 m kecepatan jelajah tercapai');
+  ok(peakSpeedOverLeg(200, 15, 2.5) === 15, 'dan tidak pernah melebihi kecepatan jelajah');
+  ok(peakSpeedOverLeg(0, 15, 2.5) === 0, 'ruas nol tidak menghasilkan kecepatan');
+
+  // Median, bukan rata-rata: ruas panjang di ujung jalur tidak boleh menarik
+  // angka yang mestinya mewakili ruas yang dialami drone sebagian besar waktu.
+  const wps = [
+    { xy: [0, 0] },
+    { xy: [10, 0] },
+    { xy: [20, 0] },
+    { xy: [30, 0] },
+    { xy: [230, 0] },
+  ];
+  ok(near(medianLegM(wps), 10, 1e-9), 'ruas median tidak tertarik oleh satu ruas 200 m', `${medianLegM(wps).toFixed(0)} m`);
+  ok(medianLegM([{ xy: [0, 0] }]) === 0, 'satu titik tidak punya ruas');
+
+  // Gerbangnya.
+  const p5 = resolveProfile(registry, { droneId: 'mini5pro' });
+  const codes = (over) =>
+    evaluateSafety({ ...fakePlan(), ...over }, p5).findings.map((f) => f.code);
+
+  const stop = { stopAtEach: true, speed: 15, legMedianM: 15, peakSpeedMs: 6.1, accel: 2.5 };
+  ok(codes(stop).includes('speed-unreached'), 'kecepatan jelajah yang tidak tercapai dijelaskan');
+  ok(
+    !codes(stop).includes('speed-blur') && !codes(stop).includes('speed-interval'),
+    'dan batas blur / jeda jepret tidak ikut muncul di mode berhenti sejenak'
+  );
+  ok(
+    !codes({ ...stop, legMedianM: 120, peakSpeedMs: 15 }).includes('speed-unreached'),
+    'di ruas panjang, tidak ada yang perlu dijelaskan'
+  );
+  ok(
+    !codes({ stopAtEach: false, speed: 8, legMedianM: 15, peakSpeedMs: 6.1 }).includes('speed-unreached'),
+    'mode tanpa jeda tidak kena pesan ini: di sana drone memang melaju terus'
+  );
+
+  const teks = evaluateSafety({ ...fakePlan(), ...stop }, p5).findings.find(
+    (f) => f.code === 'speed-unreached'
+  ).text;
+  ok(teks.includes('90 m'), 'disebut butuh ruas berapa meter supaya tercapai', '15^2/2.5 = 90 m');
 }
 
 

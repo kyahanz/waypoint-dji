@@ -15,6 +15,8 @@ import {
   offsetPolygon,
   pathLengthXY,
   missionDuration,
+  peakSpeedOverLeg,
+  medianLegM,
   splitByBattery,
   sortieSummary,
   maxDistanceFrom,
@@ -1710,6 +1712,9 @@ function buildOrbitPlan() {
     autoSpeed,
     stopAtEach,
     speed,
+    legMedianM: medianLegM(grid.waypoints),
+    peakSpeedMs: peakSpeedOverLeg(medianLegM(grid.waypoints), speed, accel),
+    accel,
     maxDist,
     distance: pathLengthXY(grid.waypoints.map((w) => w.xy)),
     duration: summaries.reduce((acc, x) => acc + x.durationS, 0),
@@ -1824,6 +1829,14 @@ function buildPlan() {
   }
 
   const hoverPerPhoto = stopAtEach ? HOVER_SEC : 0;
+
+  // Kecepatan yang BENAR-BENAR tercapai. Di mode berhenti sejenak, ruas antar
+  // titik terlalu pendek untuk mencapai kecepatan jelajah — drone mempercepat
+  // sampai setengah jalan lalu mengerem. Tanpa angka ini, layar menampilkan
+  // kecepatan jelajah sebagai kenyataan.
+  const legMedianM = medianLegM(grid.waypoints);
+  const peakSpeedMs = peakSpeedOverLeg(legMedianM, speed, accel);
+
   const maxDist = maxDistanceFrom(homeXY, grid.waypoints);
 
   // Cadangan baterai harus menutup transit pergi-pulang ke titik terjauh,
@@ -1936,6 +1949,9 @@ function buildPlan() {
     autoSpeed,
     stopAtEach,
     speed,
+    legMedianM,
+    peakSpeedMs,
+    accel,
     maxDist,
     distance: pathLengthXY(grid.waypoints.map((w) => w.xy)),
     duration: summaries.reduce((s, x) => s + x.durationS, 0),
@@ -2251,9 +2267,21 @@ function updateDerived(plan) {
     els.speed.value = String(shown.toFixed(1));
   }
   els.speedOut.textContent = `${shown.toFixed(1)} m/s`;
-  els.speedNote.textContent = state.speedAuto
-    ? `Batas blur ${p.maxSpeedBlur.toFixed(1)} m/s · batas jeda jepret ${p.maxSpeedInterval.toFixed(1)} m/s (${state.profile.mode.label}).`
-    : `Diatur manual. Batas amannya ${Math.min(p.maxSpeedBlur, p.maxSpeedInterval).toFixed(1)} m/s.`;
+  // Catatan ini dulu menyebut batas blur dan batas jeda jepret tanpa peduli
+  // mode — padahal di mode berhenti sejenak KEDUANYA tidak berlaku, karena
+  // drone berhenti sebelum menjepret. Akibatnya layar menampilkan tiga angka
+  // yang saling bertentangan: batas 12.5, batas 7.6, dan kecepatan 15.0.
+  if (plan?.stopAtEach ?? state.mode === 'stopAndShoot') {
+    const puncak = plan
+      ? ` Pada ruas antar titik ${plan.legMedianM.toFixed(0)} m, drone cuma sempat mencapai ${plan.peakSpeedMs.toFixed(1)} m/s sebelum harus mengerem.`
+      : '';
+    els.speedNote.textContent =
+      `Berhenti sejenak di tiap titik, jadi batas blur dan jeda jepret tidak berlaku — drone berhenti dulu baru menjepret.${puncak} Angka ini kepakai di ruas panjang: transit ke titik awal dan pindah antar lintasan.`;
+  } else {
+    els.speedNote.textContent = state.speedAuto
+      ? `Batas blur ${p.maxSpeedBlur.toFixed(1)} m/s · batas jeda jepret ${p.maxSpeedInterval.toFixed(1)} m/s (${state.profile.mode.label}). Yang mengikat: ${p.maxSpeedBlur < p.maxSpeedInterval ? 'blur' : 'jeda jepret'}.`
+      : `Diatur manual. Batas amannya ${Math.min(p.maxSpeedBlur, p.maxSpeedInterval).toFixed(1)} m/s.`;
+  }
 
   const meters = mult === 0 ? 'tepat di batas' : `${(mult * p.sideSpacing).toFixed(0)} m`;
   const cost = plan?.bufferCost;
@@ -2347,10 +2375,7 @@ function renderOrbitStats(plan) {
       <span class="k">Ruang kartu</span>
       <span class="v">${fmtSize(orb.photos * (state.profile.mode.approxPhotoMB ?? 8))}</span>
     </div>
-    <div class="stat">
-      <span class="k">Kecepatan</span>
-      <span class="v">${plan.speed.toFixed(1)}<small>m/s</small></span>
-    </div>
+    ${speedStat(plan)}
     <div class="stat">
       <span class="k">Waypoint</span>
       <span class="v">${plan.grid.waypoints.length}</span>
@@ -2415,6 +2440,28 @@ function renderOrbitRings(plan) {
  * menampilkan "-45°" untuk 3D bangunan menyembunyikan justru lintasan yang
  * membuat pola itu ada.
  */
+/**
+ * Baris kecepatan di ringkasan.
+ *
+ * Satu angka menyesatkan di mode berhenti sejenak: yang ditulis ke file adalah
+ * kecepatan jelajah, tapi pada ruas sependek jarak antar foto drone tidak
+ * pernah sampai ke sana. Dua angka berdampingan menjawab pertanyaan yang
+ * memang timbul waktu melihat "15.0 m/s" di misi yang titiknya berjarak 15 m.
+ */
+function speedStat(plan) {
+  const nyata = plan.peakSpeedMs;
+  if (!plan.stopAtEach || nyata === undefined || nyata >= plan.speed - 0.05) {
+    return `<div class="stat">
+      <span class="k">Kecepatan</span>
+      <span class="v">${plan.speed.toFixed(1)}<small>m/s</small></span>
+    </div>`;
+  }
+  return `<div class="stat full">
+      <span class="k">Kecepatan jelajah · tertinggi tercapai</span>
+      <span class="v">${plan.speed.toFixed(1)}<small>m/s</small> · ${nyata.toFixed(1)}<small>m/s</small></span>
+    </div>`;
+}
+
 function gimbalLabel(plan) {
   const list = plan.grid?.gimbalPitches;
   if (!list || list.length <= 1) return `${plan.gimbalPitch}°`;
@@ -2452,10 +2499,7 @@ function renderStats(plan) {
       <span class="k">Ruang kartu</span>
       <span class="v">${fmtSize(plan.grid.photos * (state.profile.mode.approxPhotoMB ?? 8))}</span>
     </div>
-    <div class="stat">
-      <span class="k">Kecepatan</span>
-      <span class="v">${plan.speed.toFixed(1)}<small>m/s</small></span>
-    </div>
+    ${speedStat(plan)}
     <div class="stat">
       <span class="k">Waypoint</span>
       <span class="v">${plan.grid.waypoints.length}</span>

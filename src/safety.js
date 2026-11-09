@@ -197,6 +197,26 @@ export function evaluateSafety(plan, profile, o = {}) {
     );
   }
 
+  // Kecepatan jelajah yang tidak pernah tercapai.
+  //
+  // Di mode berhenti sejenak, ruas antar titik terlalu pendek untuk mencapai
+  // kecepatan jelajah: drone mempercepat sampai setengah jalan lalu mengerem.
+  // Angka 15.0 m/s di layar untuk misi yang titiknya berjarak 15 m itu benar
+  // sebagai isi file, tapi tidak menggambarkan apa pun yang terjadi — dan
+  // pernah membuat pemiliknya sendiri curiga rencananya salah.
+  if (
+    plan.stopAtEach &&
+    plan.peakSpeedMs !== undefined &&
+    plan.peakSpeedMs < plan.speed - 0.05
+  ) {
+    const butuh = (plan.speed * plan.speed) / (plan.accel ?? 2.5);
+    add(
+      'info',
+      'speed-unreached',
+      `Kecepatan jelajah ${plan.speed.toFixed(1)} m/s tidak pernah tercapai di misi ini. Ruas antar titik median ${plan.legMedianM.toFixed(0)} m, dan di jarak sependek itu drone cuma sempat ${plan.peakSpeedMs.toFixed(1)} m/s sebelum harus mengerem — butuh ruas ${butuh.toFixed(0)} m untuk benar-benar sampai ${plan.speed.toFixed(1)}. Angkanya tetap ditulis ke file dan memang kepakai di ruas panjang: transit ke titik awal dan pindah antar lintasan. Batas blur dan jeda jepret juga tidak berlaku di mode ini, karena drone berhenti sebelum menjepret.`
+    );
+  }
+
   // Tidak ada satu pun contoh file nyata yang memuat tag resolusi foto —
   // baik buatan DJI Fly maupun generator pihak ketiga. Artinya resolusi
   // ditentukan setelan di DJI Fly, bukan oleh file ini. Pilihan MP di sini

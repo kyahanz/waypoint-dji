@@ -535,6 +535,46 @@ export function legTime(distM, vmax, accel = 2.5, stopAtEnds = false) {
   return (2 * vmax) / accel + (distM - 2 * dAccel) / vmax; // profil trapesium
 }
 
+/**
+ * Kecepatan tertinggi yang BENAR-BENAR tercapai di satu ruas, kalau drone
+ * berhenti di kedua ujungnya.
+ *
+ * Drone mempercepat sampai setengah jalan lalu langsung mengerem, jadi
+ * puncaknya v = akar(a x d) — bukan kecepatan jelajah yang diperintahkan.
+ * Pada ruas 15 m dengan percepatan 2.5 m/s2, puncaknya 6.1 m/s: memerintahkan
+ * 15 m/s tidak mengubah apa pun.
+ *
+ * Ini bukan detail akademis. Selama ini layar menampilkan 15.0 m/s sebagai
+ * "Kecepatan" untuk misi stop-and-shoot, tepat di bawah catatan yang menyebut
+ * batas blur 12.5 dan batas jeda jepret 7.6 — tiga angka yang saling
+ * bertentangan, dan tidak satu pun menggambarkan yang sebenarnya terjadi.
+ */
+export function peakSpeedOverLeg(distM, vmax, accel = 2.5) {
+  if (distM <= 0) return 0;
+  return Math.min(vmax, Math.sqrt(accel * distM));
+}
+
+/**
+ * Panjang ruas yang mewakili jalur ini (median).
+ *
+ * Median, bukan rata-rata: jalur survei punya beberapa ruas panjang di ujung
+ * jalur dan antar lintasan, dan rata-rata ikut tertarik olehnya. Yang ingin
+ * diketahui adalah ruas yang dialami drone sebagian besar waktu.
+ */
+export function medianLegM(waypoints) {
+  if (!waypoints || waypoints.length < 2) return 0;
+  const d = [];
+  for (let i = 1; i < waypoints.length; i++) {
+    d.push(Math.hypot(
+      waypoints[i].xy[0] - waypoints[i - 1].xy[0],
+      waypoints[i].xy[1] - waypoints[i - 1].xy[1]
+    ));
+  }
+  d.sort((a, b) => a - b);
+  const m = Math.floor(d.length / 2);
+  return d.length % 2 ? d[m] : (d[m - 1] + d[m]) / 2;
+}
+
 /** Waktu yang hilang untuk satu belokan di ujung jalur (melambat, putar, ngebut lagi). */
 export function turnPenalty(vmax, accel = 2.5) {
   return (2 * vmax) / accel + 2;
