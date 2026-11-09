@@ -305,9 +305,9 @@ export function evaluateSafety(plan, profile, o = {}) {
   // dan selama ini tidak pernah dikatakan.
   if (plan.pattern === 'crossOblique') {
     add(
-      'info',
-      'oblique-no-nadir',
-      'Tidak ada satu pun foto yang nunduk lurus di pola ini — semuanya -45°. Atap terpotret cuma dari serong, dan tidak ada frame nadir yang mengikat skala tanah. Untuk model bangunan yang utuh, pakai 3D bangunan: dia menambah satu lintasan nadir, ongkosnya sekitar 50% foto.'
+      'warn',
+      'oblique-needs-nadir',
+      `Pola ini fasad saja: semua fotonya -45°, tidak ada satu pun yang nunduk lurus. Atap dan skala tanah belum tertangkap. Terbangkan Peta datar di lahan yang sama sebagai misi kedua — titik lepas landas yang sama — lalu masukkan KEDUA set foto ke software olah dalam satu project. Tanpa itu, modelnya berdiri tapi atapnya meleleh dan ukurannya mengambang.`
     );
   }
 

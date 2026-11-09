@@ -369,13 +369,24 @@ export function generateGrid(polyXY, o) {
  *   crossOblique  — cross, tapi kamera dimiringkan. Ini yang menangkap dinding
  *                   tegak; cross saja dengan kamera nunduk lurus masih tipis.
  *                   Tapi dia kehilangan nadirnya — lihat building3d.
- *   building3d    — nadir + dua lintasan miring menyilang, dalam satu file.
- *                   Inilah bentuk yang dipakai orang untuk model bangunan.
+ *   building3d    — nadir + dua lintasan miring menyilang dalam SATU misi.
+ *                   Masih dipahami engine, tapi tidak lagi ditawarkan di layar.
  *
- * Kenapa building3d perlu ada, padahal crossOblique sudah miring: di
- * crossOblique TIDAK ADA satu pun foto yang menunduk lurus. Akibatnya atap
- * cuma kena dari serong, dan tidak ada frame yang mengikat skala tanah.
- * Lintasan nadir yang memperbaiki dua-duanya, dan ongkosnya ~50% foto.
+ * Soal nadir, dan kenapa akhirnya dipisah. Di crossOblique tidak ada satu pun
+ * foto yang menunduk lurus: atap cuma kena dari serong, dan tidak ada frame
+ * yang mengikat skala tanah. Jawaban pertamanya building3d — nadir dan miring
+ * digabung jadi tiga lintasan dalam satu misi.
+ *
+ * Yang membatalkan itu bukan teori, tapi baterai. Tiga lintasan berarti tiga
+ * kali foto dan tiga kali waktu: lahan 3.49 ha pada GSD 2.5 cm jadi 408 foto
+ * dan 42 menit, tiga baterai, dalam satu rencana yang harus diurus sekaligus.
+ * Mini bukan drone untuk itu.
+ *
+ * Dan nadirnya tidak harus satu misi: foto nadir dan foto miring digabung di
+ * software olah, bukan di file misi. Jadi "Peta datar" diterbangkan sendiri —
+ * yang sekalian memberi ortofoto sebagai hasil — lalu "3D bangunan" untuk
+ * fasadnya, dan keduanya diolah bersama. Dua misi pendek, masing-masing muat
+ * satu baterai, masing-masing bisa diulang sendiri kalau gagal.
  *
  * `passSpecs` menggantikan pasangan (passes, gimbalPitch) yang lama: tiap
  * lintasan membawa pergeseran arahnya sendiri DAN sudut gimbalnya sendiri.
@@ -405,7 +416,7 @@ export const PATTERNS = {
   },
   crossOblique: {
     id: 'crossOblique',
-    name: 'Silang + miring',
+    name: '3D bangunan',
     passes: 2,
     gimbalPitch: -45,
     passSpecs: [
@@ -415,7 +426,7 @@ export const PATTERNS = {
   },
   building3d: {
     id: 'building3d',
-    name: '3D bangunan',
+    name: '3D + nadir sekaligus',
     passes: 3,
     // Angka wakil untuk ditampilkan; yang benar-benar dipakai ada di passSpecs,
     // dan karena itulah pola ini mengunci slider gimbal manual.

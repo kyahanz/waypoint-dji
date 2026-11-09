@@ -813,12 +813,31 @@ console.log('\nGerbang keselamatan: pola miring & 3D bangunan');
   ok(!codes(datar).includes('oblique-gsd'), 'peta datar tidak kena pesan kamera miring');
   ok(codes(miring).includes('oblique-gsd'), 'pola miring: ketelitian permukaan dijelaskan');
   ok(
-    codes(miring).includes('oblique-no-nadir'),
-    'pola miring diberi tahu dia kehilangan nadirnya'
+    codes(miring).includes('oblique-needs-nadir'),
+    'pola miring diberi tahu dia fasad saja'
   );
   ok(
-    !codes(b3d).includes('oblique-no-nadir'),
-    '3D bangunan tidak kena pesan itu, karena nadirnya ada'
+    evaluateSafety(miring, p5).findings.find((f) => f.code === 'oblique-needs-nadir').level === 'warn',
+    'dan itu peringatan, bukan sekadar catatan — tanpa nadir modelnya cacat'
+  );
+  ok(
+    textOf(miring, 'oblique-needs-nadir').includes('Peta datar'),
+    'pasangannya disebut namanya: Peta datar di lahan yang sama'
+  );
+  ok(
+    textOf(miring, 'oblique-needs-nadir').includes('satu project'),
+    'dan dikatakan kedua set foto diolah bersama, bukan terpisah'
+  );
+  ok(
+    !codes(b3d).includes('oblique-needs-nadir'),
+    'pola nadir+miring sekaligus tidak kena pesan itu, karena nadirnya ada'
+  );
+
+  // Ongkos yang membuat pemisahan itu perlu: tiga lintasan = tiga kali foto.
+  ok(
+    b3d.grid.photos === miring.grid.photos * 1.5,
+    'nadir+miring sekaligus 1.5x foto dibanding miring saja',
+    `${miring.grid.photos} -> ${b3d.grid.photos}`
   );
   ok(codes(b3d).includes('building3d-shape'), '3D bangunan menjelaskan tiga lintasannya');
   ok(

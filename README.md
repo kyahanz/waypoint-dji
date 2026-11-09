@@ -365,9 +365,8 @@ selalu siap ambil alih manual saat menerbangkannya.
 - **Preset Cepat / Standar / Detail** — menyimpan ketelitian yang dituju, bukan
   ketinggian mati, jadi artinya tetap sama waktu drone diganti. Geser slider
   apa pun dan presetnya berubah jadi Custom.
-- **Pola terbang** — peta datar, silang, silang + miring, 3D bangunan
-  (nadir + miring dalam satu file), atau orbit untuk objek tegak. Biayanya
-  ditampilkan sebelum berangkat, bukan setelah.
+- **Pola terbang** — peta datar, 3D bangunan (miring -45°), atau orbit untuk
+  objek tegak. Biayanya ditampilkan sebelum berangkat, bukan setelah.
 - **Ketelitian yang jujur untuk kamera miring** — GSD dihitung dari jarak ke
   permukaan, bukan dari ketinggian terbang. Di gimbal -45° bedanya 41%.
 - **Ikuti kontur tanah** — plus peringatan kalau lereng menuntut laju naik di
@@ -404,22 +403,50 @@ Keduanya habis di sekitar **196 foto**. Itu unit alami kerjanya.
 |---|---|---|---|---|
 | Ortofoto, ukur luas, lihat kondisi | Peta datar | -90° | 2.5–3.5 cm | 75/65 |
 | Peta 3D kasar: volume, massing, bentuk atap | Silang | -90° | 3–4 cm | 80/70 |
-| Model 3D bangunan, fasad kebaca | 3D bangunan | -90° + -45° | 1.5–2.5 cm di fasad | 80/70 |
-| Fasad saja, atap sudah dapat dari misi lain | Silang + miring | -45° | 1.5–2.5 cm di fasad | 80/70 |
+| Model 3D bangunan, fasad kebaca | **3D bangunan + Peta datar, dua misi** | -45° lalu -90° | 1.5–2.5 cm di fasad | 80/70 |
 | Objek tunggal: tugu, menara, patung | Orbit objek | per cincin | 0.5–1 cm | langkah sudut 10° |
 
-Luas maksimum yang masih muat satu file untuk 3D bangunan, Mini 5 Pro 12 MP:
+### Kenapa 3D dipisah dari nadir
 
-| GSD di fasad | Tinggi | Luas | Foto | Waktu |
-|---|---|---|---|---|
-| 2.12 cm | 41 m | 64×64 m (0.41 ha) | 165 | 14m |
-| 2.83 cm | 55 m | 86×86 m (0.74 ha) | 165 | 16m |
-| 3.54 cm | 68 m | 106×106 m (1.12 ha) | 165 | 18m |
-| 4.95 cm | 96 m | 150×150 m (2.25 ha) | 165 | 21m |
+Model 3D yang utuh butuh dua-duanya: foto miring untuk fasad, foto nadir untuk
+atap dan untuk mengikat skala tanah. Pernah digabung jadi satu pola tiga
+lintasan. Yang membatalkannya bukan teori, tapi baterai:
 
-Satu rumah 40×40 m pada GSD fasad 3.54 cm: **63 foto, di bawah 5 menit.**
-Peta datar untuk lahan yang sama 21 foto. Angka 400-an muncul cuma kalau
-lahannya hektaran.
+| Lahan 3.49 ha, GSD 2.5 cm | Foto | Waktu | Baterai |
+|---|---|---|---|
+| Peta datar (nadir saja) | 136 | 14m05s | 1 |
+| 3D bangunan (miring saja) | 272 | 28m21s | 2 |
+| Nadir + miring satu misi | 408 | 42m33s | 3 |
+
+Tiga lintasan berarti tiga kali foto dan tiga kali waktu, dalam satu rencana
+yang harus diurus sekaligus. Mini bukan drone untuk itu.
+
+Dan nadirnya memang tidak harus satu misi: **foto nadir dan foto miring
+digabung di software olah, bukan di file misi.** Jadi terbangkan Peta datar
+sendiri — yang sekalian memberi ortofoto sebagai hasil — lalu 3D bangunan untuk
+fasadnya, dengan titik lepas landas yang sama. Masukkan kedua set foto ke satu
+project waktu mengolah. Dua misi pendek yang masing-masing muat satu baterai
+dan bisa diulang sendiri kalau gagal, bukan satu misi panjang yang kalau
+terputus di tengah harus dipikir ulang seluruhnya.
+
+Gerbang keselamatan menyebutkan ini setiap kali pola 3D dipilih, karena
+melupakan misi keduanya menghasilkan model yang berdiri tapi atapnya meleleh.
+
+### Berapa lama sebenarnya
+
+Satu angka yang sering mengejutkan: **mode jeda lebih menentukan waktu
+daripada jumlah foto.** Lahan yang sama, 210 foto:
+
+| Mode | Kecepatan | Waktu | Per foto |
+|---|---|---|---|
+| Berhenti sejenak | 15.0 m/s | 21m11s | 6.05 s |
+| Tanpa jeda | 7.7 m/s | 9m02s | 2.58 s |
+
+Dua kali lipat lebih lama, padahal fotonya sama persis. Sebabnya di mode
+berhenti sejenak drone mengerem, berhenti, menjepret, lalu mempercepat lagi di
+setiap titik — dan pada ruas sependek jarak antar foto, itu hampir seluruh
+waktunya. Jadi kalau rencanamu terasa lama, periksa modenya dulu sebelum
+memperkecil lahan.
 
 Yang lebih menentukan hasil daripada jumlah foto, dan tidak muncul di angka
 mana pun: tiap permukaan harus terlihat dari minimal tiga sudut berbeda

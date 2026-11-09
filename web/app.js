@@ -883,8 +883,8 @@ function syncOrbitInputs() {
 const PATTERN_SUFFIX = {
   single: '',
   cross: '-silang',
-  crossOblique: '-silang-miring',
-  building3d: '-3d',
+  crossOblique: '-3d',
+  building3d: '-3d-nadir',
   orbit: '-orbit',
 };
 
@@ -910,11 +910,11 @@ const PATTERN_RETIRED = {
     alasan:
       'dua lintasan nadir memperbaiki medan, tapi dinding tegak tetap tipis terpotret',
   },
-  crossOblique: {
-    label: 'Silang + miring',
-    saran: '3D bangunan',
+  building3d: {
+    label: '3D + nadir sekaligus',
+    saran: '3D bangunan lalu Peta datar terpisah',
     alasan:
-      'semua fotonya -45°, jadi tidak ada frame nadir yang mengikat atap dan skala tanah',
+      'tiga lintasan dalam satu misi berarti tiga kali foto dan tiga baterai sekaligus, terlalu berat untuk Mini',
   },
 };
 
@@ -965,9 +965,9 @@ const PATTERN_HINT = {
   cross:
     'Dua arah menyilang 90°. Objek tegak terpotret dari dua sisi, jadi model 3D-nya tidak bolong. Foto dan waktu jadi dua kali lipat.',
   crossOblique:
-    'Dua arah menyilang, kamera dimiringkan ke -45°. Menangkap dinding tegak, tapi tidak ada satu pun foto yang nunduk lurus — atap cuma kena dari serong. Dua kali lipat foto.',
+    'Dua arah menyilang, kamera dimiringkan -45°: ini yang menangkap dinding tegak. Atapnya tidak ikut, jadi terbangkan Peta datar di lahan yang sama sebagai misi kedua — fotonya digabung waktu diolah. Dua misi pendek, bukan satu misi panjang.',
   building3d:
-    'Satu lintasan nadir -90° plus dua lintasan miring -45° menyilang, dalam satu file. Inilah bentuk yang dipakai orang untuk model bangunan: nadir mengikat atap dan skala tanah, miring mengisi fasad. Tiga kali lipat foto.',
+    'Nadir dan miring digabung dalam satu misi: tiga lintasan, tiga kali lipat foto. Tidak ditawarkan lagi karena terlalu berat untuk baterai Mini — pakai 3D bangunan lalu Peta datar terpisah.',
   orbit:
     'Mengelilingi satu objek tegak di beberapa tingkat ketinggian, kamera selalu menghadap ke dalam. Untuk tugu, menara, patung — benda yang sempit tapi tinggi, yang isinya ada di dinding, bukan di tanah.',
 };
