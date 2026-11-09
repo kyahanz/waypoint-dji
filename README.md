@@ -442,13 +442,42 @@ yang sama — cuma arah lintasannya menyilang — jadi tidak ada gunanya memisah
 keduanya. Yang berguna dipisah cuma nadir dari miring, karena itu memang dua
 hal berbeda bagi yang menerbangkannya.
 
-Ambang jumlah file pada GSD 2.5 cm:
+### Berapa file untuk lahan seberapa
 
-| Luas | File |
-|---|---|
-| sampai 1.69 ha | **2** — satu nadir, satu miring |
-| 1.96 – 5.29 ha | 3 |
-| 5.76 ha ke atas | 5 |
+Jumlah file itu **hasil**, bukan setelan: dia turun dari luas × GSD × pola.
+Luas maksimum untuk tiap jumlah file, Mini 5 Pro 12 MP, mode berhenti sejenak:
+
+**3D bangunan** (nadir + 2 miring)
+
+| Preset | GSD di fasad | Tinggi | 2 file | 3 file |
+|---|---|---|---|---|
+| Cepat | 4.95 cm | 96 m | sampai 4.84 ha | sampai 12.60 ha |
+| Standar | 3.54 cm | 68 m | sampai 1.82 ha | sampai 5.29 ha |
+| Detail | 2.12 cm | 41 m | sampai 0.42 ha | sampai 1.32 ha |
+
+**Peta datar** (nadir saja)
+
+| Preset | GSD | Tinggi | 1 file | 2 file | 3 file |
+|---|---|---|---|---|---|
+| Cepat | 3.50 cm | 96 m | sampai 12.60 ha | sampai 28.09 ha | sampai 36.00 ha |
+| Standar | 2.50 cm | 68 m | sampai 5.29 ha | sampai 13.32 ha | sampai 22.09 ha |
+| Detail | 1.50 cm | 41 m | sampai 1.32 ha | sampai 3.06 ha | sampai 4.84 ha |
+
+Pola 3D bangunan **tidak pernah** muat satu file: dia punya dua peran, dan
+nadir tidak pernah digabung dengan miring. Jadi dua file adalah batas bawahnya,
+berapa pun kecilnya lahan.
+
+Dua hal yang terbaca dari tabel ini. Pertama, **GSD jauh lebih menentukan
+daripada yang terasa**: menaikkan dari Standar ke Detail memangkas luas yang
+muat dua file dari 1.82 ha jadi 0.42 ha — empat kali lipat lebih sempit, karena
+foto bertambah dengan kuadrat kerapatan. Kedua, kalau sebuah lahan jatuh tepat
+di atas ambang, **mengecilkan areanya sedikit** sering lebih murah daripada
+menambah satu siklus baterai.
+
+Yang mengikat bergantian antara dua batas: DJI Fly cuma menerima 200 waypoint
+per file, dan baterai cuma kepakai ~22 menit dikurangi cadangan transit. Di
+preset rapat yang mengikat batas waypoint; di preset renggang yang mengikat
+waktu baterai.
 
 **Kedua, dua pola terpisah menyerahkan hal yang tidak boleh diserahkan.**
 Pengguna harus mengingat sendiri bahwa misi keduanya memakai area, ketinggian,
