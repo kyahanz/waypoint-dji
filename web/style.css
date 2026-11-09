@@ -993,9 +993,28 @@ input[type="range"]::-moz-range-thumb {
   color: var(--muted);
 }
 
+/* Baris pengarah untuk memilih file. Ditaruh tepat di atas daftarnya karena
+   kalau ditaruh di bawah, orang sudah telanjur mengira daftar itu cuma bacaan. */
+.files-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.files-pick .btn.link {
+  padding: 0;
+  font-size: 11.5px;
+}
+
 .file {
   display: grid;
-  grid-template-columns: 10px 1fr;
+  grid-template-columns: auto 1fr;
   gap: 9px;
   align-items: start;
   padding: 8px 11px;
@@ -1003,8 +1022,39 @@ input[type="range"]::-moz-range-thumb {
   background: var(--panel);
 }
 
-.file .swatch {
-  margin-top: 4px;
+/* Target sentuhnya dilebarkan lewat padding, bukan lewat kotak centang yang
+   digedekan: yang digedekan cuma daerah yang bisa diketuk, tampilannya tetap
+   serapat baris lain. */
+.fpick {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: -8px 0 -8px -11px;
+  padding: 8px 2px 8px 11px;
+  cursor: pointer;
+}
+
+.fpick input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* File yang jalurnya sedang disembunyikan dari peta. Diredupkan, bukan
+   disembunyikan: file itu tetap akan terunduh dan tetap harus diterbangkan —
+   yang berubah cuma apa yang digambar. */
+.file.off {
+  background: var(--panel-2);
+}
+
+.file.off .fbody {
+  opacity: 0.5;
+}
+
+.lg.off {
+  opacity: 0.4;
 }
 
 .fbody {
@@ -1015,7 +1065,20 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   align-items: baseline;
   gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
   font-size: 12px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.fname:hover b,
+.fname:hover span {
+  color: var(--accent);
 }
 
 .fname b {

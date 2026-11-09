@@ -106,6 +106,13 @@ const state = {
   },
   advanced: { ...SAFE_ADVANCED },
   gateAck: false,
+  // File KMZ yang sedang DISEMBUNYIKAN dari peta. Disimpan sebagai "yang
+  // disembunyikan", bukan "yang tampil", supaya keadaan normal — semua tampil —
+  // adalah himpunan kosong, bukan daftar yang harus diisi ulang tiap rencana
+  // berubah. Isinya cuma tampilan: tidak masuk file, tidak masuk link, dan
+  // tidak mengubah apa pun yang diexport.
+  fileHidden: new Set(),
+  fileCount: 0,
   resume: null, // { index, lngLat }
   resumePicking: false,
   viewMode: '2d',
@@ -1044,6 +1051,45 @@ els.angleAuto.addEventListener('change', () => {
 els.gimbal.addEventListener('input', () => {
   state.advanced.gimbalPitch = Number(els.gimbal.value);
   render();
+});
+
+/**
+ * Memilih file mana yang jalurnya tampil di peta.
+ *
+ * Dua cara, karena ada dua pertanyaan yang berbeda. "File ini jalurnya yang
+ * mana?" dijawab dengan mengklik nama filenya: file itu tampil sendiri, klik
+ * lagi semuanya kembali. "Dua file ini tumpang tindih tidak?" dijawab dengan
+ * centang: matikan yang tidak perlu, sisanya dibandingkan berdampingan.
+ *
+ * Keduanya cuma mengubah apa yang digambar. Tidak ada file yang dikeluarkan
+ * dari export karena tidak dicentang — itu akan membuat orang tanpa sadar
+ * menerbangkan lahan yang bolong, dan diam-diam mengubah isi unduhan adalah
+ * hal terakhir yang boleh dilakukan panel ini.
+ */
+els.sorties.addEventListener('change', (e) => {
+  const cb = e.target.closest('input[data-file]');
+  if (!cb) return;
+  const i = Number(cb.dataset.file);
+  const next = new Set(state.fileHidden);
+  if (cb.checked) next.delete(i);
+  else next.add(i);
+  setFileHidden(next);
+});
+
+els.sorties.addEventListener('click', (e) => {
+  if (e.target.closest('[data-file-all]')) {
+    setFileHidden(new Set());
+    return;
+  }
+
+  const solo = e.target.closest('[data-solo]');
+  if (!solo) return;
+  const i = Number(solo.dataset.solo);
+  const n = state.plan?.sorties.length ?? 0;
+  const sudahSendiri = !state.fileHidden.has(i) && state.fileHidden.size === n - 1;
+  setFileHidden(
+    sudahSendiri ? new Set() : new Set([...Array(n).keys()].filter((k) => k !== i))
+  );
 });
 
 els.projName.addEventListener('input', () => {
@@ -2251,25 +2297,17 @@ function render() {
       : EMPTY
   );
 
-  map.getSource('route')?.setData({
-    type: 'FeatureCollection',
-    features: plan.sorties.map((sortie, i) => ({
-      type: 'Feature',
-      properties: { color: BATTERY_COLORS[i % BATTERY_COLORS.length] },
-      geometry: {
-        type: 'LineString',
-        coordinates: sortie.map((w) => plan.proj.toLL(w.xy)),
-      },
-    })),
-  });
+  // Jumlah file berubah berarti nomor file yang disembunyikan sudah menunjuk
+  // ke file lain — atau ke file yang tidak ada lagi. Disetel ulang, bukan
+  // dipetakan ulang: "file #3" sebelum dan sesudah luas lahan berubah bukan
+  // isi yang sama, jadi mempertahankannya cuma akan menyembunyikan jalur yang
+  // tidak pernah dipilih siapa pun.
+  if (state.fileCount !== plan.sorties.length) {
+    state.fileCount = plan.sorties.length;
+    state.fileHidden.clear();
+  }
 
-  map.getSource('wp')?.setData({
-    type: 'FeatureCollection',
-    features: plan.grid.waypoints.map((w) => ({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: plan.proj.toLL(w.xy) },
-    })),
-  });
+  syncRouteSources(plan);
 
   map.getSource('resume')?.setData(
     plan.resume
@@ -2416,7 +2454,18 @@ function updateDerived(plan) {
     state.speedMs = shown;
     els.speed.value = String(shown.toFixed(1));
   }
-  els.speedOut.textContent = `${shown.toFixed(1)} m/s`;
+  // Di mode berhenti sejenak, SATU angka di sini selalu menyesatkan: yang
+  // ditulis ke file adalah kecepatan jelajah, tapi pada ruas sependek jarak
+  // antar foto drone tidak pernah sampai ke sana. Dan karena otomatis memilih
+  // kecepatan tertinggi drone, yang terbaca orang adalah "15.0 m/s" di misi
+  // yang titiknya berjarak sepuluh meter — persis di sebelah catatan yang
+  // bilang angka itu tidak pernah tercapai. Dua angka berdampingan menutup
+  // pertentangan itu di tempat angkanya muncul, bukan di catatan di bawahnya.
+  const tercapai = plan?.stopAtEach ? plan.peakSpeedMs : undefined;
+  els.speedOut.textContent =
+    tercapai !== undefined && tercapai < shown - 0.05
+      ? `${shown.toFixed(1)} m/s · tercapai ${tercapai.toFixed(1)}`
+      : `${shown.toFixed(1)} m/s`;
   // Catatan ini dulu menyebut batas blur dan batas jeda jepret tanpa peduli
   // mode — padahal di mode berhenti sejenak KEDUANYA tidak berlaku, karena
   // drone berhenti sebelum menjepret. Akibatnya layar menampilkan tiga angka
@@ -2425,8 +2474,18 @@ function updateDerived(plan) {
     const puncak = plan
       ? ` Pada ruas antar titik ${plan.legMedianM.toFixed(0)} m, drone cuma sempat mencapai ${plan.peakSpeedMs.toFixed(1)} m/s sebelum harus mengerem.`
       : '';
+    // Kenapa otomatis justru mentok ke kanan, padahal catatannya bilang angka
+    // itu tidak pernah tercapai: karena di mode ini kecepatan jelajah memang
+    // cuma berlaku di ruas panjang. Di ruas antar foto, kecepatan berapa pun
+    // yang dipilih tidak mengubah apa-apa — drone tetap mempercepat lalu
+    // mengerem di jarak yang sama. Jadi yang paling masuk akal adalah angka
+    // tertinggi: menurunkannya cuma memperlambat transit dan pindah lintasan,
+    // tanpa menghemat atau mengamankan apa pun di atas lahan.
+    const kenapaOtomatis = state.speedAuto
+      ? ' Otomatis memilih angka tertinggi drone justru karena itu: di ruas antar foto angka ini tidak berpengaruh, sementara di transit dan pindah lintasan dia benar-benar kepakai.'
+      : '';
     els.speedNote.textContent =
-      `Berhenti sejenak di tiap titik, jadi batas blur dan jeda jepret tidak berlaku — drone berhenti dulu baru menjepret.${puncak} Angka ini kepakai di ruas panjang: transit ke titik awal dan pindah antar lintasan.`;
+      `Berhenti sejenak di tiap titik, jadi batas blur dan jeda jepret tidak berlaku — drone berhenti dulu baru menjepret.${puncak} Angka ini kepakai di ruas panjang: transit ke titik awal dan pindah antar lintasan.${kenapaOtomatis}`;
   } else {
     els.speedNote.textContent = state.speedAuto
       ? `Batas blur ${p.maxSpeedBlur.toFixed(1)} m/s · batas jeda jepret ${p.maxSpeedInterval.toFixed(1)} m/s (${state.profile.mode.label}). Yang mengikat: ${p.maxSpeedBlur < p.maxSpeedInterval ? 'blur' : 'jeda jepret'}.`
@@ -2719,6 +2778,90 @@ const PERAN_POLOS = {
 };
 
 /**
+ * Arah lintasan yang benar-benar ada di dalam satu file.
+ *
+ * Ini pertanyaan yang timbul sendiri begitu file dikelompokkan per peran:
+ * pola 3D bangunan dibangun dari dua lintasan miring yang MENYILANG, tapi
+ * keduanya punya peran yang sama sehingga jatuh di kelompok yang sama. Dari
+ * luar, "1 file · miring" jadi terbaca seperti satu arah saja — padahal
+ * silangnya justru yang membuat pola itu ada.
+ *
+ * Jadi arahnya dibaca balik dari titik-titiknya, bukan dari nama polanya:
+ * tiap titik membawa nomor lintasan asalnya, dan tiap lintasan tahu arahnya
+ * sendiri. Kalau satu file memuat lebih dari satu arah, itu dikatakan.
+ *
+ * Orbit tidak punya lintasan sama sekali — titiknya tidak membawa `pass` — dan
+ * untuk pola begitu fungsi ini mengembalikan null, bukan angka karangan.
+ */
+function arahJalurFile(plan, i) {
+  const passes = plan.grid?.passes;
+  const sortie = plan.sorties?.[i];
+  if (!passes || !sortie) return null;
+
+  const dipakai = [...new Set(sortie.map((w) => w.pass))].filter((k) => passes[k]);
+  if (!dipakai.length) return null;
+
+  // Dua lintasan dengan arah sama (nadir dan miring di pola 3D) tidak perlu
+  // disebut dua kali.
+  const sudut = [...new Set(dipakai.map((k) => Math.round(passes[k].angleDeg) % 180))].sort(
+    (a, b) => a - b
+  );
+  return {
+    label: sudut.map((v) => `${v}°`).join(' + '),
+    menyilang: sudut.length > 1,
+  };
+}
+
+/**
+ * Jalur dan titik di peta, mengikuti file mana yang sedang ditampilkan.
+ *
+ * Dipisah dari render() karena mencentang file bukan perubahan rencana: tidak
+ * ada yang perlu dihitung ulang, cuma dua sumber peta yang perlu diisi ulang.
+ * Menjalankan render() penuh untuk itu berarti membangun ulang seluruh grid
+ * tiap kali orang ingin melihat satu file — mahal, dan terasa berat di lahan.
+ */
+function syncRouteSources(plan) {
+  const tampil = plan.sorties
+    .map((sortie, i) => ({ sortie, i }))
+    .filter(({ i }) => !state.fileHidden.has(i));
+
+  map.getSource('route')?.setData({
+    type: 'FeatureCollection',
+    features: tampil.map(({ sortie, i }) => ({
+      type: 'Feature',
+      properties: { color: BATTERY_COLORS[i % BATTERY_COLORS.length] },
+      geometry: {
+        type: 'LineString',
+        coordinates: sortie.map((w) => plan.proj.toLL(w.xy)),
+      },
+    })),
+  });
+
+  // Titiknya ikut disaring, bukan cuma garisnya. Kalau titik semua file tetap
+  // tampil, menyembunyikan garis tidak menjawab apa pun — yang ingin dilihat
+  // orang justru titik mana yang dijepret file ini.
+  map.getSource('wp')?.setData({
+    type: 'FeatureCollection',
+    features: tampil.flatMap(({ sortie }) =>
+      sortie.map((w) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: plan.proj.toLL(w.xy) },
+      }))
+    ),
+  });
+}
+
+/** Ganti file mana yang tampil di peta, lalu gambar ulang peta dan panelnya. */
+function setFileHidden(next) {
+  state.fileHidden = next;
+  if (state.plan) {
+    syncRouteSources(state.plan);
+    renderSorties(state.plan);
+    renderLegend(state.plan);
+  }
+}
+
+/**
  * Daftar file yang akan terunduh.
  *
  * Ini bagian yang paling sering bikin orang berhenti memakai: mereka menekan
@@ -2735,15 +2878,27 @@ function renderSorties(plan) {
 
   const baris = (s, i) => {
     const p = persenBaterai(s);
+    const arah = arahJalurFile(plan, i);
+    const tampil = !state.fileHidden.has(i);
     return `
-      <div class="file">
-        <span class="swatch" style="background:${BATTERY_COLORS[i % BATTERY_COLORS.length]}"></span>
+      <div class="file${tampil ? '' : ' off'}">
+        <label class="fpick" title="${tampil ? 'Sembunyikan jalur file ini dari peta' : 'Tampilkan jalur file ini di peta'}">
+          <input type="checkbox" data-file="${i}" ${tampil ? 'checked' : ''} />
+          <span class="swatch" style="background:${BATTERY_COLORS[i % BATTERY_COLORS.length]}"></span>
+        </label>
         <div class="fbody">
-          <div class="fname"><b>#${i + 1}</b><span>${esc(namaFileKmz(plan, i))}</span></div>
+          <button type="button" class="fname" data-solo="${i}" title="Lihat jalur file ini saja di peta">
+            <b>#${i + 1}</b><span>${esc(namaFileKmz(plan, i))}</span>
+          </button>
           <div class="fmeta">
             <span><b>${s.photos}</b> foto</span>
             <span><b>${s.waypoints}</b> waypoint</span>
             <span><b>${fmtDur(s.durationS)}</b> <span class="dim">(${fmtDur(s.surveyS)} survei + ${fmtDur(s.transitS)} pergi-pulang)</span></span>
+            ${
+              arah
+                ? `<span>arah jalur <b>${arah.label}</b>${arah.menyilang ? ' <span class="dim">(menyilang)</span>' : ''}</span>`
+                : ''
+            }
           </div>
           ${
             p == null
@@ -2832,6 +2987,16 @@ function renderSorties(plan) {
           : ''
       }
 
+      <div class="files-pick">
+        <span>Klik nama file untuk melihat jalurnya sendiri di peta, atau pakai
+        centangnya untuk membandingkan beberapa file sekaligus.</span>
+        ${
+          state.fileHidden.size
+            ? `<button type="button" class="btn link" data-file-all>Tampilkan semua ${plan.summaries.length} file</button>`
+            : ''
+        }
+      </div>
+
       ${grup
         .map((g) => {
           const info = (g.role && PERAN_INFO[g.role]) || PERAN_POLOS;
@@ -2862,10 +3027,13 @@ function renderLegend(plan) {
     return;
   }
   els.legend.hidden = false;
+  // File yang sedang disembunyikan tetap disebut di legenda, cuma diredupkan.
+  // Menghapusnya dari daftar membuat peta terlihat seperti rencana yang memang
+  // cuma punya dua file — dan itu kebohongan yang paling mudah terjadi di sini.
   els.legend.innerHTML = plan.summaries
     .map(
       (s, i) =>
-        `<div class="lg"><span class="swatch" style="background:${BATTERY_COLORS[i % BATTERY_COLORS.length]}"></span>File ${i + 1} · ${fmtDur(s.durationS)}</div>`
+        `<div class="lg${state.fileHidden.has(i) ? ' off' : ''}"><span class="swatch" style="background:${BATTERY_COLORS[i % BATTERY_COLORS.length]}"></span>File ${i + 1} · ${fmtDur(s.durationS)}</div>`
     )
     .join('');
 }

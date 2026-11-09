@@ -544,6 +544,27 @@ Nama file di panel dan nama file yang terunduh disusun **satu fungsi yang
 sama** (`namaFileKmz`). Dua penyusun terpisah cepat atau lambat membuat panel
 menjanjikan nama yang tidak pernah muncul di folder HP.
 
+#### Melihat jalur per file, dan arah lintasan yang ada di dalamnya
+
+Daftar file menjawab "file ini isinya apa", tapi tidak menjawab "jalurnya yang
+mana". Jadi tiap baris file bisa **diklik namanya** untuk menampilkan jalur file
+itu sendiri di peta — garis dan titiknya, bukan cuma garisnya — dan diklik lagi
+untuk mengembalikan semuanya. Untuk membandingkan beberapa file sekaligus ada
+**centang** per baris. Keduanya cuma mengubah apa yang digambar: tidak ada file
+yang dikeluarkan dari export karena tidak dicentang, karena itu akan membuat
+orang tanpa sadar menerbangkan lahan yang bolong.
+
+Tiap baris juga menyebut **arah lintasan yang benar-benar ada di dalam file
+itu**, dibaca balik dari titik-titiknya. Ini pertanyaan yang timbul sendiri
+begitu file dikelompokkan per peran: pola 3D bangunan dibangun dari dua
+lintasan miring yang MENYILANG, tapi keduanya punya peran yang sama sehingga
+jatuh di kelompok yang sama. Dari luar, "1 file · miring" jadi terbaca seperti
+satu arah saja — padahal silangnya justru yang membuat pola itu ada. Sekarang
+baris itu berbunyi `arah jalur 0° + 90° (menyilang)` kalau memang begitu isinya,
+dan di lahan yang lebih luas — tempat kelompok miring pecah jadi dua file —
+tiap file menyebut arahnya masing-masing. Tidak ada arah yang hilang; yang
+berubah cuma di file mana dia diterbangkan.
+
 Yang tidak berlaku untuk pola banyak lintasan: **Lanjutkan misi**. Kalau
 filenya sudah dipecah per lintasan, "lanjut dari titik terakhir" tidak punya
 jawaban tunggal — lanjut di file yang mana? Dan memotong daftar waypoint global
@@ -572,6 +593,16 @@ berhenti sejenak drone mengerem, berhenti, menjepret, lalu mempercepat lagi di
 setiap titik — dan pada ruas sependek jarak antar foto, itu hampir seluruh
 waktunya. Jadi kalau rencanamu terasa lama, periksa modenya dulu sebelum
 memperkecil lahan.
+
+Perhatikan angka 15.0 m/s di baris pertama tabel itu: di mode berhenti sejenak
+**Kecepatan otomatis memang memilih kecepatan tertinggi drone**, dan itu terlihat
+seperti salah di sebelah catatan yang bilang angka itu tidak pernah tercapai.
+Keduanya benar. Di ruas antar foto, kecepatan jelajah berapa pun yang dipilih
+tidak mengubah apa-apa — drone tetap mempercepat lalu mengerem di jarak yang
+sama. Yang berubah cuma ruas panjang: transit ke titik awal dan pindah antar
+lintasan, dan di situ angka tertinggi memang yang paling masuk akal. Supaya
+pertentangannya tidak perlu dibaca dulu untuk dimengerti, pembacaan slidernya
+sendiri sekarang menampilkan dua angka: `15.0 m/s · tercapai 6.9`.
 
 Yang lebih menentukan hasil daripada jumlah foto, dan tidak muncul di angka
 mana pun: tiap permukaan harus terlihat dari minimal tiga sudut berbeda
