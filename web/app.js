@@ -1046,6 +1046,13 @@ els.gimbal.addEventListener('input', () => {
   render();
 });
 
+els.projName.addEventListener('input', () => {
+  // Nama proyek masuk ke nama file, dan daftar file menampilkan nama itu apa
+  // adanya. Tanpa ini daftarnya memajang nama lama sampai ada hal lain yang
+  // berubah — persis kebohongan yang dicegah namaFileKmz.
+  if (state.plan) renderSorties(state.plan);
+});
+
 els.safeHeight.addEventListener('input', () => {
   state.advanced.safeHeightM = Number(els.safeHeight.value);
   render();
@@ -2303,7 +2310,7 @@ function render() {
 
   els.sheetSummary.textContent =
     `${fmtArea(plan.area)} · ${plan.altitude.toFixed(0)} m · ${fmtDur(plan.duration)} · ` +
-    `${plan.sorties.length} baterai`;
+    `${plan.sorties.length} file`;
 
   syncUrl();
 }
@@ -2503,7 +2510,7 @@ function renderOrbitStats(plan) {
       <span class="v">${fmtDur(plan.duration)}</span>
     </div>
     <div class="stat hero">
-      <span class="k">Baterai</span>
+      <span class="k">File KMZ</span>
       <span class="v">${plan.sorties.length}<small>×</small></span>
     </div>
     <div class="stat">
@@ -2627,7 +2634,7 @@ function renderStats(plan) {
       <span class="v">${fmtDur(plan.duration)}</span>
     </div>
     <div class="stat hero">
-      <span class="k">Baterai</span>
+      <span class="k">File KMZ</span>
       <span class="v">${plan.sorties.length}<small>×</small></span>
     </div>
     <div class="stat">
@@ -2665,27 +2672,187 @@ function renderStats(plan) {
     </div>`;
 }
 
+/**
+ * Nama file KMZ untuk sortie ke-i.
+ *
+ * Satu fungsi, dipakai dua tempat: panel "file yang akan terunduh" dan export
+ * yang sebenarnya. Kalau keduanya menyusun namanya sendiri-sendiri, panel
+ * cepat atau lambat akan berbohong soal nama yang muncul di folder HP.
+ */
+function namaFileKmz(plan, i) {
+  const base =
+    (els.projName.value.trim() || 'survei').replace(/[^\w\-]+/g, '-') +
+    (plan.resume ? '-lanjut' : '') +
+    PATTERN_SUFFIX[plan.pattern];
+  const stamp = new Date().toISOString().slice(0, 10);
+  // Nomor urut di depan karena itu URUTAN TERBANG, peran ditempel di belakang
+  // supaya di folder HP kelihatan mana nadir mana miring tanpa dibuka.
+  const peran = plan.sortieMeta?.[i]?.role;
+  const label = peran ? `-${peran}` : '';
+  return plan.sorties.length > 1
+    ? `${base}-${stamp}_${i + 1}dari${plan.sorties.length}${label}.kmz`
+    : `${base}-${stamp}${label}.kmz`;
+}
+
+/**
+ * Apa gunanya tiap peran lintasan, dalam bahasa orang yang menerbangkannya.
+ *
+ * Nama "nadir" dan "miring" sudah cukup untuk nama file, tapi di panel yang
+ * ditanya orang bukan namanya melainkan BUAT APA. Tanpa jawaban itu, lima file
+ * cuma terlihat seperti lima kali kerja tanpa alasan — dan orang yang tidak
+ * tahu alasannya akan melewatkan salah satunya.
+ */
+const PERAN_INFO = {
+  nadir: {
+    label: 'Nadir · kamera menunduk 90°',
+    desc: 'Bahan peta datar: ortofoto, luas, jarak, ketinggian permukaan. Ini yang dipakai kalau hasilnya mau dicetak jadi peta atau diukur.',
+  },
+  miring: {
+    label: 'Miring · kamera 45°, dua arah menyilang',
+    desc: 'Bahan model 3D: dinding bangunan, sisi tebing, apa pun yang tegak dan tidak kelihatan dari atas. Tanpa file ini model 3D-nya meleleh seperti lilin.',
+  },
+};
+
+const PERAN_POLOS = {
+  label: 'Satu pola, dibagi jadi beberapa penerbangan',
+  desc: 'Isinya sama persis jenisnya, cuma dipotong supaya tiap file muat di batas DJI dan di satu baterai. Potongannya menyambung — tidak ada petak yang terlewat selama semua file diterbangkan.',
+};
+
+/**
+ * Daftar file yang akan terunduh.
+ *
+ * Ini bagian yang paling sering bikin orang berhenti memakai: mereka menekan
+ * Export, dapat lima file, dan tidak tahu apakah itu lima pilihan, lima versi,
+ * atau lima pekerjaan. Jadi yang ditulis di sini bukan cuma jumlahnya,
+ * melainkan tiga hal sekaligus — berapa, kenapa segitu, dan tiap file isinya
+ * apa serta makan berapa foto, waypoint, dan baterai.
+ */
 function renderSorties(plan) {
-  if (plan.summaries.length <= 1) {
-    const s = plan.summaries[0];
-    els.sorties.innerHTML = `<div class="note info"><span class="ic">i</span><span>Muat dalam 1 baterai — ${fmtDur(s.surveyS)} survei + ${fmtDur(s.transitS)} transit.</span></div>`;
+  const lim = state.profile?.limits ?? {};
+  const jatahS = (lim.usableFlightMin ?? 0) * 60;
+  const persenBaterai = (s) =>
+    jatahS > 0 ? Math.min(100, Math.round((s.durationS / jatahS) * 100)) : null;
+
+  const baris = (s, i) => {
+    const p = persenBaterai(s);
+    return `
+      <div class="file">
+        <span class="swatch" style="background:${BATTERY_COLORS[i % BATTERY_COLORS.length]}"></span>
+        <div class="fbody">
+          <div class="fname"><b>#${i + 1}</b><span>${esc(namaFileKmz(plan, i))}</span></div>
+          <div class="fmeta">
+            <span><b>${s.photos}</b> foto</span>
+            <span><b>${s.waypoints}</b> waypoint</span>
+            <span><b>${fmtDur(s.durationS)}</b> <span class="dim">(${fmtDur(s.surveyS)} survei + ${fmtDur(s.transitS)} pergi-pulang)</span></span>
+          </div>
+          ${
+            p == null
+              ? ''
+              : `<div class="fbat${p >= 90 ? ' tight' : ''}" title="Perkiraan pemakaian satu baterai, sudah termasuk terbang ke lokasi dan pulang">
+                   <span class="track"><i style="width:${p}%"></i></span>
+                   <span class="pct">${p}% baterai${p >= 90 ? ' — mepet' : ''}</span>
+                 </div>`
+          }
+        </div>
+      </div>`;
+  };
+
+  const s0 = plan.summaries[0];
+  if (!s0) {
+    els.sorties.innerHTML = '';
     return;
   }
 
+  if (plan.summaries.length <= 1) {
+    els.sorties.innerHTML = `
+      <div class="files">
+        <div class="files-head">
+          <span class="fcount">1</span>
+          <span class="ftitle">file KMZ<small>Seluruh area muat dalam satu penerbangan, satu baterai.</small></span>
+        </div>
+        ${baris(s0, 0)}
+      </div>`;
+    return;
+  }
+
+  // Kelompokkan file menurut peran, mengikuti urutan terbang.
+  const grup = [];
+  plan.summaries.forEach((s, i) => {
+    const role = plan.sortieMeta?.[i]?.role ?? null;
+    let g = grup[grup.length - 1];
+    if (!g || g.role !== role) {
+      g = { role, items: [] };
+      grup.push(g);
+    }
+    g.items.push({ s, i });
+  });
+
+  // Kenapa segini banyak. Tiga sebab, dan yang berlaku bisa lebih dari satu.
+  const totalWp = plan.grid.waypoints.length;
+  const maxWp = lim.maxWaypoints ?? Infinity;
+  const alasan = [];
+  if (grup.length > 1 && grup.some((g) => g.role)) {
+    alasan.push(
+      `Nadir dan miring <b>tidak dicampur</b> dalam satu file — sudut kameranya beda, dan di lapangan itu dua pekerjaan yang berbeda.`
+    );
+  }
+  if (totalWp > maxWp) {
+    alasan.push(
+      `Rencana ini butuh <b>${totalWp} waypoint</b>, sementara DJI cuma menerima <b>${maxWp} per file</b>. Tiap foto butuh satu waypoint, jadi batas inilah yang biasanya kena duluan.`
+    );
+  }
+  if (jatahS > 0 && plan.duration > jatahS) {
+    alasan.push(
+      `Totalnya <b>${fmtDur(plan.duration)}</b> terbang, sementara satu baterai aman dipakai <b>${lim.usableFlightMin} menit</b>.`
+    );
+  }
+
+  const mb = state.profile?.mode?.approxPhotoMB ?? 8;
+
   els.sorties.innerHTML = `
-    <div class="sortie-head">${plan.summaries.length} baterai</div>
-    <div class="sortie-list">
-      ${plan.summaries
-        .map(
-          (s, i) => `
-        <div class="sortie">
-          <span class="swatch" style="background:${BATTERY_COLORS[i % BATTERY_COLORS.length]}"></span>
-          <span class="sn">#${i + 1}</span>
-          <span class="sd">${fmtDur(s.durationS)}</span>
-          <span class="sp">${s.photos} foto</span>
-        </div>`
-        )
+    <div class="files">
+      <div class="files-head">
+        <span class="fcount">${plan.summaries.length}</span>
+        <span class="ftitle">file KMZ<small>Semuanya terunduh sekaligus saat kamu menekan Export.</small></span>
+      </div>
+
+      <div class="files-rule">
+        <b>1 file = 1 penerbangan = 1 baterai.</b>
+        Terbangkan berurutan mulai dari #1. Begitu satu file selesai, drone
+        pulang sendiri — ganti baterai, buka file berikutnya di DJI Fly.
+        Tidak ada yang perlu disambung manual.
+      </div>
+
+      ${
+        alasan.length
+          ? `<details class="files-why">
+               <summary>Kenapa dipecah jadi ${plan.summaries.length} file?</summary>
+               <ul>${alasan.map((a) => `<li>${a}</li>`).join('')}</ul>
+             </details>`
+          : ''
+      }
+
+      ${grup
+        .map((g) => {
+          const info = (g.role && PERAN_INFO[g.role]) || PERAN_POLOS;
+          const foto = g.items.reduce((n, x) => n + x.s.photos, 0);
+          return `
+            <div class="fgroup">
+              <div class="fgroup-head">
+                <span class="fgl">${esc(info.label)}</span>
+                <span class="fgn">${g.items.length} file · ${foto} foto</span>
+              </div>
+              <p class="fgroup-desc">${info.desc}</p>
+              ${g.items.map(({ s, i }) => baris(s, i)).join('')}
+            </div>`;
+        })
         .join('')}
+
+      <div class="files-foot">
+        Semua file digabung: <b>${plan.grid.photos} foto</b> ·
+        <b>${fmtDur(plan.duration)}</b> terbang ·
+        <b>${fmtSize(plan.grid.photos * mb)}</b> di kartu memori.
+      </div>
     </div>`;
 }
 
@@ -2698,7 +2865,7 @@ function renderLegend(plan) {
   els.legend.innerHTML = plan.summaries
     .map(
       (s, i) =>
-        `<div class="lg"><span class="swatch" style="background:${BATTERY_COLORS[i % BATTERY_COLORS.length]}"></span>Baterai ${i + 1} · ${fmtDur(s.durationS)}</div>`
+        `<div class="lg"><span class="swatch" style="background:${BATTERY_COLORS[i % BATTERY_COLORS.length]}"></span>File ${i + 1} · ${fmtDur(s.durationS)}</div>`
     )
     .join('');
 }
@@ -2736,7 +2903,7 @@ function renderPatternCost(plan) {
     return;
   }
   els.patternCost.hidden = false;
-  els.patternCostVal.textContent = `${plan.grid.photos} foto · ${fmtDur(plan.duration)} · ${plan.sorties.length} baterai`;
+  els.patternCostVal.textContent = `${plan.grid.photos} foto · ${fmtDur(plan.duration)} · ${plan.sorties.length} file`;
 }
 
 // ---------- Lanjutkan misi ----------
@@ -3097,12 +3264,6 @@ async function exportKmz() {
   els.export.textContent = 'Membuat file…';
 
   try {
-    const base =
-      (els.projName.value.trim() || 'survei').replace(/[^\w\-]+/g, '-') +
-      (plan.resume ? '-lanjut' : '') +
-      PATTERN_SUFFIX[plan.pattern];
-    const stamp = new Date().toISOString().slice(0, 10);
-
     // buildKmz sekarang asinkron karena kompresinya memakai CompressionStream.
     const files = await Promise.all(plan.sorties.map(async (sortie, i) => {
       const bytes = await buildKmz(
@@ -3142,16 +3303,10 @@ async function exportKmz() {
         },
         state.profile
       );
-      // Nomor urut tetap di depan karena itu URUTAN TERBANG, dan peran
-      // lintasannya ditempel supaya di folder HP kelihatan mana yang nadir dan
-      // mana yang miring tanpa harus dibuka satu-satu.
-      const peran = plan.sortieMeta?.[i]?.role;
-      const label = peran ? `-${peran}` : '';
-      const name =
-        plan.sorties.length > 1
-          ? `${base}-${stamp}_${i + 1}dari${plan.sorties.length}${label}.kmz`
-          : `${base}-${stamp}${label}.kmz`;
-      return { bytes, name };
+      // Namanya disusun namaFileKmz, fungsi yang sama yang dipakai panel
+      // "file yang akan terunduh" — supaya yang dijanjikan di layar persis
+      // yang muncul di folder HP.
+      return { bytes, name: namaFileKmz(plan, i) };
     }));
 
     if (canShareFiles()) {
@@ -3182,7 +3337,7 @@ async function exportKmz() {
 
     toast(
       plan.sorties.length > 1
-        ? `${plan.sorties.length} file KMZ terunduh. Pindahkan ke folder DJI Fly di HP.`
+        ? `${plan.sorties.length} file KMZ terunduh. Pindahkan SEMUANYA ke folder DJI Fly di HP, lalu terbangkan berurutan dari #1 — satu file, satu baterai.`
         : 'KMZ terunduh. Pindahkan ke folder DJI Fly di HP.',
       'ok',
       6000

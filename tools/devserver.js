@@ -27,6 +27,7 @@ const TYPES = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.woff2': 'font/woff2',
   '.kmz': 'application/vnd.google-earth.kmz',
 };
 

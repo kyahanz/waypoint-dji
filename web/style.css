@@ -9,6 +9,120 @@
  * tidak ada kaca buram, tidak ada gradien. Kalau ada yang menonjol, itu
  * karena memang penting, bukan karena dekorasi.
  */
+
+/* Huruf: Poppins, dipasang sendiri — bukan dari CDN.
+ *
+ * Kenapa Poppins: bentuknya geometris dengan x-height tinggi, jadi angka dan
+ * label pendek ("83% baterai", "162 waypoint") tetap kebaca sekilas di layar
+ * HP yang dipegang sambil berdiri. Huruf bawaan sistem lebih netral, tapi di
+ * Windows dan Android dia tampil beda-beda — dan panel ini padat, jadi
+ * perbedaan lebar huruf langsung terasa sebagai tata letak yang bergeser.
+ *
+ * Kenapa DIPASANG SENDIRI, bukan <link> ke fonts.googleapis.com: alat ini
+ * dipakai di lahan, sering tanpa sinyal. Font dari CDN berarti huruf aplikasi
+ * bergantung pada jaringan yang justru tidak ada di tempat ia dibutuhkan.
+ * Delapan berkas woff2 (latin + latin-ext, empat berat) totalnya 60 KB dan
+ * ikut di-cache service worker bersama berkas aplikasi lainnya.
+ *
+ * `font-display: swap` disengaja: lebih baik teksnya langsung terbaca dengan
+ * huruf sistem lalu berganti, daripada panel kosong beberapa ratus milidetik.
+ */
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('vendor/fonts/poppins-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('vendor/fonts/poppins-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('vendor/fonts/poppins-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('vendor/fonts/poppins-500-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('vendor/fonts/poppins-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('vendor/fonts/poppins-600-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('vendor/fonts/poppins-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('vendor/fonts/poppins-700-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  /* Satu tempat untuk tumpukan huruf, supaya tidak ada sudut aplikasi yang
+     diam-diam kembali ke huruf sistem. Monospace tetap monospace: nama file
+     dan koordinat dibaca karakter per karakter, bukan sebagai kalimat. */
+  --font: 'Poppins', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
 /* Tabel rencana tiap cincin orbit. Dibuat padat karena tempatnya di panel
    setelan yang sempit, dan angkanya dibaca berdampingan — bukan dibaca satu
    per satu. */
@@ -44,15 +158,18 @@
 :root {
   color-scheme: light;
 
-  --bg: #efece6;
+  --bg: #f1eee8;
   --panel: #ffffff;
-  --panel-2: #f5f3ee;
+  --panel-2: #f6f4f0;
   --panel-3: #e9e5dc;
   --line: #d8d3c8;
   --line-strong: #b6b0a2;
 
-  --text: #1b1915;
-  --muted: #6d6659;
+  --text: #191710;
+  /* Dinaikkan dari #6d6659. Teks redup di sini bukan teks hiasan — isinya
+     satuan, catatan kaki, dan penjelasan yang justru dibaca orang yang belum
+     paham. Di bawah matahari, abu-abu yang terlalu muda hilang duluan. */
+  --muted: #5d5649;
 
   --accent: #1b5fa8;
   --accent-hover: #164e8b;
@@ -105,8 +222,8 @@
     --line: #38363f;
     --line-strong: #514e59;
 
-    --text: #ecebe8;
-    --muted: #9c978e;
+    --text: #efeeeb;
+    --muted: #aba69c;
 
     --accent: #6aa9e9;
     --accent-hover: #87bbf0;
@@ -152,8 +269,8 @@
   --line: #38363f;
   --line-strong: #514e59;
 
-  --text: #ecebe8;
-  --muted: #9c978e;
+  --text: #efeeeb;
+  --muted: #aba69c;
 
   --accent: #6aa9e9;
   --accent-hover: #87bbf0;
@@ -203,8 +320,13 @@ body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 14px/1.55 var(--font);
+  /* Poppins itu geometris: huruf-hurufnya lebar dan bundar. Rapat sedikit
+     supaya baris panjang di panel 380px tidak patah lebih awal daripada
+     sebelumnya, tanpa membuatnya terasa sesak. */
+  letter-spacing: -0.006em;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #app {
@@ -731,51 +853,257 @@ input[type="range"]::-moz-range-thumb {
   color: var(--accent);
 }
 
-/* ---------- Daftar sortie ---------- */
+/* ---------- Daftar file KMZ ----------
+ *
+ * Dulu di sini cuma ada "5 baterai" dan lima baris berisi durasi. Secara
+ * angka itu benar, tapi orang yang menekan Export dan tiba-tiba mendapat lima
+ * file tidak sedang bertanya soal durasi — dia bertanya apakah lima file itu
+ * lima pilihan, lima versi, atau lima pekerjaan, dan mana yang boleh
+ * dilewatkan. Yang menjawabnya bukan angka, melainkan susunannya: jumlah
+ * dulu, lalu aturan mainnya, lalu alasan pemecahannya, baru tiap file dengan
+ * nama aslinya dan ongkosnya.
+ */
 
-.sortie-head {
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-
-.sortie-list {
+.files {
+  margin: 8px 0 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
+  background: var(--panel-2);
   overflow: hidden;
-  margin-bottom: 12px;
 }
 
-.sortie {
-  display: grid;
-  grid-template-columns: 10px 26px 1fr auto;
-  gap: 8px;
+.files-head {
+  display: flex;
   align-items: center;
-  padding: 7px 11px;
-  font-size: 12px;
-  background: var(--panel-2);
+  gap: 10px;
+  padding: 10px 11px;
+  background: var(--accent-soft);
   border-bottom: 1px solid var(--line);
 }
 
-.sortie:last-child {
-  border-bottom: none;
+.fcount {
+  flex: none;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 7px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 16px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.sortie .sn {
+.ftitle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--info-text);
+}
+
+.ftitle small {
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.files-rule {
+  padding: 9px 11px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+
+.files-rule b {
+  color: var(--text);
+}
+
+.files-why {
+  font-size: 11.5px;
+  border-bottom: 1px solid var(--line);
+}
+
+.files-why > summary {
+  padding: 8px 11px;
+  cursor: pointer;
+  color: var(--accent);
+  list-style: none;
+}
+
+.files-why > summary::-webkit-details-marker {
+  display: none;
+}
+
+.files-why > summary::before {
+  content: '▸ ';
+}
+
+.files-why[open] > summary::before {
+  content: '▾ ';
+}
+
+.files-why ul {
+  margin: 0;
+  padding: 0 11px 10px 26px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.files-why li + li {
+  margin-top: 6px;
+}
+
+.files-why b {
+  color: var(--text);
+}
+
+.fgroup-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 11px 0;
+}
+
+.fgl {
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.fgn {
+  flex: none;
+  font-size: 10.5px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
-.sortie .sd {
-  font-variant-numeric: tabular-nums;
-  font-weight: 550;
+.fgroup-desc {
+  margin: 3px 11px 8px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
 }
 
-.sortie .sp {
+.file {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  gap: 9px;
+  align-items: start;
+  padding: 8px 11px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.file .swatch {
+  margin-top: 4px;
+}
+
+.fbody {
+  min-width: 0;
+}
+
+.fname {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.fname b {
+  flex: none;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.fname span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0;
+}
+
+.fmeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.45;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+.fmeta b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.fmeta .dim {
+  opacity: 0.85;
+}
+
+.fbat {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+}
+
+.fbat .track {
+  flex: none;
+  width: 72px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--panel-3);
+  overflow: hidden;
+}
+
+.fbat i {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+}
+
+.fbat .pct {
+  font-size: 10.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Di atas 90% jatah baterai, angin sakal atau baterai yang sudah tua sudah
+   cukup untuk membuat penerbangan ini tidak selesai. Itu bukan kesalahan,
+   tapi orang berhak tahu sebelum berangkat. */
+.fbat.tight i {
+  background: var(--warn);
+}
+
+.fbat.tight .pct {
+  color: var(--warn-text);
+}
+
+.files-foot {
+  padding: 9px 11px;
+  border-top: 1px solid var(--line);
+  background: var(--panel-2);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.files-foot b {
+  color: var(--text);
 }
 
 .swatch {

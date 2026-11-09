@@ -215,8 +215,9 @@ Yang sudah jalan:
   pergi-pulang, cadangan baterai, dan jarak VLOS
 - Estimasi waktu yang memperhitungkan akselerasi dan belokan, bukan sekadar
   jarak dibagi kecepatan
-- Pembagian otomatis jadi beberapa sortie, berwarna di peta plus rincian
-  waktu dan jumlah foto per baterai
+- Pembagian otomatis jadi beberapa file, berwarna di peta plus daftar file yang
+  menyebutkan nama, peran, jumlah foto, waypoint, durasi, dan pemakaian baterai
+  tiap file — beserta alasan kenapa dipecah segitu
 - Peringatan: batas 120 m, jarak VLOS, limit kecepatan rolling shutter,
   jumlah waypoint, jumlah baterai
 
@@ -267,6 +268,28 @@ ke hosting mana pun yang memberi sertifikat, atau pakai terowongan seperti
 `cloudflared tunnel`.
 
 Belum ada: GCP, upload foto.
+
+### Huruf dan tema
+
+Hurufnya **Poppins**, dipasang sendiri di `web/vendor/fonts/` — bukan `<link>`
+ke `fonts.googleapis.com`. Alasannya sama dengan alasan semua yang lain di
+bagian ini: alat ini dipakai di lahan, sering tanpa sinyal, dan huruf dari CDN
+berarti tampilan aplikasi bergantung pada jaringan yang justru tidak ada di
+tempat ia dibutuhkan. Delapan berkas woff2 (latin + latin-ext, berat 400–700)
+totalnya **60 KB**, ikut di-cache service worker bersama berkas aplikasi, dan
+ikut disalin `build.js` ke `dist/vendor/fonts/`.
+
+Kenapa Poppins: geometris dengan x-height tinggi, jadi label pendek dan angka
+("83% baterai", "162 waypoint") kebaca sekilas di layar HP yang dipegang sambil
+berdiri. Karena hurufnya lebih lebar dari huruf sistem, `letter-spacing`
+dirapatkan tipis (-0.006em) supaya baris panjang di panel 380px tidak patah
+lebih awal daripada sebelumnya.
+
+Temanya tetap sama arahnya — terang jadi bawaan karena dipakai di bawah
+matahari, netralnya hangat, permukaannya rata — cuma kontrasnya dinaikkan:
+teks redup dari `#6d6659` ke `#5d5649` di terang dan `#9c978e` ke `#aba69c` di
+gelap. Teks redup di aplikasi ini bukan teks hiasan; isinya satuan, catatan
+kaki, dan penjelasan yang justru dibaca orang yang belum paham.
 
 ## Live
 
@@ -496,6 +519,30 @@ depan karena itu urutan terbang.
 
 Foto nadir dan foto miring tetap digabung di **software olah**, bukan di file
 misi: semua foto dari semua file masuk satu project.
+
+#### Panelnya harus ikut menjelaskan, bukan cuma menghitung
+
+Pemecahan yang benar tetap terasa seperti kekacauan kalau layarnya cuma
+menuliskan "5 baterai" lalu melempar lima file ke folder unduhan. Orang yang
+menekan Export tidak sedang bertanya berapa menit tiap sortie — dia bertanya
+apakah lima file itu lima pilihan, lima versi, atau lima pekerjaan, dan mana
+yang boleh dilewatkan. Angka tidak menjawab itu; susunannya yang menjawab.
+
+Jadi panel Hasil menyusunnya berurutan: **jumlah file** dulu, lalu **aturan
+mainnya** (satu file = satu penerbangan = satu baterai, terbangkan berurutan
+dari #1), lalu **alasan pemecahannya** yang bisa dibuka — peran kamera
+terpisah, batas 200 waypoint, jatah waktu baterai, lengkap dengan angka yang
+berlaku di rencana itu — baru **tiap filenya**, dikelompokkan per peran dengan
+satu kalimat tentang gunanya: nadir untuk peta dan ukuran, miring untuk dinding
+dan bentuk 3D. Tiap baris memajang **nama file yang sebenarnya** plus
+ongkosnya: jumlah foto, jumlah waypoint, durasi (survei dan pergi-pulang
+dipisah), dan perkiraan pemakaian baterai — di atas 90% ditandai "mepet",
+karena di situ angin sakal atau baterai tua sudah cukup untuk membuat
+penerbangan itu tidak selesai.
+
+Nama file di panel dan nama file yang terunduh disusun **satu fungsi yang
+sama** (`namaFileKmz`). Dua penyusun terpisah cepat atau lambat membuat panel
+menjanjikan nama yang tidak pernah muncul di folder HP.
 
 Yang tidak berlaku untuk pola banyak lintasan: **Lanjutkan misi**. Kalau
 filenya sudah dipecah per lintasan, "lanjut dari titik terakhir" tidak punya

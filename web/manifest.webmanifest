@@ -4,8 +4,8 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0d1117",
-  "theme_color": "#0d1117",
+  "background_color": "#f1eee8",
+  "theme_color": "#f1eee8",
   "description": "Perencana misi pemetaan udara untuk DJI Mini 5 Pro",
   "icons": [
     {

@@ -46,6 +46,19 @@ const PROFILE_FILES = ['drones.json', 'mini5pro.json'];
 // lebih sedikit juga berarti offline lebih tahan banting.
 const VENDOR_FILES = ['maplibre-gl.css'];
 
+// Huruf aplikasi, dipasang sendiri dengan alasan yang sama: alat ini dipakai
+// di lahan. Latin + latin-ext, empat berat, 60 KB seluruhnya.
+const FONT_FILES = [
+  'poppins-400-latin.woff2',
+  'poppins-400-latin-ext.woff2',
+  'poppins-500-latin.woff2',
+  'poppins-500-latin-ext.woff2',
+  'poppins-600-latin.woff2',
+  'poppins-600-latin-ext.woff2',
+  'poppins-700-latin.woff2',
+  'poppins-700-latin-ext.woff2',
+];
+
 /** ../src/x -> ./src/x dan ../profiles/x -> ./profiles/x */
 // replaceAll belum ada di Node 14, jadi pakai regex global.
 const rewrite = (text) =>
@@ -66,7 +79,7 @@ if (keptLink) {
 }
 fs.mkdirSync(path.join(DIST, 'src'), { recursive: true });
 fs.mkdirSync(path.join(DIST, 'profiles'), { recursive: true });
-fs.mkdirSync(path.join(DIST, 'vendor'), { recursive: true });
+fs.mkdirSync(path.join(DIST, 'vendor', 'fonts'), { recursive: true });
 
 let rewritten = 0;
 for (const f of WEB_FILES) {
@@ -83,6 +96,13 @@ for (const f of SRC_FILES) {
 
 for (const f of VENDOR_FILES) {
   fs.copyFileSync(path.join(ROOT, 'web', 'vendor', f), path.join(DIST, 'vendor', f));
+}
+
+for (const f of FONT_FILES) {
+  fs.copyFileSync(
+    path.join(ROOT, 'web', 'vendor', 'fonts', f),
+    path.join(DIST, 'vendor', 'fonts', f)
+  );
 }
 
 for (const f of PROFILE_FILES) {
@@ -109,5 +129,11 @@ fs.writeFileSync(
 );
 
 console.log(
-  `dist/ siap — ${WEB_FILES.length + SRC_FILES.length + PROFILE_FILES.length} berkas, ${rewritten} ditulis ulang`
+  `dist/ siap — ${
+    WEB_FILES.length +
+    SRC_FILES.length +
+    PROFILE_FILES.length +
+    VENDOR_FILES.length +
+    FONT_FILES.length
+  } berkas, ${rewritten} ditulis ulang`
 );

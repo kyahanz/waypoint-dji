@@ -1,7 +1,7 @@
 // Service worker: membuat aplikasi dan tile peta tetap bisa dipakai tanpa
 // sinyal. Dipasang dari app.js, hanya jalan di konteks aman (https/localhost).
 
-const SHELL = 'wpdji-shell-v21';
+const SHELL = 'wpdji-shell-v23';
 const TILES = 'wpdji-tiles-v1';
 const DATA = 'wpdji-data-v1';
 
@@ -30,6 +30,16 @@ const SHELL_FILES = [
   '../profiles/drones.json',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js',
   './vendor/maplibre-gl.css',
+  // Huruf aplikasi dipasang sendiri, jadi dia juga harus ikut offline —
+  // percuma menyimpan seluruh aplikasi kalau hurufnya yang hilang di lahan.
+  './vendor/fonts/poppins-400-latin.woff2',
+  './vendor/fonts/poppins-400-latin-ext.woff2',
+  './vendor/fonts/poppins-500-latin.woff2',
+  './vendor/fonts/poppins-500-latin-ext.woff2',
+  './vendor/fonts/poppins-600-latin.woff2',
+  './vendor/fonts/poppins-600-latin-ext.woff2',
+  './vendor/fonts/poppins-700-latin.woff2',
+  './vendor/fonts/poppins-700-latin-ext.woff2',
   'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
 ];
 
