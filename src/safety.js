@@ -328,11 +328,15 @@ export function evaluateSafety(plan, profile, o = {}) {
       `Tiga lintasan dalam satu file: ${nadir?.photos ?? 0} foto nadir -90° untuk atap dan skala tanah, lalu ${oblique.reduce((a, p) => a + p.photos, 0)} foto miring -45° dari dua arah menyilang untuk fasad. Sudut gimbal ditulis per titik, jadi slider gimbal manual tidak berlaku untuk pola ini.`
     );
 
-    add(
-      'info',
-      'building3d-split',
-      `Export jadi ${plan.sorties.length} file, dipotong di batas lintasan — bukan di titik ke-${lim.maxWaypoints} yang kebetulan. Jadi satu file berisi nadir saja, dan sisanya miring saja; nama filenya menyebutkan yang mana. Terbangkan berurutan dengan titik lepas landas yang SAMA, lalu masukkan semua fotonya ke satu project waktu mengolah.`
-    );
+    {
+      const nadir = plan.sortieMeta?.filter((m) => m.role === 'nadir').length ?? 0;
+      const miring = plan.sortieMeta?.filter((m) => m.role === 'miring').length ?? 0;
+      add(
+        'info',
+        'building3d-split',
+        `Export jadi ${plan.sorties.length} file: ${nadir} berisi nadir saja, ${miring} berisi miring saja. Dipotong di batas peran, bukan di titik ke-${lim.maxWaypoints} yang kebetulan — jadi tidak ada file yang mencampur dua sudut gimbal, dan namanya menyebutkan yang mana. Terbangkan berurutan dengan titik lepas landas yang SAMA, lalu masukkan semua fotonya ke satu project waktu mengolah.`
+      );
+    }
 
     if (plan.sorties.length > 2) {
       add(

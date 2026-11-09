@@ -27,7 +27,7 @@ import {
   climbDemand,
   makeProjector,
   splitByBattery,
-  splitByPass,
+  splitByRole,
   offsetPolygon,
 } from '../src/survey.js';
 import { evaluateSafety, JARINGAN_LISTRIK } from '../src/safety.js';
@@ -1086,130 +1086,128 @@ console.log('\nLanjutkan misi: dari waypoint mana jalur dipotong');
 }
 
 
-// --------------------------------- pecah file: per lintasan dulu, baru baterai
+// ----------------------------------- pecah file: per peran dulu, baru baterai
 
-console.log('\nPemecahan file: per lintasan dulu, baru per baterai');
+console.log('\nPemecahan file: per peran dulu, baru per baterai');
 {
   const p5 = resolveProfile(registry, { droneId: 'mini5pro' });
   const par = computeSurveyParams(p5.camera, {
     gsdCm: 2.5, frontOverlap: 0.8, sideOverlap: 0.7,
     minIntervalSec: p5.camera.minIntervalSec, gimbalPitchDeg: -45,
   });
-  const lahan = 187; // 3.49 ha — ukuran yang memunculkan masalahnya
-  const hh = lahan / 2;
-  const poly = offsetPolygon([[-hh,-hh],[hh,-hh],[hh,hh],[-hh,hh]], par.sideSpacing);
-  const g = generatePattern(poly, {
-    pattern: 'building3d', angleDeg: 0,
-    sideSpacing: par.sideSpacing, frontSpacing: par.frontSpacing,
-    mode: 'stopAndShoot', overshoot: 0,
-  });
-  const roleOfPass = Object.fromEntries(g.passes.map((x) => [x.index, x.role]));
-  const opt = {
-    speed: 15, accel: 2.5, stopAtEach: true,
-    usableFlightMin: p5.limits.usableFlightMin, hoverPerPhotoSec: 1,
-    transitReserveSec: 120, maxWaypoints: p5.limits.maxWaypoints, roleOfPass,
-  };
 
-  const lama = splitByBattery(g.waypoints, opt);
-  const baru = splitByPass(g.waypoints, opt);
-  const sudut = (s) => new Set(s.map((w) => w.gimbalPitch)).size;
-  const lintasan = (s) => new Set(s.map((w) => w.pass)).size;
-
-  // Inilah cacat yang diperbaiki: potongan lama jatuh di titik ke-200, bukan di
-  // batas lintasan, jadi satu file memuat dua sudut gimbal sekaligus.
-  ok(
-    lama.filter((s) => sudut(s) > 1).length > 0,
-    'potongan per baterai memang mencampur sudut gimbal dalam satu file',
-    lama.filter((s) => sudut(s) > 1).length + ' dari ' + lama.length + ' file'
-  );
-  ok(
-    lama.some((s) => s.length < 20),
-    'dan menyisakan file kerdil yang memboroskan satu baterai',
-    'terkecil ' + Math.min(...lama.map((s) => s.length)) + ' titik'
-  );
-
-  ok(baru.sorties.every((s) => sudut(s) === 1), 'potongan per lintasan tidak pernah mencampur sudut gimbal');
-  ok(baru.sorties.every((s) => lintasan(s) === 1), 'tiap file berisi tepat satu lintasan');
-  ok(
-    baru.sorties.length === g.passes.length,
-    'tiga lintasan jadi tiga file, bukan lebih',
-    baru.sorties.length + ' file'
-  );
-  ok(
-    new Set(baru.sorties.map((s) => s.length)).size === 1,
-    'ukurannya merata, tidak ada file kerdil',
-    baru.sorties.map((s) => s.length).join(' / ')
-  );
-
-  // Tidak ada titik yang hilang atau dobel — ini yang paling mahal kalau salah.
-  ok(
-    baru.sorties.reduce((a, s) => a + s.length, 0) === g.waypoints.length,
-    'semua titik terbagi habis, tidak ada yang hilang',
-    g.waypoints.length + ' titik'
-  );
-
-  // Peran lintasan ikut terbawa, karena itu yang dipakai menamai file.
-  ok(
-    baru.meta.map((m) => m.role).join(',') === 'nadir,miring,miring',
-    'peran tiap file terbawa untuk penamaan',
-    baru.meta.map((m) => m.role).join(' / ')
-  );
-
-  // Lintasan yang lebih besar dari satu baterai tetap harus dipecah lagi, supaya
-  // batas waypoint tidak pernah dilanggar hanya demi kerapian lintasan.
-  {
-    const besar = generatePattern(
-      offsetPolygon([[-200,-200],[200,-200],[200,200],[-200,200]], par.sideSpacing),
-      { pattern: 'building3d', angleDeg: 0, sideSpacing: par.sideSpacing, frontSpacing: par.frontSpacing, mode: 'stopAndShoot', overshoot: 0 }
-    );
-    const r = splitByPass(besar.waypoints, {
-      ...opt,
-      roleOfPass: Object.fromEntries(besar.passes.map((x) => [x.index, x.role])),
-    });
-    ok(
-      r.sorties.length > besar.passes.length,
-      'lintasan yang tidak muat satu baterai tetap dipecah lagi',
-      besar.passes.length + ' lintasan -> ' + r.sorties.length + ' file'
-    );
-    ok(
-      r.sorties.every((s) => s.length <= p5.limits.maxWaypoints),
-      'dan tidak satu pun file melewati batas waypoint DJI Fly'
-    );
-    ok(
-      r.sorties.every((s) => lintasan(s) === 1),
-      'pecahan lanjutannya pun tetap satu lintasan per file'
-    );
-
-    // Pecahannya harus RATA. Pembagian rakus memberi 200 + 15: file kedua
-    // berisi lima belas foto, satu siklus baterai penuh untuk terbang ke
-    // lokasi, menjepret lima belas kali, lalu pulang — dan di pola tiga
-    // lintasan itu terjadi tiga kali. Ini cacat yang muncul justru SETELAH
-    // pemecahan per lintasan diperbaiki, jadi dia dijaga terpisah.
-    const ukuran = r.sorties.map((x) => x.length);
-    ok(
-      Math.max(...ukuran) - Math.min(...ukuran) <= 1,
-      'pecahan dalam satu lintasan dibagi rata, bukan diisi sampai batas lalu sisanya',
-      ukuran.join(' / ')
-    );
-    ok(
-      Math.min(...ukuran) > p5.limits.maxWaypoints / 4,
-      'jadi tidak ada file kerdil yang memboroskan satu baterai',
-      'terkecil ' + Math.min(...ukuran) + ' titik'
-    );
-  }
-
-  // Pola satu lintasan harus berperilaku persis seperti sebelumnya.
-  {
-    const satu = generatePattern(poly, {
-      pattern: 'single', angleDeg: 0,
+  const buat = (side, pattern) => {
+    const hh = side / 2;
+    const poly = offsetPolygon([[-hh,-hh],[hh,-hh],[hh,hh],[-hh,hh]], par.sideSpacing);
+    const g = generatePattern(poly, {
+      pattern, angleDeg: 0,
       sideSpacing: par.sideSpacing, frontSpacing: par.frontSpacing,
       mode: 'stopAndShoot', overshoot: 0,
     });
-    const a = splitByBattery(satu.waypoints, opt);
-    const b = splitByPass(satu.waypoints, opt);
+    const opt = {
+      speed: 15, accel: 2.5, stopAtEach: true,
+      usableFlightMin: p5.limits.usableFlightMin, hoverPerPhotoSec: 1,
+      transitReserveSec: 120, maxWaypoints: p5.limits.maxWaypoints,
+      roleOfPass: Object.fromEntries(g.passes.map((x) => [x.index, x.role ?? null])),
+    };
+    return { g, opt, r: splitByRole(g.waypoints, opt) };
+  };
+
+  const sudut = (x) => new Set(x.map((w) => w.gimbalPitch)).size;
+
+  // ---- Cacat lama: potongan rakus mencampur gimbal dan menyisakan remahan.
+  {
+    const { g, opt } = buat(248, 'building3d');
+    const rakus = splitByBattery(g.waypoints, opt);
     ok(
-      a.length === b.sorties.length && a.every((s, i) => s.length === b.sorties[i].length),
-      'untuk pola satu lintasan, hasilnya identik dengan pemecahan lama'
+      rakus.some((x) => sudut(x) > 1),
+      'potongan rakus memang mencampur sudut gimbal dalam satu file',
+      rakus.map((x) => x.length).join('/')
+    );
+    ok(
+      Math.min(...rakus.map((x) => x.length)) < 50,
+      'dan memang menyisakan file kerdil',
+      'terkecil ' + Math.min(...rakus.map((x) => x.length)) + ' titik'
+    );
+  }
+
+  // ---- Pengelompokan per peran.
+  {
+    const { g, r } = buat(248, 'building3d');
+    ok(r.sorties.every((x) => sudut(x) === 1), 'tidak ada file yang mencampur sudut gimbal');
+    ok(
+      r.meta.map((m) => m.role).join(',') === 'nadir,nadir,miring,miring,miring',
+      'dikelompokkan jadi nadir lalu miring, bukan per lintasan',
+      r.meta.map((m) => m.role).join('/')
+    );
+    ok(r.sorties.length === 5, 'lahan 6.15 ha jadi 5 file', r.sorties.map((x) => x.length).join('/'));
+
+    // Inti pemilihan per-peran: dua lintasan miring TIDAK dipisah, karena
+    // setelan kameranya sama. Memisahkannya memberi 6 file dan tiap
+    // penerbangan cuma memakai setengah baterai.
+    const fileMiring = r.sorties.filter((x, i) => r.meta[i].role === 'miring');
+    const lintasanMiring = new Set(fileMiring.flat().map((w) => w.pass));
+    ok(
+      lintasanMiring.size === 2 && fileMiring.length === 3,
+      'dua lintasan miring dijadikan satu kelompok, dipecah 3 bukan 4',
+      fileMiring.length + ' file memuat ' + lintasanMiring.size + ' lintasan'
+    );
+
+    const uk = r.sorties.map((x) => x.length);
+    ok(Math.min(...uk) > 50, 'tidak ada file kerdil', 'terkecil ' + Math.min(...uk) + ' titik');
+    ok(
+      r.sorties.reduce((a, x) => a + x.length, 0) === g.waypoints.length,
+      'semua titik terbagi habis, tidak ada yang hilang',
+      g.waypoints.length + ' titik'
+    );
+    ok(
+      r.sorties.every((x) => x.length <= p5.limits.maxWaypoints),
+      'tidak satu pun file melewati batas waypoint DJI Fly'
+    );
+
+    // Urutan terbang harus tetap: nadir dulu, baru miring.
+    ok(
+      r.sorties.flat().every((w, i, arr) => i === 0 || arr[i - 1].pass <= w.pass),
+      'urutan terbang tidak teracak saat dikelompokkan ulang'
+    );
+  }
+
+  // ---- Lahan kecil: tepat dua file, satu nadir satu miring.
+  {
+    const { r } = buat(130, 'building3d');
+    ok(
+      r.sorties.length === 2 && r.meta.map((m) => m.role).join(',') === 'nadir,miring',
+      'lahan 1.69 ha jadi tepat 2 file: nadir dan miring',
+      r.sorties.map((x) => x.length).join('/')
+    );
+  }
+
+  // ---- Pola tanpa peran tidak dikelompokkan sama sekali.
+  {
+    const datar = buat(248, 'single');
+    ok(
+      datar.r.meta.every((m) => m.role === null),
+      'peta datar tidak punya peran, jadi tidak dikelompokkan'
+    );
+    const ukd = datar.r.sorties.map((x) => x.length);
+    ok(
+      Math.max(...ukd) - Math.min(...ukd) <= 1,
+      'dan pecahannya tetap dibagi rata, bukan diisi sampai batas lalu sisanya',
+      ukd.join('/')
+    );
+
+    // Orbit: tiap cincin punya sudut gimbalnya sendiri. Kalau pengelompokan
+    // memakai sudut gimbal dan bukan peran, tiap cincin jadi filenya sendiri.
+    const orb = generateOrbit(p5.camera, [0, 0], { radiusM: 18, objectHeightM: 20 });
+    const ro = splitByRole(orb.waypoints, {
+      speed: 5, accel: 2.5, stopAtEach: true,
+      usableFlightMin: p5.limits.usableFlightMin, hoverPerPhotoSec: 1,
+      transitReserveSec: 120, maxWaypoints: p5.limits.maxWaypoints,
+    });
+    ok(
+      ro.sorties.length < orb.rings.length,
+      'orbit tidak dipecah per cincin meski tiap cincin beda sudut gimbal',
+      ro.sorties.length + ' file untuk ' + orb.rings.length + ' cincin'
     );
   }
 }

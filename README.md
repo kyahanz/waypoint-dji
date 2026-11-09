@@ -367,8 +367,8 @@ selalu siap ambil alih manual saat menerbangkannya.
   apa pun dan presetnya berubah jadi Custom.
 - **Pola terbang** — peta datar, 3D bangunan (nadir + miring), atau orbit
   untuk objek tegak. Biayanya ditampilkan sebelum berangkat, bukan setelah.
-- **Export dipecah per lintasan** — satu file per lintasan, bukan dipotong di
-  titik ke-200 yang kebetulan. Nama filenya menyebutkan isinya.
+- **Export dipecah per peran** — file nadir dan file miring terpisah, bukan
+  dipotong di titik ke-200 yang kebetulan. Nama filenya menyebutkan isinya.
 - **Ketelitian yang jujur untuk kamera miring** — GSD dihitung dari jarak ke
   permukaan, bukan dari ketinggian terbang. Di gimbal -45° bedanya 41%.
 - **Ikuti kontur tanah** — plus peringatan kalau lereng menuntut laju naik di
@@ -417,21 +417,38 @@ lintasan — dan di lahan 3.49 ha itu 408 foto, 42 menit, tiga baterai.
 Pernah dicoba memecahnya jadi dua POLA terpisah dengan alasan baterai. Itu
 keliru tempat, karena dua alasan.
 
-**Pertama, yang berat bukan rencananya — yang berat filenya.** Pemecah baterai
-memotong di mana pun jatah waktu atau batas 200 waypoint habis, dan di pola
-banyak lintasan potongan itu jatuh di tengah lintasan:
+**Pertama, yang berat bukan rencananya — yang berat filenya.** Ini butuh dua
+kali salah sebelum benar, dan ketiga caranya diukur di lahan contoh 6.15 ha
+(630 foto, batas 200 waypoint per file, minimum mutlak 4 file):
 
-| | Dipotong per baterai | Dipotong per lintasan |
-|---|---|---|
-| file 1 | 200 titik, lintasan 0 **+ 1**, gimbal −90 **dan** −45 | 136 titik, nadir |
-| file 2 | 200 titik, lintasan 1 **+ 2** | 136 titik, miring |
-| file 3 | **8 titik** | 136 titik, miring |
+| Cara memecah | File | Ukuran | Baterai kepakai | Masalah |
+|---|---|---|---|---|
+| Rakus per baterai | 4 | 198/195/194/**43** | 91% | satu file campur −90 dan −45, satu file 43 foto |
+| Per lintasan | **6** | 105 ×6 | **48%** | enam kali lepas landas untuk pekerjaan yang muat empat |
+| **Per peran** | 5 | 105/105 · 140/140/140 | 66% | — |
 
-Dua-duanya buruk di kolom kiri. File pertama mencampur foto nadir dan foto
-miring, jadi tidak ada satu pun file yang bisa disebut "ini yang nadir" —
-padahal itulah satu-satunya alasan memecahnya. Dan file ketiga berisi delapan
-foto: satu siklus baterai penuh untuk terbang ke lokasi, menjepret delapan
-kali, lalu pulang.
+Cara rakus memotong di mana pun jatah habis, jadi potongannya jatuh di tengah
+lintasan: satu file mencampur foto nadir dan foto miring, dan file terakhir
+berisi 43 foto — satu siklus baterai penuh untuk terbang ke lokasi, menjepret
+43 kali, lalu pulang.
+
+Memotong per **lintasan** menghilangkan campurannya, tapi karena tiap lintasan
+210 titik sementara batasnya 200, tiap lintasan pecah jadi 105+105. Enam file,
+dan tiap penerbangan cuma memakai 48% baterai. Lebih buruk, cuma buruknya di
+dimensi lain.
+
+Yang dipakai sekarang: per **peran**. Dua lintasan miring punya setelan kamera
+yang sama — cuma arah lintasannya menyilang — jadi tidak ada gunanya memisahkan
+keduanya. Yang berguna dipisah cuma nadir dari miring, karena itu memang dua
+hal berbeda bagi yang menerbangkannya.
+
+Ambang jumlah file pada GSD 2.5 cm:
+
+| Luas | File |
+|---|---|
+| sampai 1.69 ha | **2** — satu nadir, satu miring |
+| 1.96 – 5.29 ha | 3 |
+| 5.76 ha ke atas | 5 |
 
 **Kedua, dua pola terpisah menyerahkan hal yang tidak boleh diserahkan.**
 Pengguna harus mengingat sendiri bahwa misi keduanya memakai area, ketinggian,
@@ -440,15 +457,16 @@ titik lepas landas, jadi berdiri di tempat lain membuat kedua set foto tidak
 nyambung. Satu rencana menjamin semuanya identik; dua rencana memindahkan
 jaminan itu ke ingatan orang.
 
-Jadi yang dipecah sekarang **filenya**, bukan polanya: satu file per lintasan,
-dan lintasan yang masih terlalu besar untuk satu baterai dipecah lagi di dalam
-lintasannya sendiri. Nama filenya menyebutkan isinya —
-`survei-2026-11-09_1dari3-nadir.kmz`, `_2dari3-miring.kmz` — supaya di folder
-HP kelihatan mana yang mana tanpa dibuka satu-satu. Nomor urut tetap di depan
-karena itu urutan terbang.
+Jadi yang dipecah sekarang **filenya**, bukan polanya: file nadir dan file
+miring terpisah, dan kelompok yang masih terlalu besar untuk satu baterai
+dipecah lagi RATA di dalam kelompoknya sendiri — bukan diisi sampai batas lalu
+sisanya jadi remahan. Nama filenya menyebutkan isinya —
+`survei-3d-2026-11-09_1dari5-nadir.kmz`, `_3dari5-miring.kmz` — supaya di
+folder HP kelihatan mana yang mana tanpa dibuka satu-satu. Nomor urut tetap di
+depan karena itu urutan terbang.
 
 Foto nadir dan foto miring tetap digabung di **software olah**, bukan di file
-misi: semua foto dari ketiga file masuk satu project.
+misi: semua foto dari semua file masuk satu project.
 
 Yang tidak berlaku untuk pola banyak lintasan: **Lanjutkan misi**. Kalau
 filenya sudah dipecah per lintasan, "lanjut dari titik terakhir" tidak punya

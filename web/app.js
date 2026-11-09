@@ -18,7 +18,7 @@ import {
   peakSpeedOverLeg,
   medianLegM,
   resumeIndexFor,
-  splitByPass,
+  splitByRole,
   sortieSummary,
   maxDistanceFrom,
   altitudeFromGsd,
@@ -1722,7 +1722,7 @@ function buildOrbitPlan() {
   const maxDist = maxDistanceFrom(homeXY, grid.waypoints);
   const transitReserveSec = (2 * maxDist) / speed + 60;
 
-  const { sorties, meta: sortieMeta } = splitByPass(grid.waypoints, {
+  const { sorties, meta: sortieMeta } = splitByRole(grid.waypoints, {
     speed,
     accel,
     stopAtEach,
@@ -1961,7 +1961,7 @@ function buildPlan() {
     (grid.passes ?? []).map((x) => [x.index, x.role ?? null])
   );
 
-  const { sorties, meta: sortieMeta } = splitByPass(grid.waypoints, {
+  const { sorties, meta: sortieMeta } = splitByRole(grid.waypoints, {
     speed,
     accel,
     stopAtEach,

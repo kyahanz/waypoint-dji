@@ -723,41 +723,54 @@ function bagiRata(arr, n) {
 }
 
 /**
- * Pecah jalur jadi beberapa file: per LINTASAN dulu, baru per baterai.
+ * Pecah jalur jadi beberapa file: per PERAN dulu, baru per baterai.
  *
- * Kenapa urutannya begitu. splitByBattery memotong di mana pun jatah waktu
- * atau batas 200 waypoint habis, dan di pola banyak lintasan potongan itu
- * jatuh di tengah lintasan. Untuk lahan 3.49 ha dengan nadir + dua miring,
- * hasilnya:
+ * Peran, bukan lintasan. Bedanya nyata, dan ini sudah salah dua kali.
  *
- *   file 1   200 titik   lintasan 0 + 1   gimbal -90 DAN -45 tercampur
- *   file 2   200 titik   lintasan 1 + 2
- *   file 3     8 titik   lintasan 2
+ * Percobaan pertama memakai splitByBattery apa adanya: rakus, memotong di mana
+ * pun jatah waktu atau batas 200 waypoint habis. Di pola banyak lintasan
+ * potongan itu jatuh di tengah lintasan — lahan 6.15 ha jadi 198/195/194/43,
+ * satu file mencampur gimbal -90 dan -45, dan file terakhir berisi 43 foto.
  *
- * Dua-duanya buruk. File pertama mencampur foto nadir dan foto miring, jadi
- * tidak ada satu pun file yang bisa disebut "ini yang nadir" — padahal itulah
- * satu-satunya alasan memecahnya. Dan file ketiga berisi 8 foto: satu siklus
- * baterai penuh untuk terbang ke lokasi, menjepret delapan kali, lalu pulang.
+ * Percobaan kedua memotong per LINTASAN. Campurannya hilang, tapi karena tiap
+ * lintasan 210 titik sementara batasnya 200, tiap lintasan pecah jadi 105+105:
+ * enam file, dan tiap penerbangan cuma memakai 48% baterai. Enam kali lepas
+ * landas untuk pekerjaan yang muat empat. Itu lebih buruk, cuma buruknya di
+ * dimensi lain.
  *
- * Dipotong per lintasan dulu, lahan yang sama jadi 136 / 136 / 136 — tiga file
- * rapi, masing-masing satu lintasan, semuanya di bawah batas waypoint.
+ * Sekarang per PERAN. Dua lintasan miring punya setelan kamera yang sama —
+ * cuma arah lintasannya menyilang — jadi tidak ada gunanya memisahkan
+ * keduanya. Yang berguna dipisahkan cuma nadir dari miring, karena itu memang
+ * dua hal yang berbeda bagi orang yang menerbangkannya. Lahan 6.15 ha jadi:
  *
- * Ini bukan pilihan yang ditawarkan ke pengguna. Tidak ada kasus di mana orang
- * INGIN file yang mencampur dua sudut gimbal, atau file berisi delapan foto.
+ *   nadir    105 + 105
+ *   miring   140 + 140 + 140
  *
- * Lintasan yang masih terlalu besar untuk satu baterai tetap dipecah lagi di
- * dalam lintasannya sendiri, jadi batas baterai tidak pernah dilanggar.
+ * Lima file, baterai kepakai 66%, dan lahan kecil (di bawah ~2.5 ha) jadi
+ * tepat dua file: satu nadir, satu miring. Minimum mutlaknya empat file
+ * (630 foto / batas 200), jadi pemisahan peran ini berongkos satu file.
  *
- * @returns {{sorties: Array<Array<object>>, meta: Array<{pass:number, role:string|null, part:number, parts:number}>}}
+ * Pola yang TIDAK punya peran — peta datar, miring saja, orbit — tidak
+ * dikelompokkan sama sekali: satu kelompok, dibagi rata. Mengelompokkan orbit
+ * per sudut gimbal akan memecah tiap cincin jadi filenya sendiri, dan itu
+ * jelas bukan yang diinginkan.
+ *
+ * @returns {{sorties: Array<Array<object>>, meta: Array<{role:string|null, part:number, parts:number}>}}
  */
-export function splitByPass(waypoints, o) {
-  // Kelompokkan menurut lintasan, menjaga urutan kemunculannya.
+export function splitByRole(waypoints, o) {
+  // Kelompokkan menurut peran, menjaga urutan terbang. Peran yang sama dan
+  // BERURUTAN menyatu dengan sendirinya karena kelompok baru hanya dimulai
+  // saat perannya berganti — jadi dua lintasan miring yang bersebelahan jadi
+  // satu kelompok, sementara urutan nadir-lalu-miring tetap terjaga.
+  const peranDari = (w) => o.roleOfPass?.[w.pass] ?? null;
+  const adaPeran = waypoints.some((w) => peranDari(w) !== null);
+
   const groups = [];
   for (const w of waypoints) {
-    const key = w.pass ?? 0;
+    const key = adaPeran ? peranDari(w) : null;
     let g = groups[groups.length - 1];
-    if (!g || g.pass !== key) {
-      g = { pass: key, waypoints: [] };
+    if (!g || g.role !== key) {
+      g = { role: key, waypoints: [] };
       groups.push(g);
     }
     g.waypoints.push(w);
@@ -783,12 +796,7 @@ export function splitByPass(waypoints, o) {
     const parts = rakus.length > 1 ? bagiRata(g.waypoints, rakus.length) : rakus;
     parts.forEach((part, i) => {
       sorties.push(part);
-      meta.push({
-        pass: g.pass,
-        role: o.roleOfPass?.[g.pass] ?? null,
-        part: i,
-        parts: parts.length,
-      });
+      meta.push({ role: g.role, part: i, parts: parts.length });
     });
   }
   return { sorties, meta };
