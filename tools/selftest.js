@@ -1368,25 +1368,66 @@ console.log('\nKetinggian terhadap bangunan');
     'lahan tanpa bangunan tidak pernah kena pemeriksaan ini'
   );
 
-  // Bangunan 20 m di lahan 44 m: pada ketinggian teraman pun satu frame masih
-  // selebar lahannya, jadi sarannya harus berhenti menyuruh turun dan mulai
-  // menyuruh pindah pola.
+  // Bangunan 20 m di lahan 44 m, terbang 70 m: 3.5x tinggi objeknya. Yang
+  // diperingatkan rasio itu — BUKAN "frame lebih lebar dari lahan", karena
+  // jarak antar foto ditentukan overlap dan di 35 m lahan yang sama
+  // menghasilkan 150 foto dari 150 posisi berbeda.
   {
     const t = evaluateSafety(dasar(70, 20), p5).findings.find(
-      (f) => f.code === 'terlalu-tinggi-untuk-lahan'
+      (f) => f.code === 'ketinggian-vs-objek'
     );
-    ok(!!t, 'jejak foto yang melebihi lahan tetap diperingatkan');
+    ok(!!t, 'terbang 3.5x tinggi bangunan diperingatkan');
+    ok(/sekitar 40 m/.test(t?.text ?? ''), 'dan sarannya 2x tinggi objek, bukan setengah lebar lahan');
     ok(
-      /ORBIT/.test(t?.text ?? ''),
-      'dan di lahan sesempit itu sarannya pindah pola ke orbit, bukan turun'
+      !kode(dasar(70, 20)).includes('objek-setinggi-lahan'),
+      'bangunan 20 m di lahan 44 m TIDAK disuruh pindah ke orbit'
     );
+    ok(
+      !kode(dasar(40, 20)).includes('ketinggian-vs-objek'),
+      'dan di 2x tinggi bangunan tidak diperingatkan lagi'
+    );
+  }
 
-    const tanpaObjek = evaluateSafety(dasar(70, 0), p5).findings.find(
-      (f) => f.code === 'terlalu-tinggi-untuk-lahan'
+  // Orbit cuma disarankan kalau objeknya setinggi lebar lahannya sendiri —
+  // objek tunggal yang menjulang. Lahan dua hektar jelas bukan itu: orbit
+  // memutari satu titik pusat, dia bukan alat untuk hamparan.
+  {
+    const sempit = evaluateSafety(dasar(70, 40), p5).findings.find(
+      (f) => f.code === 'objek-setinggi-lahan'
+    );
+    ok(!!sempit, 'bangunan 40 m di lahan 44 m disuruh pindah ke orbit');
+    ok(/ORBIT/.test(sempit?.text ?? ''), 'dan kalimatnya memang menyebut orbit');
+
+    const duaHektar = {
+      ...dasar(70, 20),
+      area: 20000,
+      gridArea: 20000,
+      polyXY: [[0, 0], [141, 0], [141, 141], [0, 141]],
+    };
+    ok(
+      !kode(duaHektar).includes('objek-setinggi-lahan'),
+      'lahan 2 ha dengan bangunan 20 m tidak pernah disuruh pakai orbit'
+    );
+  }
+
+  // Pola 3D tanpa tinggi bangunan tidak bisa diperiksa terhadap apa pun.
+  ok(
+    kode(dasar(70, 0)).includes('objek-belum-diisi'),
+    'pola 3D dengan tinggi bangunan nol diingatkan untuk mengisinya'
+  );
+
+  // Peta datar tidak pernah disuruh pakai orbit, dan fotonya yang sedikit
+  // bukan masalah — yang dilewatkan cuma ketelitian.
+  {
+    const datar = { ...dasar(70, 0), pattern: 'single' };
+    const kodeDatar = kode(datar);
+    ok(
+      kodeDatar.includes('ketinggian-boros-ketelitian'),
+      'peta datar di lahan sempit dapat catatan ketelitian'
     );
     ok(
-      !/ORBIT/.test(tanpaObjek?.text ?? '') && /turun ke sekitar/.test(tanpaObjek?.text ?? ''),
-      'tanpa bangunan, sarannya tetap menurunkan ketinggian'
+      !kodeDatar.includes('objek-setinggi-lahan') && !kodeDatar.includes('objek-belum-diisi'),
+      'dan tidak kena pemeriksaan yang khusus bangunan'
     );
   }
 }

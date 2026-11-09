@@ -667,6 +667,60 @@ Contoh nyatanya persis kasus di atas: bangunan 20 m di lahan 44 × 44 m menuntut
 minimal ~35 m, dan di 35 m satu frame masih 53 m — lebih lebar dari lahannya.
 Grid memang bukan alatnya di situ.
 
+#### Koreksi: "grid bukan alatnya, pakai orbit" itu keliru
+
+Kalimat di atas sempat berbunyi begitu, dan runtuh oleh satu pertanyaan: *lahan
+dua hektar dengan bangunan — mau diorbit mengelilingi apa?* Orbit memutari
+**satu titik pusat**. Dia alat untuk satu objek menjulang, bukan untuk hamparan.
+
+Dan premisnya sendiri salah. Jarak antar foto **tidak ditentukan lebar lahan**,
+melainkan overlap. Di 35 m jaraknya 7,9 m ke depan dan 15,8 m ke samping, jadi
+lahan 44 m yang sama menghasilkan **150 foto dari 150 posisi yang benar-benar
+berbeda**. Frame yang lebih lebar dari lahan sama sekali tidak mengurangi
+paralaks — grid justru bekerja baik di situ:
+
+| Ketinggian | Rasio ke bangunan 20 m | Jarak foto | Foto | GSD dinding |
+|---|---|---|---|---|
+| 70 m | 3.5× | 15.7 m | 63 | 3.63 cm/px |
+| 40 m | 2.0× | 9.0 m | 108 | 2.07 cm/px |
+| 35 m | 1.8× | 7.9 m | 150 | 1.81 cm/px |
+
+Jadi acuannya diganti dari lahan ke **tinggi objek**, karena memang itu yang
+dikerjakan pola ini:
+
+| Keadaan | Tingkat |
+|---|---|
+| di bawah tinggi objek + 15 m | merah — terlalu mepet ke atapnya |
+| di atas 2.5× tinggi objek | kuning — objeknya kecil di dalam frame |
+| tinggi objek ≥ 0.8× lebar lahan | kuning — grid tidak punya ruang mundur, **orbit** |
+
+Baris terakhir itu satu-satunya tempat orbit disarankan: objek tunggal yang
+tingginya setara lebar lahannya sendiri, sehingga lintasan miring harus berdiri
+di luar lahan untuk bisa menatap dinding. Lahan dua hektar tidak akan pernah
+kena baris itu, dan ada ujinya.
+
+#### Lahan kecil punya jatah yang tidak bisa ditabung
+
+Di petak 1950 m², rencana 3D memakai **63 dari 200 waypoint dan 32% baterai**.
+Sisanya tidak bisa disimpan untuk besok — satu-satunya cara memakainya adalah
+merapatkan lintasan. Tapi menaikkan overlap di slider akan merapatkan lintasan
+**nadir** juga, dan nadir tidak membutuhkannya: fotonya jadi dua kali lipat
+tanpa menambah apa pun pada hasilnya.
+
+Maka ada tuas **Kerapatan lintasan miring**, yang merapatkan lintasan miring
+saja:
+
+| Kerapatan | Foto (nadir + miring) | File | Waktu |
+|---|---|---|---|
+| 1.0× | 21 + 42 = 63 | 2 | 8 menit |
+| 1.5× | 21 + 110 = 131 | 2 | 14 menit |
+| 2.0× | 21 + 196 = 217 | 2 | 22 menit |
+| 2.5× | 21 + 324 = 345 | 3 | 31 menit |
+
+Nadirnya tetap 21 di semua baris — yang ditambah cuma yang membangun dinding.
+Di lahan kecil, 2× masih muat dalam dua file yang sama; jatah yang tadinya
+menganggur berubah jadi model yang jauh lebih tebal.
+
 #### Dan "lebar lahan" itu sisi tersempitnya, bukan akar luasnya
 
 Angka 44 × 44 m di atas datang dari akar luas 1950 m², dan itu **mengandaikan

@@ -280,37 +280,52 @@ export function evaluateSafety(plan, profile, o = {}) {
     );
   }
 
-  // ---- Ketinggian vs ukuran lahan ----
+  // ---- Ketinggian terhadap objeknya, dan terhadap lahannya ----
   //
-  // Pemeriksaan ini lahir dari satu pertanyaan yang wajar: "lahan 1950 m²,
-  // ketinggian 70 m, pola 3D — kok cuma 52 foto, 5 menit?" Angkanya benar.
-  // Yang salah ketinggiannya: pada 70 m satu frame menutupi 105 x 79 m,
-  // sementara lahannya 44 x 44 m. Satu jepretan saja sudah memuat seluruh
-  // lahan, jadi tidak ada yang bisa dilakukan foto ke-52 selain mengulang
-  // yang sama dari posisi yang nyaris sama.
+  // Bagian ini sudah salah dua kali, dan keduanya karena memakai LAHAN sebagai
+  // acuan untuk pekerjaan yang acuannya OBJEK.
   //
-  // Ini bukan soal efisiensi, melainkan soal hasil: model 3D dibangun dari
-  // PERBEDAAN sudut pandang antar foto. Kalau semua foto memuat seluruh
-  // lahan dari ketinggian yang sama, perbedaannya tipis dan rekonstruksinya
-  // ikut tipis — sementara layar tetap melaporkan "52 foto" seolah cukup.
+  // Salah pertama: "lahan 44 x 44 m, turun saja ke 20 m" — padahal di lahan itu
+  // berdiri bangunan 20 m, jadi yang disarankan adalah melintas nol meter di
+  // atas atapnya.
+  //
+  // Salah kedua, lebih halus: "di 35 m pun satu frame masih selebar 53 m,
+  // sementara lahannya 44 m, jadi grid bukan alatnya — pakai orbit". Itu
+  // terdengar masuk akal dan ternyata keliru. Jarak antar foto tidak ditentukan
+  // lebar lahan melainkan OVERLAP: di 35 m jaraknya 7.9 m ke depan dan 15.8 m
+  // ke samping, jadi lahan 44 m yang sama menghasilkan 150 foto dari 150 posisi
+  // yang benar-benar berbeda. Frame yang lebih lebar dari lahan sama sekali
+  // tidak mengurangi paralaks. Grid justru bekerja baik di situ.
+  //
+  // Dan saran orbit itu runtuh sendiri begitu ditanya: lahan dua hektar dengan
+  // bangunan — mau diorbit mengelilingi apa? Orbit memutari SATU titik pusat.
+  // Dia alat untuk satu objek menjulang, bukan untuk hamparan.
+  //
+  // Jadi yang dipakai sekarang perbandingan ketinggian terhadap TINGGI OBJEK:
+  //
+  //   di bawah objek + 15 m   terlalu mepet ke atapnya        (merah)
+  //   di atas 2.5x objek      objeknya kecil di dalam frame   (kuning)
+  //   objek setinggi lahan    grid tidak punya ruang mundur    (kuning, orbit)
+  //
+  // Angka 1.5-2x tinggi objek itu yang lazim dipakai untuk pemetaan bangunan:
+  // cukup tinggi untuk melewati atap dengan aman, cukup rendah supaya dinding
+  // mengisi bagian frame yang berguna.
   {
     const fp = plan.params.footprint;
     const sisi = Math.sqrt(plan.area ?? 0);
     const objek = plan.objectHeightM ?? 0;
+    const tigaD = !!PATTERNS[plan.pattern]?.mixedGimbal;
 
-    // Lantai ketinggian yang ditentukan BANGUNANNYA, bukan lahannya.
-    //
-    // Ini pelajaran dari saran yang pernah salah di aplikasi ini sendiri:
-    // "lahan 44 x 44 m, turun saja ke 20 m". Kalau di lahan itu berdiri
-    // bangunan 20 m, terbang di 20 m berarti melintas NOL meter di atas
-    // atapnya. Lebar lahan tidak tahu apa-apa soal tinggi bangunan, jadi
-    // saran yang cuma berdasar lebar lahan bisa mengarahkan drone menabrak.
-    //
     // Jarak aman 15 m di atas titik tertinggi: cukup untuk melesetnya GPS
     // vertikal, hembusan angin di atas atap, dan benda tipis yang tidak masuk
-    // hitungan tinggi bangunan (antena, kabel penangkal petir).
+    // hitungan tinggi bangunan (antena, kabel penangkal petir, tiang bendera).
     const JARAK_AMAN_ATAS = 15;
     const lantai = objek > 0 ? objek + JARAK_AMAN_ATAS : 20;
+
+    // Lebar lahan yang SEBENARNYA, bukan akar dari luasnya. Akar luas diam-diam
+    // mengandaikan lahannya bujursangkar: luas 1950 m2 memang 44 x 44 m kalau
+    // bujursangkar, tapi bisa juga 100 x 19.5 m.
+    const lebar = polygonMinWidth(plan.polyXY ?? []);
 
     if (objek > 0 && plan.altitude < lantai) {
       add(
@@ -320,66 +335,60 @@ export function evaluateSafety(plan, profile, o = {}) {
       );
     }
 
-    // Lebar lahan yang SEBENARNYA, bukan akar dari luasnya.
-    //
-    // Akar luas diam-diam mengandaikan lahannya bujursangkar. Luas 1950 m²
-    // memang 44 x 44 m kalau bujursangkar, tapi bisa juga 100 x 19.5 m — dan
-    // di strip selebar 19.5 m satu frame 105 m sudah melintasinya lima kali
-    // lipat, sementara akar luasnya (44 m) membuat pemeriksaan ini lolos
-    // begitu saja. Sawah justru sering berbentuk strip panjang.
-    const lebar = polygonMinWidth(plan.polyXY ?? []);
+    // Objek setinggi lebar lahannya: grid tidak punya ruang untuk mundur.
+    // Lintasan miring harus berdiri cukup jauh ke samping supaya kameranya
+    // menatap dinding, dan di lahan yang lebarnya setara tinggi objeknya,
+    // "cukup jauh" itu di luar lahan. Ini satu-satunya keadaan di mana orbit
+    // memang jawabannya — objek tunggal yang menjulang, bukan hamparan.
+    if (tigaD && objek > 0 && lebar > 0 && objek >= lebar * 0.8) {
+      add(
+        'warn',
+        'objek-setinggi-lahan',
+        `Bangunannya ${objek} m sementara sisi tersempit lahannya cuma ${lebar.toFixed(0)} m — tingginya setara lebar lahannya sendiri. Lintasan miring butuh ruang untuk berdiri agak jauh ke samping supaya kameranya menatap dinding, bukan atap, dan di lahan sesempit ini ruang itu ada DI LUAR lahan. Untuk objek tunggal yang menjulang begini, pola ORBIT yang tepat: drone memutarinya dari samping di beberapa tingkat ketinggian. Pola 3D grid baru masuk akal kalau yang dipetakan hamparan — beberapa bangunan, blok kampung, kompleks.`
+      );
+    }
 
-    if (fp?.w > 0 && lebar > 0 && plan.pattern !== 'orbit' && fp.w >= lebar) {
-      // Jejak foto lurus sebanding dengan ketinggian, jadi ketinggian yang
-      // membuat lebar jejak jadi separuh lebar lahan tinggal dihitung lurus —
-      // TAPI tidak boleh menembus lantai yang ditentukan bangunannya.
-      const dariLahan = Math.round(((plan.altitude * (lebar / 2)) / fp.w) / 5) * 5;
-      const saran = Math.max(lantai, dariLahan);
-
-      // Kalau lantainya sendiri masih menghasilkan jejak selebar lahan, grid
-      // memang bukan alatnya. Bukan "turunkan sedikit lagi" — pada ketinggian
-      // serendah apa pun yang masih aman, satu frame tetap melintasi seluruh
-      // lebar lahan. Yang mendekati bangunan dari samping tanpa melintas di
-      // atasnya adalah orbit, dan pola itu sudah ada di aplikasi ini.
-      const jejakDiLantai = (fp.w * saran) / plan.altitude;
-      const buntu = jejakDiLantai >= lebar;
-
-      // Satu frame yang melintasi LEBAR lahan belum tentu memuat seluruh
-      // lahan: di strip panjang dia cuma melintasi sisi pendeknya. Bedanya
-      // nyata bagi yang membaca, jadi kalimatnya ikut berbeda.
-      const seluruhnya = sisi > 0 && fp.w >= sisi && fp.h >= sisi;
-      const pembuka =
-        `Di ${plan.altitude.toFixed(0)} m, satu foto menutupi ${fp.w.toFixed(0)} x ${fp.h.toFixed(0)} m — sementara sisi tersempit lahannya cuma sekitar ${lebar.toFixed(0)} m. ` +
-        (seluruhnya
-          ? 'Jadi tiap jepretan memuat seluruh lahan, dan foto berikutnya nyaris mengulang yang sebelumnya dari posisi yang nyaris sama. '
-          : 'Jadi tiap jepretan sudah melintasi seluruh lebar lahan dalam sekali lintas. ');
-
-      // Akibatnya BEDA menurut polanya, dan menyamakannya pernah membuat
-      // peringatan ini menyuruh pakai orbit di peta datar sawah yang tidak
-      // punya bangunan sama sekali.
-      //
-      // Pola 3D: fotonya sedikit itu masalah, karena rekonstruksi hidup dari
-      // beda sudut pandang antar foto. Peta datar: fotonya sedikit bukan
-      // masalah — ortofoto strip sempit memang tidak butuh banyak. Yang
-      // dilewatkan di situ cuma KETELITIAN: di lahan sesempit itu ketinggian
-      // bisa diturunkan dan GSD-nya membaik tanpa menambah lintasan.
-      if (PATTERNS[plan.pattern]?.mixedGimbal) {
+    // Ketinggian beberapa kali lipat tinggi objeknya: objeknya jadi kecil di
+    // dalam frame, dan karena jarak antar foto ikut melebar bersama
+    // ketinggian, jumlah fotonya ikut turun.
+    if (tigaD && objek > 0) {
+      const saran = Math.max(lantai, Math.round((objek * 2) / 5) * 5);
+      if (plan.altitude > objek * 2.5 && saran < plan.altitude) {
+        const gsdSaran = ((plan.params.gsd ?? 0) * saran) / plan.altitude;
         add(
           'warn',
-          'terlalu-tinggi-untuk-lahan',
-          pembuka +
-            'Fotonya sedikit bukan karena hitungannya hemat, melainkan karena tidak ada lagi yang bisa dilihat — dan model 3D dibangun dari beda sudut pandang antar foto, bukan dari banyaknya piksel. ' +
-            (buntu
-              ? `Menurunkan ketinggian tidak menyelesaikan ini: ${objek > 0 ? `bangunan ${objek} m` : 'jarak aman di atas objeknya'} menuntut minimal sekitar ${saran} m, dan di ${saran} m pun satu frame masih selebar ${jejakDiLantai.toFixed(0)} m. Untuk objek tunggal di lahan sesempit ini, yang tepat pola ORBIT — drone memutarinya dari samping, bukan melintas di atasnya.`
-              : `Coba turun ke sekitar ${saran} m${objek > 0 ? ` — itu sudah termasuk ${JARAK_AMAN_ATAS} m jarak aman di atas bangunan ${objek} m` : ''}.`)
+          'ketinggian-vs-objek',
+          `Ketinggian ${plan.altitude.toFixed(0)} m itu ${(plan.altitude / objek).toFixed(1)}x tinggi bangunannya (${objek} m). Dari sejauh itu bangunannya kecil di dalam frame, dinding yang terpotret jadi kasar, dan karena jarak antar foto melebar bersama ketinggian, jumlah fotonya ikut sedikit. Untuk pemetaan bangunan yang lazim dipakai 1.5-2x tinggi objek: sekitar ${saran} m di sini — ketelitiannya jadi ${gsdSaran.toFixed(2)} cm/px dari ${(plan.params.gsd ?? 0).toFixed(2)}, dan fotonya bertambah banyak karena jaraknya ikut merapat. Angka ${saran} m itu sudah di atas lantai aman ${lantai} m.`
         );
-      } else {
+      }
+    }
+
+    // Pola 3D tanpa tinggi bangunan: polanya sendiri mengandaikan ada yang
+    // berdiri di lahan itu, jadi angka nol di situ hampir pasti berarti
+    // "belum diisi", bukan "memang rata".
+    if (tigaD && objek === 0) {
+      add(
+        'info',
+        'objek-belum-diisi',
+        'Tinggi bangunan masih nol, jadi ketinggian terbangnya tidak bisa diperiksa terhadap apa pun — padahal pola ini memang dibuat untuk lahan yang ada bangunannya. Isi tinggi bangunan tertinggi supaya jarak aman di atas atap dan kekasaran dindingnya ikut dihitung.'
+      );
+    }
+
+    // Peta datar di lahan sempit: fotonya sedikit bukan masalah, ortofoto
+    // strip sempit memang tidak butuh banyak. Yang dilewatkan cuma ketelitian.
+    if (!tigaD && fp?.w > 0 && lebar > 0 && plan.pattern !== 'orbit' && fp.w >= lebar) {
+      const saran = Math.max(lantai, Math.round(((plan.altitude * (lebar / 2)) / fp.w) / 5) * 5);
+      const seluruhnya = sisi > 0 && fp.w >= sisi && fp.h >= sisi;
+      if (saran < plan.altitude) {
         const gsdSaran = ((plan.params.gsd ?? 0) * saran) / plan.altitude;
         add(
           'info',
           'ketinggian-boros-ketelitian',
-          pembuka +
-            `Untuk ortofoto itu tidak salah — lahan sesempit ini memang tidak butuh banyak foto. Yang dilewatkan cuma ketelitiannya: turun ke sekitar ${saran} m memberi ${gsdSaran.toFixed(2)} cm/px, bukan ${(plan.params.gsd ?? 0).toFixed(2)}, dan di lahan selebar ini jumlah lintasannya tidak banyak bertambah.`
+          `Di ${plan.altitude.toFixed(0)} m, satu foto menutupi ${fp.w.toFixed(0)} x ${fp.h.toFixed(0)} m — sementara sisi tersempit lahannya cuma sekitar ${lebar.toFixed(0)} m. ` +
+            (seluruhnya
+              ? 'Jadi tiap jepretan memuat seluruh lahan. '
+              : 'Jadi tiap jepretan sudah melintasi seluruh lebar lahan dalam sekali lintas. ') +
+            `Untuk ortofoto itu tidak salah — lahan sesempit ini memang tidak butuh banyak foto. Yang dilewatkan cuma ketelitiannya: turun ke sekitar ${saran} m memberi ${gsdSaran.toFixed(2)} cm/px, bukan ${(plan.params.gsd ?? 0).toFixed(2)}.`
         );
       }
     }

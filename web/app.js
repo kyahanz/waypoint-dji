@@ -127,6 +127,8 @@ const state = {
   // untuk memeriksa ketinggian terbang terhadap objeknya — bukan cuma
   // terhadap batas regulasi.
   objectHeightM: 15,
+  // Pengali kerapatan lintasan MIRING saja. 1 = sama dengan nadir.
+  obliqueDensity: 1,
   resume: null, // { index, lngLat }
   resumePicking: false,
   viewMode: '2d',
@@ -526,6 +528,10 @@ const els = {
   fieldObjek: $('field-objek'),
   objekTinggi: $('objek-tinggi'),
   objekTinggiOut: $('objek-tinggi-out'),
+  fieldRapat: $('field-rapat'),
+  rapatMiring: $('rapat-miring'),
+  rapatMiringOut: $('rapat-miring-out'),
+  rapatHint: $('rapat-hint'),
   objHeight: $('obj-height'),
   objHeightOut: $('obj-height-out'),
   orbitRadius: $('orbit-radius'),
@@ -998,6 +1004,7 @@ function syncPatternFields() {
   // Di peta datar tidak ada objek tegak yang jadi acuan, dan di orbit tinggi
   // objek sudah jadi input utamanya sendiri.
   els.fieldObjek.hidden = !PATTERNS[state.pattern]?.mixedGimbal;
+  els.fieldRapat.hidden = !PATTERNS[state.pattern]?.mixedGimbal;
   els.fieldAlt.hidden = orbit;
   els.fieldOverlap.hidden = orbit;
   els.fieldBuffer.hidden = orbit;
@@ -1105,6 +1112,11 @@ els.projName.addEventListener('input', () => {
   // adanya. Tanpa ini daftarnya memajang nama lama sampai ada hal lain yang
   // berubah — persis kebohongan yang dicegah namaFileKmz.
   if (state.plan) renderSorties(state.plan);
+});
+
+els.rapatMiring.addEventListener('input', () => {
+  state.obliqueDensity = Number(els.rapatMiring.value);
+  render();
 });
 
 els.objekTinggi.addEventListener('input', () => {
@@ -1973,6 +1985,9 @@ function buildPlan() {
     // Poligon yang sudah dibuffer sudah memberi ruang ancang-ancang; overshoot
     // hanya dipakai kalau buffer dimatikan, supaya jalur tidak dobel memanjang.
     overshoot: bufferM > 0 ? 0 : mode === 'continuous' ? params.frontSpacing : 0,
+    // Berlaku hanya untuk lintasan yang perannya miring; nadir tidak ikut
+    // dirapatkan, karena peta tidak butuh kerapatan yang dibutuhkan dinding.
+    obliqueDensity: state.obliqueDensity,
   };
 
   const grid = generatePattern(gridPoly, { ...gridOpts, pattern: state.pattern });
@@ -2477,6 +2492,18 @@ function updateDerived(plan) {
   els.objekTinggi.value = String(state.objectHeightM);
   els.objekTinggiOut.textContent =
     state.objectHeightM > 0 ? `${state.objectHeightM} m` : 'tidak ada / rata tanah';
+
+  // Tuas kerapatan tidak berarti apa-apa tanpa ongkosnya, dan ongkosnya di
+  // sini bukan abstraksi: berapa foto miring tambahan, dan berapa menit.
+  els.rapatMiring.value = String(state.obliqueDensity);
+  els.rapatMiringOut.textContent = `${state.obliqueDensity.toFixed(2).replace(/0$/, '')}×`;
+  const miring = (plan?.grid?.passes ?? []).filter((x) => x.role === 'miring');
+  els.rapatHint.textContent =
+    state.obliqueDensity <= 1
+      ? 'Merapatkan lintasan miring saja — lintasan nadir tidak ikut. Peta cukup dengan overlap biasa; dinding yang hidup dari banyaknya sudut pandang.'
+      : miring.length
+        ? `Lintasan miring jadi ${miring.reduce((n, x) => n + x.photos, 0)} foto, nadirnya tetap ${(plan.grid.passes.find((x) => x.role === 'nadir')?.photos ?? 0)}. Yang ditambah cuma yang membangun dinding.`
+        : 'Berlaku untuk lintasan miring di pola 3D.';
 
   const o = state.orbit;
   els.objHeightOut.textContent = `${o.objectHeightM} m`;
@@ -3480,6 +3507,7 @@ function onSave() {
     terrain: state.terrain,
     fileSplit: state.fileSplit,
     objectHeightM: state.objectHeightM,
+    obliqueDensity: state.obliqueDensity,
     front: Number(els.front.value),
     side: Number(els.side.value),
     buffer: Number(els.buffer.value),
@@ -3556,6 +3584,7 @@ function openProject(id) {
   state.terrain = !!p.terrain;
   state.fileSplit = p.fileSplit ?? 'peran';
   state.objectHeightM = p.objectHeightM ?? 15;
+  state.obliqueDensity = p.obliqueDensity ?? 1;
   els.terrain.checked = state.terrain;
   state.resume = null;
 
@@ -3793,6 +3822,7 @@ function encodeState() {
     tf: state.terrain ? 1 : 0,
     fs: state.fileSplit,
     oh: state.objectHeightM,
+    od: state.obliqueDensity,
     adv: state.advanced,
     v: SCHEMA_VERSION,
   };
@@ -3845,6 +3875,7 @@ function applyStateFromUrl() {
     state.terrain = !!d.tf;
     state.fileSplit = d.fs ?? 'peran';
     state.objectHeightM = d.oh ?? 15;
+    state.obliqueDensity = d.od ?? 1;
     els.terrain.checked = state.terrain;
     state.advanced = { ...SAFE_ADVANCED, ...(d.adv ?? {}) };
     syncProfile();

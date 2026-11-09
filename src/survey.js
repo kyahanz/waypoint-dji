@@ -622,7 +622,27 @@ export function generatePattern(polyXY, o) {
 
   specs.forEach((ps, i) => {
     const ang = angleDeg + ps.angleOffset;
-    const g = generateGrid(polyXY, { ...rest, angleDeg: ang });
+
+    // Lintasan miring boleh lebih rapat daripada lintasan nadir.
+    //
+    // Keduanya tidak mengerjakan hal yang sama: nadir membangun PETA, miring
+    // membangun DINDING. Peta cukup dengan overlap yang biasa; dinding hidup
+    // dari banyaknya sudut pandang yang berbeda terhadap permukaan tegak, dan
+    // di situ foto tambahan terbayar jauh lebih banyak.
+    //
+    // Yang membuat tuas ini masuk akal justru lahan KECIL: di petak 1950 m²
+    // rencana 3D memakai 63 dari 200 waypoint dan 32% baterai. Jatah yang
+    // tersisa itu tidak bisa ditabung — satu-satunya cara memakainya adalah
+    // merapatkan lintasan. Menaikkan overlap di slider akan merapatkan nadir
+    // juga, dan nadir tidak butuh itu: fotonya jadi dua kali lipat tanpa
+    // menambah apa pun pada hasilnya.
+    const rapat = ps.role === 'miring' ? Math.max(1, o.obliqueDensity ?? 1) : 1;
+    const g = generateGrid(polyXY, {
+      ...rest,
+      angleDeg: ang,
+      sideSpacing: rest.sideSpacing / rapat,
+      frontSpacing: rest.frontSpacing / rapat,
+    });
     for (const w of g.waypoints) {
       w.pass = i;
       if (mixed) w.gimbalPitch = ps.gimbalPitch;
