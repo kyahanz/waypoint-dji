@@ -82,6 +82,9 @@ const SAFE_ADVANCED = {
   finishAction: 'goHome',
   gimbalPitch: -90,
   safeHeightM: 20,
+  // Ketinggian pulang otomatis. Dulu ikut safeHeightM, dan itu menurunkan RTH
+  // jadi 20 m tanpa ada yang meminta — lihat catatan di updateDerived.
+  rthHeightM: 100,
   angleDeg: 0, // 0 = otomatis, ikut sisi terpanjang
 };
 
@@ -523,9 +526,12 @@ const els = {
   patternCostVal: $('pattern-cost-val'),
   gimbal: $('gimbal'),
   gimbalOut: $('gimbal-out'),
+  gimbalNote: $('gimbal-note'),
   rcLost: $('rc-lost'),
   finish: $('finish'),
   safeHeight: $('safe-height'),
+  rthHeight: $('rth-height'),
+  rthHeightOut: $('rth-height-out'),
   safeHeightOut: $('safe-height-out'),
   resetAdv: $('btn-reset-adv'),
   gate: $('gate'),
@@ -1049,6 +1055,11 @@ els.safeHeight.addEventListener('input', () => {
   render();
 });
 
+els.rthHeight.addEventListener('input', () => {
+  state.advanced.rthHeightM = Number(els.rthHeight.value);
+  render();
+});
+
 els.rcLost.onchange = () => {
   state.advanced.rcLostAction = els.rcLost.value;
   render();
@@ -1074,6 +1085,7 @@ function syncAdvancedInputs() {
   els.angle.value = String(a.angleDeg);
   els.gimbal.value = String(a.gimbalPitch);
   els.safeHeight.value = String(a.safeHeightM);
+  els.rthHeight.value = String(a.rthHeightM ?? SAFE_ADVANCED.rthHeightM);
   els.rcLost.value = a.rcLostAction;
   els.finish.value = a.finishAction;
 }
@@ -2205,15 +2217,29 @@ function updateDerived(plan) {
       ? 'per cincin'
       : 'per lintasan'
     : `${state.advanced.gimbalPitch}°`;
+  // Kontrol abu-abu tanpa keterangan terbaca sebagai rusak. Keterangannya
+  // ditaruh di tempat kontrolnya, bukan cuma di angka di sebelahnya.
+  els.gimbalNote.textContent = mixedGimbal
+    ? state.pattern === 'orbit'
+      ? 'Tidak berlaku untuk orbit: tiap cincin punya sudutnya sendiri, dihitung dari titik bidiknya di objek.'
+      : 'Tidak berlaku untuk 3D bangunan: lintasan nadir -90° dan dua lintasan miring -45° masing-masing membawa sudutnya sendiri.'
+    : 'Untuk peta datar, -90° (nunduk lurus) yang benar. Memiringkannya mengubah pola ini jadi satu lintasan miring — bukan peta datar lagi.';
 
-  // DJI Fly tidak memakai takeOffSecurityHeight sama sekali — itu terbaca
-  // dari file aslinya. Jadi kontrolnya dimatikan, bukan dibiarkan terlihat
-  // berfungsi padahal angkanya tidak pernah sampai ke drone.
-  const usesSafeHeight = state.profile?.dialect === 'enterprise';
-  els.safeHeight.disabled = !usesSafeHeight;
-  els.safeHeightOut.textContent = usesSafeHeight
-    ? `${state.advanced.safeHeightM} m`
-    : 'diurus drone';
+  // Dulu kontrol ini dimatikan untuk DJI Fly, dengan alasan takeOffSecurityHeight
+  // tidak pernah ditulis. Alasan itu BENAR waktu ditulis, dan berhenti benar di
+  // commit "Ikuti generator pihak ketiga yang memang dipakai orang memetakan":
+  // sejak itu tag-nya ditulis untuk dialek DJI Fly juga. Penjaganya tidak ikut
+  // diperbarui, jadi selama ini angkanya masuk ke file sementara pengguna tidak
+  // bisa mengubahnya dan diberi tahu kontrolnya tidak berfungsi.
+  //
+  // Lebih buruk lagi: nilai yang sama juga dipakai sebagai globalRTHHeight,
+  // jadi ketinggian pulang otomatis terkunci di 20 m — padahal bawaan
+  // MISSION_DEFAULTS 100 m. Export dari web diam-diam MENURUNKAN RTH ke angka
+  // yang bisa lebih rendah dari pohon dan bangunan di jalur pulang. Sekarang
+  // keduanya kontrol sendiri-sendiri, karena memang dua hal yang berbeda.
+  els.safeHeight.disabled = false;
+  els.safeHeightOut.textContent = `${state.advanced.safeHeightM} m`;
+  els.rthHeightOut.textContent = `${state.advanced.rthHeightM ?? SAFE_ADVANCED.rthHeightM} m`;
 
   const mult = Number(els.buffer.value);
   els.bufferOut.textContent = mult === 0 ? 'mati' : `${mult.toFixed(1)}× jalur`;
@@ -3031,7 +3057,7 @@ async function exportKmz() {
           takeOffSecurityHeight: plan.advanced.safeHeightM,
           flyToWaylineMode: 'safely',
 
-          rthHeight: plan.advanced.safeHeightM,
+          rthHeight: plan.advanced.rthHeightM ?? SAFE_ADVANCED.rthHeightM,
 
           // Tidak ada perintah jepret-per-jarak: tidak ada satu pun contoh
           // nyata yang memakainya, dan file yang memakainya ditolak DJI Fly.

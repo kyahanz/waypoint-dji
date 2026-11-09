@@ -422,7 +422,7 @@
                   <output id="gimbal-out">-90°</output>
                 </div>
                 <input id="gimbal" type="range" min="-90" max="0" step="5" value="-90" />
-                <p class="sub">
+                <p class="sub" id="gimbal-note">
                   -90° nunduk lurus untuk ortofoto. -45° untuk menangkap dinding
                   tegak pada model 3D.
                 </p>
@@ -458,10 +458,23 @@
                 </div>
                 <input id="safe-height" type="range" min="10" max="120" step="5" value="20" />
                 <p class="sub">
-                  DJI Fly tidak menerima angka ini — terbaca dari file aslinya,
-                  dia memang tidak menulisnya. Naik-aman sebelum menyeberang
-                  tetap terjadi, tapi ketinggiannya ditentukan drone lewat
-                  setelan RTH-nya sendiri, bukan dari sini.
+                  Drone naik ke sini dulu sebelum menyeberang ke titik awal,
+                  juga di tiap pergantian baterai. Inilah yang mencegah dia
+                  melintas rendah di atas area yang belum tentu kosong.
+                </p>
+              </div>
+
+              <div class="field">
+                <div class="field-head">
+                  <label for="rth-height">Ketinggian pulang otomatis (m)</label>
+                  <output id="rth-height-out">100 m</output>
+                </div>
+                <input id="rth-height" type="range" min="20" max="200" step="10" value="100" />
+                <p class="sub">
+                  Ketinggian yang dinaiki drone sebelum pulang sendiri — saat
+                  baterai kritis atau sinyal hilang. Harus lebih tinggi dari
+                  apa pun di antara drone dan titik pulang, karena jalur
+                  pulangnya garis lurus dan dia tidak akan menghindar.
                 </p>
               </div>
 

@@ -961,5 +961,70 @@ console.log('\nKecepatan: jelajah vs yang tercapai');
 }
 
 
+// ----------------------------- gerbang: ketinggian pulang otomatis
+
+console.log('\nGerbang keselamatan: ketinggian pulang otomatis');
+{
+  const p5 = resolveProfile(registry, { droneId: 'mini5pro' });
+  const planRth = (rthHeightM, over = {}) => ({
+    ...fakePlan(),
+    altitude: 80,
+    ...over,
+    advanced: { ...fakePlan().advanced, safeHeightM: 20, rthHeightM, ...(over.advanced ?? {}) },
+  });
+  const codes = (plan, opts) => evaluateSafety(plan, p5, opts).findings.map((f) => f.code);
+  const blockers = (plan, opts) => evaluateSafety(plan, p5, opts).blockers.map((f) => f.code);
+
+  ok(codes(planRth(100)).includes('rth-height'), 'ketinggian pulang selalu disebutkan');
+
+  // Yang paling penting: jalur pulang itu garis lurus tanpa menghindar.
+  const gedung = { obstacles: [{ heightM: 45, clearanceM: 35, distM: 10, estimated: false, name: null }] };
+  ok(
+    blockers(planRth(30), gedung).includes('rth-below-obstacle'),
+    'pulang 30 m dengan bangunan 45 m di jalur MENAHAN export'
+  );
+  ok(
+    !codes(planRth(100), gedung).includes('rth-below-obstacle'),
+    'pulang 100 m di atas bangunan yang sama tidak ditahan'
+  );
+  ok(
+    evaluateSafety(planRth(30), p5, gedung)
+      .findings.find((f) => f.code === 'rth-below-obstacle')
+      .text.includes('70 m'),
+    'dan disarankan angka yang sudah dibulatkan ke atas',
+    '45 + 25 -> 70 m'
+  );
+
+  ok(
+    codes(planRth(40)).includes('rth-below-mission'),
+    'pulang 40 m di bawah ketinggian terbang 80 m diperingatkan'
+  );
+  ok(
+    !codes(planRth(100)).includes('rth-below-mission'),
+    'pulang di atas ketinggian terbang tidak diperingatkan'
+  );
+  ok(
+    codes(planRth(15)).includes('rth-below-transit'),
+    'pulang lebih rendah dari ketinggian transit diperingatkan sebagai tidak konsisten'
+  );
+
+  // Bawaan yang sekarang dipakai web harus lolos bersih.
+  ok(
+    !blockers(planRth(100)).includes('rth-below-obstacle') &&
+      !codes(planRth(100)).includes('rth-below-mission') &&
+      !codes(planRth(100)).includes('rth-below-transit'),
+    'bawaan 100 m tidak memicu satu pun peringatan RTH'
+  );
+
+  // Rencana lama tanpa rthHeightM sama sekali tidak boleh bikin gerbang meledak.
+  const lama = { ...fakePlan(), advanced: { ...fakePlan().advanced } };
+  delete lama.advanced.rthHeightM;
+  ok(
+    !codes(lama).includes('rth-height'),
+    'rencana tanpa setelan RTH dilewati, bukan error'
+  );
+}
+
+
 console.log(failed ? `\n${failed} pemeriksaan GAGAL\n` : '\nSemua pemeriksaan lolos\n');
 process.exit(failed ? 1 : 0);

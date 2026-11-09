@@ -527,6 +527,56 @@ export function evaluateSafety(plan, profile, o = {}) {
 
   // ---- Setelan lanjutan ----
 
+  // ---- Ketinggian pulang otomatis ----
+  //
+  // Angka paling penting di seluruh file, dan yang paling lama salah di sini:
+  // sampai commit ini, web memakai satu slider untuk ketinggian transit DAN
+  // ketinggian pulang, jadi RTH terkunci di 20 m — lebih rendah dari bawaan
+  // MISSION_DEFAULTS (100 m), dan lebih rendah dari banyak pohon.
+  //
+  // Yang membuat ini mematikan: jalur pulang otomatis adalah GARIS LURUS ke
+  // titik home. Drone naik ke ketinggian RTH, lalu menyeberang tanpa
+  // menghindar apa pun. Kalau ada yang lebih tinggi di antaranya, dia menabrak
+  // — dan itu terjadi justru saat pengguna sudah kehilangan kendali atau
+  // baterainya kritis.
+  if (adv.rthHeightM !== undefined) {
+    const rth = adv.rthHeightM;
+
+    const tertinggi = o.obstacles?.length
+      ? o.obstacles.reduce((a, b) => (a.heightM > b.heightM ? a : b))
+      : null;
+
+    if (tertinggi && tertinggi.heightM >= rth) {
+      add(
+        'bad',
+        'rth-below-obstacle',
+        `Ketinggian pulang ${rth} m, sementara ada bangunan setinggi ${tertinggi.heightM.toFixed(0)} m di jalur. Pulang otomatis itu garis lurus tanpa menghindar — naikkan ke setidaknya ${Math.ceil((tertinggi.heightM + 25) / 10) * 10} m. Data tinggi bangunan OSM juga sering kurang dari aslinya, dan antena di atap tidak terdata sama sekali.`
+      );
+    }
+
+    if (rth < plan.altitude) {
+      add(
+        'warn',
+        'rth-below-mission',
+        `Ketinggian pulang ${rth} m lebih rendah dari ketinggian terbang ${plan.altitude.toFixed(0)} m. Artinya saat pulang otomatis drone TURUN dulu, baru menyeberang di atas area yang tadi dia lewati dari lebih tinggi. Kalau ketinggian terbangnya dipilih karena ada yang tinggi di lahan ini, pulangnya jadi lebih berbahaya daripada terbangnya.`
+      );
+    }
+
+    if (rth < adv.safeHeightM) {
+      add(
+        'warn',
+        'rth-below-transit',
+        `Ketinggian pulang ${rth} m lebih rendah dari ketinggian transit ${adv.safeHeightM} m. Tidak konsisten: drone naik ${adv.safeHeightM} m untuk menyeberang ke titik awal, tapi cuma ${rth} m untuk pulang — padahal jalur pulang justru yang dilewati tanpa pengawasan.`
+      );
+    }
+
+    add(
+      'info',
+      'rth-height',
+      `Pulang otomatis di ${rth} m, lurus ke titik lepas landas tanpa menghindar. Pastikan tidak ada pohon, menara, atau bangunan yang lebih tinggi dari itu di garis antara lahan dan titik pulang.`
+    );
+  }
+
   if (adv.rcLostAction && adv.rcLostAction !== 'goBack') {
     add(
       'bad',
