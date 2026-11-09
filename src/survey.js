@@ -27,6 +27,77 @@ export function polygonArea(xy) {
 }
 
 /**
+ * Lebar tersempit poligon: jarak terkecil antara dua garis sejajar yang masih
+ * mengapitnya.
+ *
+ * Dipakai untuk menjawab "apakah satu foto sudah melintasi seluruh lebar
+ * lahan". Dulu yang dipakai akar dari luasnya, dan itu diam-diam
+ * mengandaikan lahannya bujursangkar. Luas 1950 m² memang 44 x 44 m KALAU
+ * bujursangkar — tapi bisa juga 100 x 19.5 m, dan di strip selebar 19.5 m
+ * satu frame 105 m sudah melintasinya lima kali lipat sementara akar luasnya
+ * (44 m) membuat pemeriksaan itu lolos begitu saja. Sawah di Indonesia justru
+ * sering berbentuk strip panjang.
+ *
+ * Dihitung dari cangkang cembungnya: untuk tiap sisi cangkang, dicari titik
+ * terjauh tegak lurus dari sisi itu; yang terkecil di antara semuanya adalah
+ * lebarnya. Untuk lahan cekung hasilnya jadi lebar cangkangnya — lebih besar
+ * dari lebar sebenarnya, jadi pemeriksaannya cuma kurang galak, tidak keliru.
+ */
+export function polygonMinWidth(xy) {
+  const titik = convexHull(xy);
+  const n = titik.length;
+  if (n < 3) {
+    if (n < 2) return 0;
+    return 0; // segaris: tidak punya lebar sama sekali
+  }
+
+  let min = Infinity;
+  for (let i = 0; i < n; i++) {
+    const [x1, y1] = titik[i];
+    const [x2, y2] = titik[(i + 1) % n];
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-9) continue;
+
+    let jauh = 0;
+    for (const [px, py] of titik) {
+      jauh = Math.max(jauh, Math.abs((px - x1) * dy - (py - y1) * dx) / len);
+    }
+    min = Math.min(min, jauh);
+  }
+  return Number.isFinite(min) ? min : 0;
+}
+
+/** Cangkang cembung, rantai monoton Andrew. Urut berlawanan arah jarum jam. */
+function convexHull(xy) {
+  const p = [...xy].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length < 3) return p;
+
+  const silang = (o, a, b) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+
+  const bawah = [];
+  for (const q of p) {
+    while (bawah.length >= 2 && silang(bawah[bawah.length - 2], bawah[bawah.length - 1], q) <= 0)
+      bawah.pop();
+    bawah.push(q);
+  }
+
+  const atas = [];
+  for (let i = p.length - 1; i >= 0; i--) {
+    const q = p[i];
+    while (atas.length >= 2 && silang(atas[atas.length - 2], atas[atas.length - 1], q) <= 0)
+      atas.pop();
+    atas.push(q);
+  }
+
+  bawah.pop();
+  atas.pop();
+  return bawah.concat(atas);
+}
+
+/**
  * Apakah batas poligonnya memotong dirinya sendiri?
  *
  * Ini bukan kerewelan geometri, melainkan satu-satunya penjelasan untuk angka

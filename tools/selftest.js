@@ -30,6 +30,7 @@ import {
   splitByRole,
   offsetPolygon,
   polygonArea,
+  polygonMinWidth,
   selfIntersects,
   centroid,
 } from '../src/survey.js';
@@ -1238,6 +1239,33 @@ console.log('\nBentuk lahan');
   ok(!selfIntersects(segiDuaBelas), 'poligon 12 titik tidak dianggap menyilang');
   ok(!selfIntersects([[0, 0], [100, 0], [50, 80]]), 'segitiga tidak dianggap menyilang');
   ok(selfIntersects(dasi), 'dasi kupu-kupu ketahuan menyilang');
+
+  // Lebar lahan yang sebenarnya, bukan akar luasnya.
+  //
+  // Luas 1950 m² memang 44 x 44 m KALAU bujursangkar. Strip 100 x 19.5 m
+  // luasnya sama persis, tapi sisi sempitnya 19.5 m — dan akar luas membuat
+  // pemeriksaan "satu foto selebar lahan" lolos begitu saja di sana.
+  {
+    const sisiBujur = Math.sqrt(1950); // supaya luasnya sama persis dengan stripnya
+    const bujur = [[0, 0], [sisiBujur, 0], [sisiBujur, sisiBujur], [0, sisiBujur]];
+    const strip = [[0, 0], [100, 0], [100, 19.5], [0, 19.5]];
+    const stripMiring = strip.map(([x, y]) => [
+      x * Math.SQRT1_2 - y * Math.SQRT1_2,
+      x * Math.SQRT1_2 + y * Math.SQRT1_2,
+    ]);
+
+    ok(near(polygonMinWidth(bujur), sisiBujur, 0.1), 'lebar bujursangkar = sisinya');
+    ok(near(polygonMinWidth(strip), 19.5, 0.1), 'lebar strip = sisi pendeknya, bukan akar luasnya');
+    ok(
+      near(polygonMinWidth(stripMiring), 19.5, 0.1),
+      'dan strip yang diputar 45 derajat lebarnya tetap sama',
+      polygonMinWidth(stripMiring).toFixed(1) + ' m'
+    );
+    ok(
+      near(polygonArea(strip), polygonArea(bujur), 2),
+      'padahal luas keduanya sama — itulah kenapa akar luas tidak cukup'
+    );
+  }
   // Titik tengah: rata-rata titik sudut jatuh DI LUAR lahan bentuk L, titik
   // berat luasnya tidak. Di aplikasi ini titik itu posisi awal penanda lepas
   // landas, jadi "di luar lahan" bukan ketidaktelitian — itu tempat yang tidak

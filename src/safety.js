@@ -12,7 +12,7 @@
 // dibatasi, itu harus muncul di sini sebagai kalimat, bukan dipotong di
 // belakang layar.
 
-import { climbDemand, selfIntersects } from './survey.js';
+import { climbDemand, selfIntersects, polygonMinWidth, PATTERNS } from './survey.js';
 
 const pct = (v) => `${Math.round(v * 100)}%`;
 
@@ -320,29 +320,68 @@ export function evaluateSafety(plan, profile, o = {}) {
       );
     }
 
-    if (fp?.w > 0 && sisi > 0 && plan.pattern !== 'orbit' && fp.w >= sisi) {
+    // Lebar lahan yang SEBENARNYA, bukan akar dari luasnya.
+    //
+    // Akar luas diam-diam mengandaikan lahannya bujursangkar. Luas 1950 m²
+    // memang 44 x 44 m kalau bujursangkar, tapi bisa juga 100 x 19.5 m — dan
+    // di strip selebar 19.5 m satu frame 105 m sudah melintasinya lima kali
+    // lipat, sementara akar luasnya (44 m) membuat pemeriksaan ini lolos
+    // begitu saja. Sawah justru sering berbentuk strip panjang.
+    const lebar = polygonMinWidth(plan.polyXY ?? []);
+
+    if (fp?.w > 0 && lebar > 0 && plan.pattern !== 'orbit' && fp.w >= lebar) {
       // Jejak foto lurus sebanding dengan ketinggian, jadi ketinggian yang
       // membuat lebar jejak jadi separuh lebar lahan tinggal dihitung lurus —
       // TAPI tidak boleh menembus lantai yang ditentukan bangunannya.
-      const dariLahan = Math.round(((plan.altitude * (sisi / 2)) / fp.w) / 5) * 5;
+      const dariLahan = Math.round(((plan.altitude * (lebar / 2)) / fp.w) / 5) * 5;
       const saran = Math.max(lantai, dariLahan);
 
       // Kalau lantainya sendiri masih menghasilkan jejak selebar lahan, grid
       // memang bukan alatnya. Bukan "turunkan sedikit lagi" — pada ketinggian
-      // serendah apa pun yang masih aman, satu frame tetap memuat seluruh
-      // lahan. Yang mendekati bangunan dari samping tanpa melintas di atasnya
-      // adalah orbit, dan pola itu sudah ada di aplikasi ini.
+      // serendah apa pun yang masih aman, satu frame tetap melintasi seluruh
+      // lebar lahan. Yang mendekati bangunan dari samping tanpa melintas di
+      // atasnya adalah orbit, dan pola itu sudah ada di aplikasi ini.
       const jejakDiLantai = (fp.w * saran) / plan.altitude;
-      const buntu = jejakDiLantai >= sisi;
+      const buntu = jejakDiLantai >= lebar;
 
-      add(
-        'warn',
-        'terlalu-tinggi-untuk-lahan',
-        `Di ${plan.altitude.toFixed(0)} m, satu foto sudah menutupi ${fp.w.toFixed(0)} x ${fp.h.toFixed(0)} m — sementara lahannya cuma sekitar ${sisi.toFixed(0)} x ${sisi.toFixed(0)} m. Jadi tiap jepretan memuat seluruh lahan, dan foto berikutnya nyaris mengulang yang sebelumnya dari posisi yang nyaris sama. Fotonya sedikit bukan karena hitungannya hemat, melainkan karena tidak ada lagi yang bisa dilihat — dan model 3D dibangun dari beda sudut pandang antar foto, bukan dari banyaknya piksel. ` +
-          (buntu
-            ? `Menurunkan ketinggian tidak menyelesaikan ini: bangunan ${objek > 0 ? `${objek} m` : 'di lahan ini'} menuntut minimal sekitar ${saran} m, dan di ${saran} m pun satu frame masih selebar ${jejakDiLantai.toFixed(0)} m. Untuk objek tunggal di lahan sesempit ini, yang tepat pola ORBIT — drone memutarinya dari samping, bukan melintas di atasnya.`
-            : `Coba turun ke sekitar ${saran} m${objek > 0 ? ` — itu sudah termasuk ${JARAK_AMAN_ATAS} m jarak aman di atas bangunan ${objek} m` : ''}.`)
-      );
+      // Satu frame yang melintasi LEBAR lahan belum tentu memuat seluruh
+      // lahan: di strip panjang dia cuma melintasi sisi pendeknya. Bedanya
+      // nyata bagi yang membaca, jadi kalimatnya ikut berbeda.
+      const seluruhnya = sisi > 0 && fp.w >= sisi && fp.h >= sisi;
+      const pembuka =
+        `Di ${plan.altitude.toFixed(0)} m, satu foto menutupi ${fp.w.toFixed(0)} x ${fp.h.toFixed(0)} m — sementara sisi tersempit lahannya cuma sekitar ${lebar.toFixed(0)} m. ` +
+        (seluruhnya
+          ? 'Jadi tiap jepretan memuat seluruh lahan, dan foto berikutnya nyaris mengulang yang sebelumnya dari posisi yang nyaris sama. '
+          : 'Jadi tiap jepretan sudah melintasi seluruh lebar lahan dalam sekali lintas. ');
+
+      // Akibatnya BEDA menurut polanya, dan menyamakannya pernah membuat
+      // peringatan ini menyuruh pakai orbit di peta datar sawah yang tidak
+      // punya bangunan sama sekali.
+      //
+      // Pola 3D: fotonya sedikit itu masalah, karena rekonstruksi hidup dari
+      // beda sudut pandang antar foto. Peta datar: fotonya sedikit bukan
+      // masalah — ortofoto strip sempit memang tidak butuh banyak. Yang
+      // dilewatkan di situ cuma KETELITIAN: di lahan sesempit itu ketinggian
+      // bisa diturunkan dan GSD-nya membaik tanpa menambah lintasan.
+      if (PATTERNS[plan.pattern]?.mixedGimbal) {
+        add(
+          'warn',
+          'terlalu-tinggi-untuk-lahan',
+          pembuka +
+            'Fotonya sedikit bukan karena hitungannya hemat, melainkan karena tidak ada lagi yang bisa dilihat — dan model 3D dibangun dari beda sudut pandang antar foto, bukan dari banyaknya piksel. ' +
+            (buntu
+              ? `Menurunkan ketinggian tidak menyelesaikan ini: ${objek > 0 ? `bangunan ${objek} m` : 'jarak aman di atas objeknya'} menuntut minimal sekitar ${saran} m, dan di ${saran} m pun satu frame masih selebar ${jejakDiLantai.toFixed(0)} m. Untuk objek tunggal di lahan sesempit ini, yang tepat pola ORBIT — drone memutarinya dari samping, bukan melintas di atasnya.`
+              : `Coba turun ke sekitar ${saran} m${objek > 0 ? ` — itu sudah termasuk ${JARAK_AMAN_ATAS} m jarak aman di atas bangunan ${objek} m` : ''}.`)
+        );
+      } else {
+        const gsdSaran = ((plan.params.gsd ?? 0) * saran) / plan.altitude;
+        add(
+          'info',
+          'ketinggian-boros-ketelitian',
+          pembuka +
+            `Untuk ortofoto itu tidak salah — lahan sesempit ini memang tidak butuh banyak foto. Yang dilewatkan cuma ketelitiannya: turun ke sekitar ${saran} m memberi ${gsdSaran.toFixed(2)} cm/px, bukan ${(plan.params.gsd ?? 0).toFixed(2)}, dan di lahan selebar ini jumlah lintasannya tidak banyak bertambah.`
+        );
+      }
     }
   }
 

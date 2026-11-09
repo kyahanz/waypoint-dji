@@ -667,6 +667,31 @@ Contoh nyatanya persis kasus di atas: bangunan 20 m di lahan 44 × 44 m menuntut
 minimal ~35 m, dan di 35 m satu frame masih 53 m — lebih lebar dari lahannya.
 Grid memang bukan alatnya di situ.
 
+#### Dan "lebar lahan" itu sisi tersempitnya, bukan akar luasnya
+
+Angka 44 × 44 m di atas datang dari akar luas 1950 m², dan itu **mengandaikan
+lahannya bujursangkar**. Luas yang sama persis bisa juga berbentuk 100 × 19.5 m
+— dan di strip selebar 19,5 m, satu frame 105 m sudah melintasinya lima kali
+lipat, sementara akar luasnya (44 m) membuat pemeriksaan itu lolos begitu saja.
+Sawah justru sering berbentuk strip panjang.
+
+Jadi yang dipakai sekarang **lebar tersempit poligonnya** (`polygonMinWidth`):
+jarak terkecil antara dua garis sejajar yang masih mengapit lahan, dihitung
+dari cangkang cembungnya. Hasilnya tidak berubah kalau lahannya digambar
+miring, dan di lahan cekung dia memberi lebar cangkangnya — lebih besar dari
+yang sebenarnya, jadi pemeriksaannya cuma kurang galak, bukan keliru.
+
+Akibat sempitnya lahan juga **berbeda menurut polanya**, dan menyamakannya
+sempat membuat peringatan ini menyarankan pola Orbit untuk peta datar sawah
+yang tidak punya bangunan sama sekali:
+
+- **Pola 3D** — fotonya sedikit itu masalah, karena rekonstruksi hidup dari
+  beda sudut pandang antar foto. Ini yang jadi peringatan.
+- **Peta datar** — fotonya sedikit bukan masalah; ortofoto strip sempit memang
+  tidak butuh banyak. Yang dilewatkan cuma **ketelitian**, jadi bentuknya
+  catatan biasa: "turun ke ~20 m memberi 0.73 cm/px, bukan 2.56, dan jumlah
+  lintasannya tidak banyak bertambah."
+
 Masih di keluarga yang sama: **buffer tepi diukur dalam kelipatan jarak
 jalur**, dan jarak jalur tidak tahu lahannya seberapa. Di sawah 10 ha satu
 jarak jalur itu pinggiran tipis; di petak 1950 m² satu jarak jalur (31 m)
