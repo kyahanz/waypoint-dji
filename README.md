@@ -359,9 +359,11 @@ selalu siap ambil alih manual saat menerbangkannya.
 - **Preset Cepat / Standar / Detail** — menyimpan ketelitian yang dituju, bukan
   ketinggian mati, jadi artinya tetap sama waktu drone diganti. Geser slider
   apa pun dan presetnya berubah jadi Custom.
-- **Pola terbang** — peta datar, silang (double grid), silang + miring untuk
-  model 3D, atau orbit untuk objek tegak. Biayanya ditampilkan sebelum
-  berangkat, bukan setelah.
+- **Pola terbang** — peta datar, silang, silang + miring, 3D bangunan
+  (nadir + miring dalam satu file), atau orbit untuk objek tegak. Biayanya
+  ditampilkan sebelum berangkat, bukan setelah.
+- **Ketelitian yang jujur untuk kamera miring** — GSD dihitung dari jarak ke
+  permukaan, bukan dari ketinggian terbang. Di gimbal -45° bedanya 41%.
 - **Ikuti kontur tanah** — plus peringatan kalau lereng menuntut laju naik di
   atas kemampuan drone.
 - **Peta 2D / 3D / objek** — medan timbul dari DEM, dan bangunan OSM sebagai
@@ -371,6 +373,72 @@ selalu siap ambil alih manual saat menerbangkannya.
 - **Gerbang keselamatan** — satu pintu yang semua rencana harus lewati.
   Aplikasi tidak pernah diam-diam membetulkan angka; kalau ada yang berbahaya,
   dia bilang.
+
+## Memilih pola menurut fungsinya
+
+Jumlah foto itu **hasil**, bukan setelan:
+
+```
+foto ≈ luas ÷ (jarak jalur × jarak foto) × jumlah lintasan
+```
+
+Dan karena jarak jalur/foto turun dari ketinggian, dan ketinggian turun dari
+GSD — begitu luas dan GSD dipilih, jumlah fotonya sudah ditentukan. Tidak ada
+tombol "3D tapi 200 foto".
+
+Dua batas keras yang kebetulan ketemu di titik yang sama: DJI Fly cuma
+menerima **200 waypoint per file**, dan baterai Mini 5 Pro kepakai ~22 menit.
+Keduanya habis di sekitar **196 foto**. Itu unit alami kerjanya.
+
+| Fungsi | Pola | Gimbal | GSD | Overlap |
+|---|---|---|---|---|
+| Ortofoto, ukur luas, lihat kondisi | Peta datar | -90° | 2.5–3.5 cm | 75/65 |
+| Peta 3D kasar: volume, massing, bentuk atap | Silang | -90° | 3–4 cm | 80/70 |
+| Model 3D bangunan, fasad kebaca | 3D bangunan | -90° + -45° | 1.5–2.5 cm di fasad | 80/70 |
+| Fasad saja, atap sudah dapat dari misi lain | Silang + miring | -45° | 1.5–2.5 cm di fasad | 80/70 |
+| Objek tunggal: tugu, menara, patung | Orbit objek | per cincin | 0.5–1 cm | langkah sudut 10° |
+
+Luas maksimum yang masih muat satu file untuk 3D bangunan, Mini 5 Pro 12 MP:
+
+| GSD di fasad | Tinggi | Luas | Foto | Waktu |
+|---|---|---|---|---|
+| 2.12 cm | 41 m | 64×64 m (0.41 ha) | 165 | 14m |
+| 2.83 cm | 55 m | 86×86 m (0.74 ha) | 165 | 16m |
+| 3.54 cm | 68 m | 106×106 m (1.12 ha) | 165 | 18m |
+| 4.95 cm | 96 m | 150×150 m (2.25 ha) | 165 | 21m |
+
+Satu rumah 40×40 m pada GSD fasad 3.54 cm: **63 foto, di bawah 5 menit.**
+Peta datar untuk lahan yang sama 21 foto. Angka 400-an muncul cuma kalau
+lahannya hektaran.
+
+Yang lebih menentukan hasil daripada jumlah foto, dan tidak muncul di angka
+mana pun: tiap permukaan harus terlihat dari minimal tiga sudut berbeda
+(400 foto satu arah lebih jelek dari 150 foto empat arah), exposure dan white
+balance dikunci manual, dan cahaya yang rata — mendung tipis lebih baik
+daripada siang tegak.
+
+## Kamera miring: angka di layar bukan angka yang didapat
+
+Ini bug yang hidup lama di aplikasi ini. `gsdFromAltitude` dan `footprint`
+mengandaikan kamera menunduk lurus, padahal pola miring tidak pernah begitu.
+
+Pada gimbal -45° di ketinggian 80 m, jarak ke tengah frame **113 m, bukan
+80 m**. Jadi ketelitiannya 4.14 cm/px, bukan 2.93 cm/px yang dilaporkan — dan
+karena tidak ada satu pun foto yang nunduk lurus di pola itu, angka 2.93 tidak
+mewakili satu piksel pun di dataset. Di -30° melesetnya 100%.
+
+Yang diperbaiki: `surfaceGsd()` menghitung ketelitian di tengah frame dan di
+kedua tepinya, dan itulah yang ditampilkan. Satu foto miring membentang jauh:
+pada -45° tepi dekatnya 22 m di depan drone dengan 3.04 cm/px, tepi jauhnya
+286 m dengan 10.87 cm/px.
+
+Yang **tidak** diubah: jarak jalur dan jarak foto tetap dihitung dari geometri
+nadir. Itu disengaja. Frame miring adalah trapesium sedalam ratusan meter, dan
+sebagian besar kedalamannya terlalu kasar untuk dipakai. Melebarkan jarak
+sampai overlap "pas 80%" dari trapesium penuh justru menjarangkan bagian
+dekat-tengah — satu-satunya bagian yang berguna. Hasilnya overlap efektif
+lebih tinggi dari yang diminta (79% samping / 93% depan pada -45°), dan itu
+memang yang dipakai perencana komersial.
 
 ## Dua cara melihat objek
 

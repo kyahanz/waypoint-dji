@@ -20,6 +20,7 @@ import {
   maxDistanceFrom,
   altitudeFromGsd,
   gsdFromAltitude,
+  surfaceGsd,
 } from '../src/survey.js';
 import {
   resolveProfile,
@@ -490,6 +491,7 @@ const els = {
   alt: $('alt'),
   altOut: $('alt-out'),
   gsdDerived: $('gsd-derived'),
+  gsdObliqueNote: $('gsd-oblique-note'),
   speed: $('speed'),
   speedOut: $('speed-out'),
   speedAuto: $('speed-auto'),
@@ -889,12 +891,25 @@ function syncOrbitInputs() {
   syncPatternFields();
 }
 
+// Akhiran nama file per pola. Dulu semua yang bukan peta datar disebut
+// '-silang', dan 3D bangunan ikut kebawa — nama file yang menyebut pola yang
+// salah bikin susah waktu ada beberapa KMZ di satu folder HP.
+const PATTERN_SUFFIX = {
+  single: '',
+  cross: '-silang',
+  crossOblique: '-silang-miring',
+  building3d: '-3d',
+  orbit: '-orbit',
+};
+
 const PATTERN_HINT = {
   single: 'Satu arah, kamera nunduk lurus. Untuk ortofoto dan ukur luas.',
   cross:
     'Dua arah menyilang 90°. Objek tegak terpotret dari dua sisi, jadi model 3D-nya tidak bolong. Foto dan waktu jadi dua kali lipat.',
   crossOblique:
-    'Dua arah menyilang, kamera dimiringkan. Ini yang menangkap dinding tegak — untuk model bangunan. Dua kali lipat juga.',
+    'Dua arah menyilang, kamera dimiringkan ke -45°. Menangkap dinding tegak, tapi tidak ada satu pun foto yang nunduk lurus — atap cuma kena dari serong. Dua kali lipat foto.',
+  building3d:
+    'Satu lintasan nadir -90° plus dua lintasan miring -45° menyilang, dalam satu file. Inilah bentuk yang dipakai orang untuk model bangunan: nadir mengikat atap dan skala tanah, miring mengisi fasad. Tiga kali lipat foto.',
   orbit:
     'Mengelilingi satu objek tegak di beberapa tingkat ketinggian, kamera selalu menghadap ke dalam. Untuk tugu, menara, patung — benda yang sempit tapi tinggi, yang isinya ada di dinding, bukan di tanah.',
 };
@@ -930,11 +945,11 @@ els.patternSeg.querySelectorAll('[data-pattern]').forEach((btn) => {
     els.patternHint.textContent = PATTERN_HINT[state.pattern];
     syncPatternFields();
 
-    // Di orbit, gimbal TIDAK boleh ikut satu angka: tiap cincin punya
-    // pitch-nya sendiri, dihitung dari sudut bidiknya. Memasang satu nilai di
-    // sini akan menimpa semuanya dan mengembalikan orbit jadi lingkaran datar
-    // yang menyorot ke satu arah.
-    if (state.pattern !== 'orbit') {
+    // Pola yang mencampur sudut gimbal TIDAK boleh ikut satu angka: tiap
+    // lintasan (atau tiap cincin, di orbit) punya pitch-nya sendiri. Memasang
+    // satu nilai di sini akan menimpa semuanya — orbit jadi lingkaran datar
+    // yang menyorot satu arah, dan 3D bangunan kehilangan lintasan nadirnya.
+    if (state.pattern !== 'orbit' && !PATTERNS[state.pattern]?.mixedGimbal) {
       // Gimbal mengikuti pola, karena itulah yang membedakan silang biasa dari
       // silang yang benar-benar berguna untuk 3D. Tetap bisa diubah manual.
       state.advanced.gimbalPitch = PATTERNS[state.pattern].gimbalPitch;
@@ -1643,8 +1658,19 @@ function buildPlan() {
   const area = polygonArea(polyXY);
 
   const lim = profile.limits;
+
+  // Sudut gimbal mana yang dipakai untuk melaporkan ketelitian. Yang dipilih
+  // adalah yang PALING MIRING dari nadir di antara yang benar-benar dipakai,
+  // karena itulah yang GSD-nya paling kasar — dan angka terburuk yang jujur
+  // lebih berguna daripada angka terbaik yang menyenangkan.
+  const usedPitches = PATTERNS[state.pattern]?.mixedGimbal
+    ? PATTERNS[state.pattern].passSpecs.map((x) => x.gimbalPitch)
+    : [state.advanced.gimbalPitch];
+  const worstPitch = usedPitches.reduce((a, b) => (Math.abs(a) < Math.abs(b) ? a : b));
+
   const params = computeSurveyParams(profile.camera, {
     altitudeM: state.altitudeM,
+    gimbalPitchDeg: worstPitch,
     frontOverlap: Number(els.front.value) / 100,
     sideOverlap: Number(els.side.value) / 100,
     // Jeda jepret ikut mode foto: 48 MP tidak bisa dijepret secepat 12 MP,
@@ -2079,7 +2105,16 @@ function updateDerived(plan) {
     : plan
       ? `otomatis · ${plan.advanced.angleDeg}°`
       : 'otomatis';
-  els.gimbalOut.textContent = `${state.advanced.gimbalPitch}°`;
+  // Pola yang mencampur sudut gimbal memegang nilainya sendiri per lintasan.
+  // Slider-nya dimatikan, bukan dibiarkan terlihat berfungsi padahal angkanya
+  // tidak pernah sampai ke file.
+  const mixedGimbal = !!PATTERNS[state.pattern]?.mixedGimbal || state.pattern === 'orbit';
+  els.gimbal.disabled = mixedGimbal;
+  els.gimbalOut.textContent = mixedGimbal
+    ? state.pattern === 'orbit'
+      ? 'per cincin'
+      : 'per lintasan'
+    : `${state.advanced.gimbalPitch}°`;
 
   // DJI Fly tidak memakai takeOffSecurityHeight sama sekali — itu terbaca
   // dari file aslinya. Jadi kontrolnya dimatikan, bukan dibiarkan terlihat
@@ -2108,7 +2143,26 @@ function updateDerived(plan) {
   els.altOut.textContent = `${state.altitudeM} m`;
 
   const gsd = gsdFromAltitude(state.profile.camera, state.altitudeM);
-  els.gsdDerived.textContent = `${gsd.toFixed(2)} cm/px`;
+
+  // Angka nadir itu dasar hitungan jarak jalur, tapi untuk pola miring dia
+  // BUKAN ketelitian yang didapat — dan dulu cuma angka inilah yang tampil.
+  const pitchForGsd = PATTERNS[state.pattern]?.mixedGimbal
+    ? PATTERNS[state.pattern].passSpecs
+        .map((x) => x.gimbalPitch)
+        .reduce((a, b) => (Math.abs(a) < Math.abs(b) ? a : b))
+    : state.advanced.gimbalPitch;
+
+  const sg = surfaceGsd(state.profile.camera, state.altitudeM, pitchForGsd);
+  const isOblique = state.pattern !== 'orbit' && sg.tiltDeg > 5;
+
+  els.gsdDerived.textContent = `${(isOblique ? sg.centerCm : gsd).toFixed(2)} cm/px`;
+  els.gsdObliqueNote.hidden = !isOblique;
+  if (isOblique) {
+    els.gsdObliqueNote.textContent =
+      `Kamera miring ${pitchForGsd}°, jadi jarak ke permukaan ${sg.slantM.toFixed(0)} m — bukan ${state.altitudeM} m. ` +
+      `Nadir setara ${gsd.toFixed(2)} cm/px, tapi yang mendarat di dinding ${sg.centerCm.toFixed(2)} cm/px di tengah frame ` +
+      `(${sg.nearCm.toFixed(2)} di tepi dekat, ${sg.farCm.toFixed(2)} di tepi jauh). Yang berguna buat olah cuma bagian dekat-tengah.`;
+  }
 
   const p = computeSurveyParams(state.profile.camera, {
     altitudeM: state.altitudeM,
@@ -2280,6 +2334,19 @@ function renderOrbitRings(plan) {
     <p class="sub">Kaki objek 0–${orb.rings[0].aimHeightM.toFixed(1)} m tidak terjangkau drone. Keliling bagian itu dengan kamera tangan, lalu gabungkan di software olah yang sama.</p>`;
 }
 
+/**
+ * Sudut gimbal yang benar-benar dipakai rencana ini.
+ *
+ * Satu angka tidak lagi cukup sejak ada pola yang mencampur nadir dan miring:
+ * menampilkan "-45°" untuk 3D bangunan menyembunyikan justru lintasan yang
+ * membuat pola itu ada.
+ */
+function gimbalLabel(plan) {
+  const list = plan.grid?.gimbalPitches;
+  if (!list || list.length <= 1) return `${plan.gimbalPitch}°`;
+  return list.map((v) => `${v}°`).join(' + ');
+}
+
 function renderStats(plan) {
   if (plan.pattern === 'orbit') return renderOrbitStats(plan);
   els.stats.className = 'stats';
@@ -2301,7 +2368,7 @@ function renderStats(plan) {
     </div>
     <div class="stat">
       <span class="k">Ketelitian</span>
-      <span class="v">${plan.params.gsd.toFixed(2)}<small>cm/px</small></span>
+      <span class="v">${plan.params.surfaceGsd.toFixed(2)}<small>cm/px</small></span>
     </div>
     <div class="stat">
       <span class="k">Jumlah foto</span>
@@ -2329,7 +2396,7 @@ function renderStats(plan) {
     </div>
     <div class="stat full">
       <span class="k">Drone · lensa · pola</span>
-      <span class="v sm">${esc(state.profile.name)} · ${esc(state.profile.lens.name)} ${esc(state.profile.mode.label)} · ${esc(plan.patternName)} ${plan.gimbalPitch}°</span>
+      <span class="v sm">${esc(state.profile.name)} · ${esc(state.profile.lens.name)} ${esc(state.profile.mode.label)} · ${esc(plan.patternName)} ${esc(gimbalLabel(plan))}</span>
     </div>`;
 }
 
@@ -2768,7 +2835,10 @@ function planWaypointsToMission(plan, sortie) {
       // titik: tiap cincin punya pitch-nya sendiri, dan di petak nadir di atas
       // kameranya nunduk lurus.
       headingMode: orbit ? (w.poi ? plan.orbitHeadingMode : 'followWayline') : 'followWayline',
-      gimbalPitch: orbit ? (w.gimbalPitch ?? plan.gimbalPitch) : plan.gimbalPitch,
+      // Titik yang membawa sudutnya sendiri menang: itu dipasang generator
+      // untuk pola yang mencampur nadir dan miring. Yang tidak membawa apa-apa
+      // ikut sudut misi, yang masih bisa digeser manual di panel lanjutan.
+      gimbalPitch: w.gimbalPitch ?? plan.gimbalPitch,
       takePhoto: true,
       // Jeda sejenak hanya di mode stop & shoot. Di mode jalan terus drone
       // melintas sambil menjepret, dan itulah bedanya sekarang — bukan lagi
@@ -2812,7 +2882,7 @@ async function exportKmz() {
     const base =
       (els.projName.value.trim() || 'survei').replace(/[^\w\-]+/g, '-') +
       (plan.resume ? '-lanjut' : '') +
-      (plan.pattern === 'orbit' ? '-orbit' : plan.pattern === 'single' ? '' : '-silang');
+      PATTERN_SUFFIX[plan.pattern];
     const stamp = new Date().toISOString().slice(0, 10);
 
     // buildKmz sekarang asinkron karena kompresinya memakai CompressionStream.

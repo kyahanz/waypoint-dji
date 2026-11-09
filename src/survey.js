@@ -54,6 +54,67 @@ export function footprint(cam, altM) {
   };
 }
 
+// ---------- Kamera miring ----------
+//
+// Semua hitungan di atas mengandaikan kamera menunduk LURUS. Untuk pola
+// miring itu tidak berlaku, dan bedanya besar: pada gimbal -45° di 80 m,
+// jarak ke tengah frame bukan 80 m melainkan 113 m — jadi GSD-nya 41% lebih
+// kasar dari angka nadir. Di -30° melesetnya 100%.
+//
+// Yang lebih halus: di pola miring tidak ada SATU PUN foto yang menunduk
+// lurus, jadi angka GSD nadir tidak mewakili satu piksel pun di dataset.
+// Itulah kenapa fungsi-fungsi ini ada, dan kenapa yang ditampilkan ke layar
+// harus yang keluar dari sini.
+
+const RAD = Math.PI / 180;
+
+/**
+ * Sudut pandang dari arah nadir, dari sudut pitch gimbal.
+ * -90 (nunduk lurus) -> 0°; -45 -> 45°; -30 -> 60°.
+ */
+export function tiltFromNadirDeg(gimbalPitchDeg) {
+  return 90 - Math.abs(gimbalPitchDeg);
+}
+
+/** Jarak miring dari kamera ke tengah frame, dalam meter. */
+export function slantRange(altM, gimbalPitchDeg) {
+  const tilt = tiltFromNadirDeg(gimbalPitchDeg);
+  // Di atas 85° dari nadir kamera praktis menatap cakrawala; jarak miringnya
+  // meledak dan angkanya berhenti berarti. Dibatasi supaya tidak ada Infinity
+  // yang menyelinap ke layar sebagai angka yang kelihatan sah.
+  return altM / Math.cos(Math.min(tilt, 85) * RAD);
+}
+
+/**
+ * GSD yang benar-benar mendarat di permukaan yang dipotret, untuk kamera
+ * pada sudut tertentu — di tengah frame, dan di kedua tepinya.
+ *
+ * Tepi jauh itu yang sering mengejutkan: pada -45° dengan FOV vertikal 59°,
+ * tepi jauh frame mendarat 286 m di depan drone dengan GSD 11 cm/px, sementara
+ * tepi dekatnya 22 m dengan 3.1 cm/px. Satu foto, selisih ketelitian 3.5 kali.
+ * Yang berguna untuk rekonstruksi cuma bagian dekat-tengah.
+ */
+export function surfaceGsd(cam, altM, gimbalPitchDeg = -90) {
+  const tilt = tiltFromNadirDeg(gimbalPitchDeg);
+  const halfVDeg = (Math.atan(cam.sensorHeightMm / (2 * cam.focalLengthMm)) / RAD);
+
+  const at = (deg) => gsdFromAltitude(cam, altM / Math.cos(Math.min(Math.max(deg, 0), 85) * RAD));
+  const groundAt = (deg) => altM * Math.tan(Math.min(Math.max(deg, 0), 85) * RAD);
+
+  return {
+    tiltDeg: tilt,
+    halfVDeg,
+    slantM: slantRange(altM, gimbalPitchDeg),
+    centerCm: at(tilt),
+    nearCm: at(tilt - halfVDeg),
+    farCm: at(tilt + halfVDeg),
+    nearM: groundAt(tilt - halfVDeg),
+    farM: groundAt(tilt + halfVDeg),
+    // Berapa kali lebih kasar dari angka nadir yang selama ini ditampilkan.
+    vsNadir: at(tilt) / gsdFromAltitude(cam, altM),
+  };
+}
+
 /**
  * Batas kecepatan supaya motion blur tidak melebihi toleransi.
  * Mini 5 Pro pakai rolling shutter, jadi ini bukan sekadar saran.
@@ -80,6 +141,10 @@ export function computeSurveyParams(cam, input) {
     shutterSec = 1 / 500,
     blurPx = 1,
     minIntervalSec = 2,
+    // Sudut gimbal pola ini. Tidak mengubah jarak jalur maupun jarak foto —
+    // itu sengaja, lihat catatan di bawah — tapi menentukan GSD yang
+    // dilaporkan, yang sebelumnya selalu angka nadir meski kameranya miring.
+    gimbalPitchDeg = -90,
   } = input;
 
   const altitude = altitudeM ?? altitudeFromGsd(cam, gsdCm);
@@ -92,9 +157,31 @@ export function computeSurveyParams(cam, input) {
   const vBlur = maxSpeedForBlur(gsd, shutterSec, blurPx);
   const vInterval = maxSpeedForInterval(frontSpacing, minIntervalSec);
 
+  // Jarak jalur dan jarak foto SENGAJA tetap memakai geometri nadir, meski
+  // kameranya miring. Bukan kelalaian:
+  //
+  // Frame miring itu trapesium sedalam ratusan meter, dan sebagian besar
+  // kedalamannya terlalu kasar untuk dipakai (tepi jauh 11 cm/px). Kalau
+  // jaraknya dilebarkan sampai overlap "pas 80%" dari trapesium penuh, yang
+  // dijarangkan justru bagian dekat-tengah — satu-satunya bagian yang
+  // berguna. Memakai footprint nadir menghasilkan overlap efektif yang lebih
+  // tinggi dari yang diminta (79% samping / 93% depan pada -45°), dan itu
+  // memang yang dipakai perencana komersial.
+  //
+  // Yang TIDAK boleh ikut nadir adalah angka yang dibaca orang. Itu di bawah.
+  const surface = surfaceGsd(cam, altitude, gimbalPitchDeg);
+
   return {
     altitude,
+    // GSD nadir. Inilah dasar jarak jalur dan jarak foto, dan inilah angka
+    // yang dulu ditampilkan ke layar meski polanya miring.
     gsd,
+    // GSD yang benar-benar mendarat di permukaan. Untuk pola nadir dua-duanya
+    // sama; untuk pola miring, INI yang harus ditampilkan.
+    surfaceGsd: surface.centerCm,
+    surface,
+    gimbalPitchDeg,
+    oblique: Math.abs(gimbalPitchDeg) < 85,
     footprint: fp,
     sideSpacing,
     frontSpacing,
@@ -279,17 +366,67 @@ export function generateGrid(polyXY, o) {
  *   cross         — ditambah jalur menyilang 90°. Objek tegak terpotret dari
  *                   dua arah, jadi model 3D-nya tidak bolong di sisi yang
  *                   tidak pernah menghadap kamera.
- *   crossOblique  — cross, tapi kamera dimiringkan (lihat gimbalPitch di
- *                   pemanggilnya). Ini yang benar-benar menangkap dinding
+ *   crossOblique  — cross, tapi kamera dimiringkan. Ini yang menangkap dinding
  *                   tegak; cross saja dengan kamera nunduk lurus masih tipis.
+ *                   Tapi dia kehilangan nadirnya — lihat building3d.
+ *   building3d    — nadir + dua lintasan miring menyilang, dalam satu file.
+ *                   Inilah bentuk yang dipakai orang untuk model bangunan.
  *
- * Ongkosnya nyata: cross dan crossOblique melipatgandakan foto, waktu, dan
- * jumlah baterai. Pemanggil wajib menampilkan itu sebelum berangkat.
+ * Kenapa building3d perlu ada, padahal crossOblique sudah miring: di
+ * crossOblique TIDAK ADA satu pun foto yang menunduk lurus. Akibatnya atap
+ * cuma kena dari serong, dan tidak ada frame yang mengikat skala tanah.
+ * Lintasan nadir yang memperbaiki dua-duanya, dan ongkosnya ~50% foto.
+ *
+ * `passSpecs` menggantikan pasangan (passes, gimbalPitch) yang lama: tiap
+ * lintasan membawa pergeseran arahnya sendiri DAN sudut gimbalnya sendiri.
+ * Tanpa itu, satu angka gimbal dipasang ke semua titik dan nadir tidak mungkin
+ * dicampur dengan miring dalam satu misi.
+ *
+ * Ongkosnya nyata: tiap lintasan tambahan melipatkan foto, waktu, dan jumlah
+ * baterai. Pemanggil wajib menampilkan itu sebelum berangkat.
  */
 export const PATTERNS = {
-  single: { id: 'single', name: 'Peta datar', passes: 1, gimbalPitch: -90 },
-  cross: { id: 'cross', name: 'Silang', passes: 2, gimbalPitch: -90 },
-  crossOblique: { id: 'crossOblique', name: 'Silang + miring', passes: 2, gimbalPitch: -45 },
+  single: {
+    id: 'single',
+    name: 'Peta datar',
+    passes: 1,
+    gimbalPitch: -90,
+    passSpecs: [{ angleOffset: 0, gimbalPitch: -90 }],
+  },
+  cross: {
+    id: 'cross',
+    name: 'Silang',
+    passes: 2,
+    gimbalPitch: -90,
+    passSpecs: [
+      { angleOffset: 0, gimbalPitch: -90 },
+      { angleOffset: 90, gimbalPitch: -90 },
+    ],
+  },
+  crossOblique: {
+    id: 'crossOblique',
+    name: 'Silang + miring',
+    passes: 2,
+    gimbalPitch: -45,
+    passSpecs: [
+      { angleOffset: 0, gimbalPitch: -45 },
+      { angleOffset: 90, gimbalPitch: -45 },
+    ],
+  },
+  building3d: {
+    id: 'building3d',
+    name: '3D bangunan',
+    passes: 3,
+    // Angka wakil untuk ditampilkan; yang benar-benar dipakai ada di passSpecs,
+    // dan karena itulah pola ini mengunci slider gimbal manual.
+    gimbalPitch: -45,
+    mixedGimbal: true,
+    passSpecs: [
+      { angleOffset: 0, gimbalPitch: -90, role: 'nadir' },
+      { angleOffset: 0, gimbalPitch: -45, role: 'miring' },
+      { angleOffset: 90, gimbalPitch: -45, role: 'miring' },
+    ],
+  },
   // Orbit tidak punya "lintasan" dan tidak punya satu sudut gimbal: tiap
   // cincin punya pitch-nya sendiri. Dia ada di daftar ini supaya UI bisa
   // menamainya seperti pola lain, tapi jalurnya dibuat generateOrbit —
@@ -306,29 +443,52 @@ export function generatePattern(polyXY, o) {
     );
   }
   const spec = PATTERNS[pattern] ?? PATTERNS.single;
-  const angles = spec.passes === 1 ? [angleDeg] : [angleDeg, angleDeg + 90];
+  const specs = spec.passSpecs ?? [{ angleOffset: 0, gimbalPitch: spec.gimbalPitch }];
+
+  // Hanya pola yang BENAR-BENAR mencampur sudut gimbal yang menuliskannya
+  // per titik. Untuk pola bersudut seragam, titiknya sengaja dibiarkan kosong
+  // supaya slider gimbal manual di UI tetap berlaku — kalau diisi di sini,
+  // setelan pengguna akan ditimpa diam-diam.
+  const mixed = new Set(specs.map((x) => x.gimbalPitch)).size > 1;
 
   const lines = [];
   const waypoints = [];
   const passes = [];
   let photos = 0;
 
-  angles.forEach((ang, i) => {
+  specs.forEach((ps, i) => {
+    const ang = angleDeg + ps.angleOffset;
     const g = generateGrid(polyXY, { ...rest, angleDeg: ang });
-    for (const w of g.waypoints) w.pass = i;
+    for (const w of g.waypoints) {
+      w.pass = i;
+      if (mixed) w.gimbalPitch = ps.gimbalPitch;
+    }
     lines.push(...g.lines);
     waypoints.push(...g.waypoints);
     photos += g.photos;
     passes.push({
       index: i,
       angleDeg: ((ang % 360) + 360) % 360,
+      gimbalPitch: ps.gimbalPitch,
+      role: ps.role ?? null,
       photos: g.photos,
       waypoints: g.waypoints.length,
       lines: g.lines,
     });
   });
 
-  return { lines, waypoints, photos, passes, pattern: spec.id, gimbalPitch: spec.gimbalPitch };
+  return {
+    lines,
+    waypoints,
+    photos,
+    passes,
+    pattern: spec.id,
+    gimbalPitch: spec.gimbalPitch,
+    mixedGimbal: mixed,
+    // Sudut gimbal unik yang benar-benar dipakai, untuk ditampilkan dan
+    // dipakai gerbang keselamatan.
+    gimbalPitches: [...new Set(specs.map((x) => x.gimbalPitch))],
+  };
 }
 
 /**

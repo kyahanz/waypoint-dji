@@ -14,6 +14,10 @@ import {
   altitudeFromGsd,
   gsdFromAltitude,
   generatePattern,
+  PATTERNS,
+  surfaceGsd,
+  slantRange,
+  tiltFromNadirDeg,
   generateOrbit,
   ORBIT_DEFAULTS,
   missionDuration,
@@ -113,6 +117,106 @@ ok(cross.passes[1].angleDeg === 90, 'lintasan kedua menyilang 90°', `${cross.pa
 ok(cross.photos > single.photos * 1.8, 'silang hampir melipatgandakan foto', `${single.photos} -> ${cross.photos}`);
 ok(oblique.gimbalPitch === -45, 'silang + miring memiringkan gimbal ke -45°');
 ok(single.gimbalPitch === -90, 'peta datar tetap nunduk lurus');
+
+// ------------------------------------------------------- 3D bangunan
+
+console.log('\nPola 3D bangunan (nadir + miring dalam satu file)');
+{
+  const b3d = generatePattern(square, { ...gridOpts, pattern: 'building3d' });
+
+  ok(b3d.passes.length === 3, 'tiga lintasan');
+  ok(
+    b3d.passes.map((p) => p.gimbalPitch).join(',') === '-90,-45,-45',
+    'lintasan 1 nadir, lintasan 2 & 3 miring',
+    b3d.passes.map((p) => `${p.angleDeg}°@${p.gimbalPitch}`).join(' ')
+  );
+  ok(
+    b3d.passes[1].angleDeg === 0 && b3d.passes[2].angleDeg === 90,
+    'dua lintasan miring menyilang 90°'
+  );
+
+  // Inilah yang hilang di crossOblique, dan alasan pola ini ada.
+  ok(
+    b3d.waypoints.some((w) => w.gimbalPitch === -90),
+    'ADA foto nadir — yang tidak dimiliki silang + miring'
+  );
+  ok(
+    b3d.waypoints.some((w) => w.gimbalPitch === -45),
+    'dan ada foto miring di file yang sama'
+  );
+  ok(b3d.mixedGimbal === true, 'ditandai mencampur sudut gimbal');
+  ok(
+    b3d.gimbalPitches.join(',') === '-90,-45',
+    'sudut yang dipakai dilaporkan apa adanya',
+    b3d.gimbalPitches.join(' + ')
+  );
+
+  // Pola bersudut seragam TIDAK boleh menulis sudut di titik: kalau diisi,
+  // slider gimbal manual di UI jadi tidak berefek tanpa ada yang bilang.
+  ok(
+    oblique.waypoints.every((w) => w.gimbalPitch === undefined),
+    'pola seragam membiarkan sudutnya kosong, supaya slider manual tetap berlaku'
+  );
+  ok(oblique.mixedGimbal === false, 'silang + miring tidak dianggap mencampur');
+
+  ok(
+    near(b3d.photos / oblique.photos, 1.5, 0.02),
+    'nadir menambah sekitar 50% foto',
+    `${oblique.photos} -> ${b3d.photos}`
+  );
+
+  let tolak = false;
+  try {
+    generatePattern(square, { ...gridOpts, pattern: 'orbit' });
+  } catch {
+    tolak = true;
+  }
+  ok(tolak, 'orbit tetap ditolak generatePattern');
+}
+
+// ------------------------------------------------- GSD kamera miring
+
+console.log('\nKetelitian kamera miring');
+{
+  const p5 = resolveProfile(registry, { droneId: 'mini5pro' });
+  const cam = p5.camera;
+  const H = 80;
+  const nadirGsd = gsdFromAltitude(cam, H);
+
+  ok(tiltFromNadirDeg(-90) === 0, 'gimbal -90 = 0° dari nadir');
+  ok(tiltFromNadirDeg(-45) === 45, 'gimbal -45 = 45° dari nadir');
+  ok(near(slantRange(H, -90), H, 1e-9), 'nadir: jarak ke permukaan = ketinggian');
+  ok(
+    near(slantRange(H, -45), H * Math.SQRT2, 1e-6),
+    'gimbal -45: jarak miring = ketinggian x akar 2',
+    `${slantRange(H, -45).toFixed(1)} m`
+  );
+
+  const nadir = surfaceGsd(cam, H, -90);
+  const obl45 = surfaceGsd(cam, H, -45);
+  const obl30 = surfaceGsd(cam, H, -30);
+
+  ok(near(nadir.centerCm, nadirGsd, 1e-9), 'pola nadir: GSD permukaan = GSD nadir');
+  ok(near(obl45.vsNadir, Math.SQRT2, 1e-6), 'gimbal -45 meleset 41% dari angka nadir', `${obl45.centerCm.toFixed(2)} vs ${nadirGsd.toFixed(2)} cm/px`);
+  ok(near(obl30.vsNadir, 2, 1e-6), 'gimbal -30 meleset 100%', `${obl30.centerCm.toFixed(2)} cm/px`);
+  ok(obl45.farCm > obl45.nearCm * 3, 'dalam satu foto miring, tepi jauh jauh lebih kasar', `${obl45.nearCm.toFixed(2)} -> ${obl45.farCm.toFixed(2)} cm/px`);
+  ok(obl45.farM > obl45.nearM * 5, 'tepi jauh frame mendarat ratusan meter di depan drone', `${obl45.nearM.toFixed(0)} -> ${obl45.farM.toFixed(0)} m`);
+
+  // Tanpa pembatas, gimbal mendatar bikin jarak miring jadi tak hingga dan
+  // angka tak hingga akan tampil di layar seolah-olah sah.
+  ok(Number.isFinite(surfaceGsd(cam, H, 0).centerCm), 'gimbal mendatar tidak menghasilkan angka tak hingga');
+
+  // params harus membawa dua-duanya: nadir untuk jarak jalur, permukaan untuk layar.
+  const par = computeSurveyParams(cam, { altitudeM: H, gimbalPitchDeg: -45 });
+  ok(near(par.gsd, nadirGsd, 1e-9), 'params.gsd tetap angka nadir — dasar jarak jalur');
+  ok(near(par.surfaceGsd, obl45.centerCm, 1e-9), 'params.surfaceGsd angka yang mendarat di dinding');
+  ok(par.oblique === true, 'params menandai polanya miring');
+  ok(computeSurveyParams(cam, { altitudeM: H }).oblique === false, 'tanpa sudut, dianggap nadir');
+  ok(
+    near(computeSurveyParams(cam, { altitudeM: H }).surfaceGsd, nadirGsd, 1e-9),
+    'dan GSD permukaannya sama dengan GSD nadir'
+  );
+}
 
 // ------------------------------------------------------------------- orbit
 
@@ -659,6 +763,88 @@ console.log('\nOrbit: isi file dan gerbang keselamatan');
   ok(
     codes(orbitPlan({ terrainRequested: true })).includes('orbit-terrain-na'),
     'ikut kontur yang dinyalakan tapi tidak dipakai, dibilang'
+  );
+}
+
+
+// ------------------------------------- gerbang: pola miring & 3D bangunan
+
+console.log('\nGerbang keselamatan: pola miring & 3D bangunan');
+{
+  const p5 = resolveProfile(registry, { droneId: 'mini5pro' });
+
+  const planFor = (pattern, pitch) => {
+    const grid = generatePattern(square, { ...gridOpts, pattern });
+    const par = computeSurveyParams(p5.camera, {
+      altitudeM: 80,
+      gimbalPitchDeg: pitch,
+      frontOverlap: 0.8,
+      sideOverlap: 0.7,
+    });
+    return {
+      ...fakePlan(),
+      pattern,
+      patternName: PATTERNS[pattern].name,
+      gimbalPitch: PATTERNS[pattern].gimbalPitch,
+      grid,
+      params: par,
+      altitude: 80,
+      sorties: splitByBattery(grid.waypoints, {
+        speed: 8,
+        usableFlightMin: 22,
+        accel: 2.5,
+        maxWaypoints: p5.limits.maxWaypoints,
+      }),
+      advanced: { ...fakePlan().advanced, gimbalPitch: pitch },
+    };
+  };
+
+  const codes = (plan) => evaluateSafety(plan, p5).findings.map((f) => f.code);
+  const textOf = (plan, code) =>
+    evaluateSafety(plan, p5).findings.find((f) => f.code === code)?.text ?? '';
+
+  const datar = planFor('single', -90);
+  const miring = planFor('crossOblique', -45);
+  const b3d = planFor('building3d', -45);
+
+  ok(!codes(datar).includes('oblique-gsd'), 'peta datar tidak kena pesan kamera miring');
+  ok(codes(miring).includes('oblique-gsd'), 'pola miring: ketelitian permukaan dijelaskan');
+  ok(
+    codes(miring).includes('oblique-no-nadir'),
+    'pola miring diberi tahu dia kehilangan nadirnya'
+  );
+  ok(
+    !codes(b3d).includes('oblique-no-nadir'),
+    '3D bangunan tidak kena pesan itu, karena nadirnya ada'
+  );
+  ok(codes(b3d).includes('building3d-shape'), '3D bangunan menjelaskan tiga lintasannya');
+  ok(
+    textOf(b3d, 'building3d-shape').includes('nadir'),
+    'dan menyebut berapa foto nadirnya'
+  );
+  ok(
+    textOf(b3d, 'pattern-cost').includes('3 kali'),
+    'biaya pola menyebut 3 lintasan, bukan "dua kali"',
+    textOf(b3d, 'pattern-cost').slice(0, 60)
+  );
+  ok(
+    textOf(miring, 'pattern-cost').includes('2 kali'),
+    'dan pola miring tetap menyebut 2'
+  );
+
+  // Gimbal mendatar: peringatan harus muncul untuk pola seragam...
+  const datarGimbal = planFor('crossOblique', -20);
+  ok(codes(datarGimbal).includes('gimbal-flat'), 'gimbal -20° pada pola seragam diperingatkan');
+  ok(codes(datarGimbal).includes('oblique-spread'), 'dan sebaran ketelitiannya disebut');
+  // ...tapi TIDAK untuk pola yang memegang sudutnya sendiri per lintasan.
+  ok(
+    !codes(b3d).includes('gimbal-flat'),
+    '3D bangunan tidak diperingatkan soal slider gimbal yang tidak berlaku untuknya'
+  );
+
+  ok(
+    textOf(miring, 'photo-mode-manual').includes(miring.params.surfaceGsd.toFixed(2)),
+    'perkiraan ruang kartu menyebut GSD permukaan, bukan GSD nadir'
   );
 }
 

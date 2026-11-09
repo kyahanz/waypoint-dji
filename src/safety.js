@@ -117,7 +117,7 @@ export function evaluateSafety(plan, profile, o = {}) {
     add(
       'warn',
       'photo-mode-manual',
-      `Resolusi foto tidak ikut masuk file — setel sendiri di DJI Fly ke ${profile.mode.label} supaya cocok dengan hitungan di sini. Kalau drone menembak resolusi lain, ketelitian ${plan.params.gsd.toFixed(2)} cm/px di layar tidak berlaku. Perkiraan ruang kartu: ${mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : Math.round(mb) + ' MB'} untuk ${plan.grid.photos} foto JPEG; RAW jauh lebih besar.`
+      `Resolusi foto tidak ikut masuk file — setel sendiri di DJI Fly ke ${profile.mode.label} supaya cocok dengan hitungan di sini. Kalau drone menembak resolusi lain, ketelitian ${(plan.params.surfaceGsd ?? plan.params.gsd).toFixed(2)} cm/px di layar tidak berlaku. Perkiraan ruang kartu: ${mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : Math.round(mb) + ' MB'} untuk ${plan.grid.photos} foto JPEG; RAW jauh lebih besar.`
     );
   }
 
@@ -154,7 +154,7 @@ export function evaluateSafety(plan, profile, o = {}) {
     add(
       'info',
       'pattern-cost',
-      `Pola ${plan.patternName.toLowerCase()} menerbangkan lahan dua kali: ${plan.grid.photos} foto, ${plan.sorties.length} baterai. Kalau yang kamu butuh cuma peta datar, ini mubazir.`
+      `Pola ${plan.patternName} menerbangkan lahan ${plan.grid.passes?.length ?? 2} kali: ${plan.grid.photos} foto, ${plan.sorties.length} baterai. Kalau yang kamu butuh cuma peta datar, ini mubazir.`
     );
   }
 
@@ -164,6 +164,61 @@ export function evaluateSafety(plan, profile, o = {}) {
       'pattern-nadir',
       'Jalur menyilang dengan kamera nunduk lurus memperbaiki medan, tapi dinding tegak masih tipis terpotret. Untuk model bangunan, pakai silang + miring.'
     );
+  }
+
+  // ---- Kamera miring: ketelitian yang tidak seragam dalam satu foto ----
+  //
+  // Ini bagian yang paling lama salah di aplikasi ini. Selama GSD dihitung
+  // dari ketinggian terbang, angka di layar bukan angka yang didapat — dan
+  // pengguna memilih ketinggian berdasarkan angka itu.
+  const surf = plan.params.surface;
+  if (surf && surf.tiltDeg > 5 && plan.pattern !== 'orbit') {
+    add(
+      'info',
+      'oblique-gsd',
+      `Kamera miring ${plan.params.gimbalPitchDeg}°, jadi jarak ke permukaan ${surf.slantM.toFixed(0)} m — bukan ${plan.altitude.toFixed(0)} m. Ketelitiannya ${surf.centerCm.toFixed(2)} cm/px di tengah frame, ${surf.nearCm.toFixed(2)} di tepi dekat, ${surf.farCm.toFixed(2)} di tepi jauh. Jarak jalur dan jarak foto tetap dihitung dari geometri nadir, dan itu disengaja: bagian frame yang berguna cuma yang dekat-tengah, jadi overlap efektifnya lebih tinggi dari yang kamu minta.`
+    );
+
+    // Gimbal yang terlalu datar: tepi jauh frame jadi tidak berguna sama
+    // sekali, dan separuh foto terbuang.
+    if (surf.farCm > surf.nearCm * 5) {
+      add(
+        'warn',
+        'oblique-spread',
+        `Dalam satu foto, ketelitian membentang ${surf.nearCm.toFixed(2)} sampai ${surf.farCm.toFixed(2)} cm/px — ${(surf.farCm / surf.nearCm).toFixed(1)} kali. Sudut sedatar ini membuat sebagian besar frame terlalu kasar untuk dipakai. Curamkan gimbal ke -45° atau lebih.`
+      );
+    }
+  }
+
+  // Pola miring tanpa nadir: atap cuma kena dari serong, dan tidak ada frame
+  // yang mengikat skala tanah. Kebalikan dari pesan 'pattern-nadir' di atas,
+  // dan selama ini tidak pernah dikatakan.
+  if (plan.pattern === 'crossOblique') {
+    add(
+      'info',
+      'oblique-no-nadir',
+      'Tidak ada satu pun foto yang nunduk lurus di pola ini — semuanya -45°. Atap terpotret cuma dari serong, dan tidak ada frame nadir yang mengikat skala tanah. Untuk model bangunan yang utuh, pakai 3D bangunan: dia menambah satu lintasan nadir, ongkosnya sekitar 50% foto.'
+    );
+  }
+
+  if (plan.pattern === 'building3d') {
+    const nadir = plan.grid.passes?.find((p) => p.role === 'nadir');
+    const oblique = plan.grid.passes?.filter((p) => p.role === 'miring') ?? [];
+    add(
+      'info',
+      'building3d-shape',
+      `Tiga lintasan dalam satu file: ${nadir?.photos ?? 0} foto nadir -90° untuk atap dan skala tanah, lalu ${oblique.reduce((a, p) => a + p.photos, 0)} foto miring -45° dari dua arah menyilang untuk fasad. Sudut gimbal ditulis per titik, jadi slider gimbal manual tidak berlaku untuk pola ini.`
+    );
+
+    // Satu file 200 waypoint adalah batas DJI Fly, dan di pola tiga lintasan
+    // batas itu kena jauh lebih cepat daripada baterai.
+    if (plan.grid.photos > lim.maxWaypoints) {
+      add(
+        'info',
+        'building3d-split',
+        `${plan.grid.photos} foto melewati batas ${lim.maxWaypoints} waypoint per file, jadi misinya terbagi ${plan.sorties.length} file. Itu bukan masalah, tapi matahari bergeser di antara baterai — kalau bisa, perkecil lahannya supaya muat satu file.`
+      );
+    }
   }
 
   // ---- Orbit: objek tegak ----
@@ -380,7 +435,11 @@ export function evaluateSafety(plan, profile, o = {}) {
     );
   }
 
-  if (adv.gimbalPitch !== undefined && adv.gimbalPitch > -30) {
+  // Pola yang mencampur sudut memegang nilainya sendiri per lintasan, jadi
+  // angka di slider tidak pernah sampai ke file — memperingatkannya cuma
+  // bikin bingung.
+  const mixedGimbal = plan.grid?.mixedGimbal || plan.pattern === 'orbit';
+  if (!mixedGimbal && adv.gimbalPitch !== undefined && adv.gimbalPitch > -30) {
     add(
       'warn',
       'gimbal-flat',
