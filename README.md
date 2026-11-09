@@ -165,9 +165,9 @@ python -m http.server 5173
 
 Lalu buka <http://localhost:5173/web/>.
 
-**Agar fitur "Buka di HP" berfungsi**, buka prototipe lewat alamat LAN komputer,
-bukan `localhost` — QR berisi alamat yang sedang dibuka, dan `localhost` di HP
-menunjuk ke HP itu sendiri. Cari alamatnya:
+**Mau membukanya dari HP di jaringan yang sama?** Buka prototipe lewat alamat
+LAN komputer, bukan `localhost` — `localhost` di HP menunjuk ke HP itu sendiri.
+Cari alamatnya:
 
 ```bash
 ipconfig
@@ -222,12 +222,10 @@ Yang sudah jalan:
   jumlah waypoint, jumlah baterai
 
 **Keluaran**
-- "Buka di HP": rencana diringkas ke dalam URL dan ditampilkan sebagai QR,
-  jadi perencanaan bisa dipindah ke HP tanpa server atau akun
-- Seluruh rencana tersimpan di hash URL — refresh dan tombol back tidak
-  menghilangkan pekerjaan
 - Export KMZ, satu file per baterai
-- Export GeoJSON (area, titik home, jalur) untuk dibuka di QGIS
+- Seluruh rencana tersimpan di hash URL — refresh dan tombol back tidak
+  menghilangkan pekerjaan, dan menyalin alamatnya sama dengan membagikan
+  rencananya
 - Simpan dan buka kembali project dari penyimpanan browser
 
 ### Catatan terrain following
@@ -262,10 +260,9 @@ hilang — tanpa batas, cache tumbuh terus tanpa ada yang bisa menghentikannya.
 
 **Batasan penting:** service worker hanya berjalan di konteks aman — `https`
 atau `localhost`. Membuka prototipe lewat alamat LAN (`http://192.168.x.x`)
-untuk fitur "Buka di HP" berarti tidak ada cache offline di sana. Supaya
-keduanya jalan bersamaan di HP, prototipe perlu disajikan lewat https: deploy
-ke hosting mana pun yang memberi sertifikat, atau pakai terowongan seperti
-`cloudflared tunnel`.
+berarti tidak ada cache offline di sana. Supaya keduanya jalan bersamaan di HP,
+prototipe perlu disajikan lewat https: deploy ke hosting mana pun yang memberi
+sertifikat, atau pakai terowongan seperti `cloudflared tunnel`.
 
 Belum ada: GCP, upload foto.
 
@@ -554,6 +551,17 @@ untuk mengembalikan semuanya. Untuk membandingkan beberapa file sekaligus ada
 yang dikeluarkan dari export karena tidak dicentang, karena itu akan membuat
 orang tanpa sadar menerbangkan lahan yang bolong.
 
+Di peta, tiap file yang tampil juga diberi **dua label berwarna sama dengan
+garisnya**: titik 1 dan titik terakhir. Garis berwarna sudah memberi tahu file
+mana yang mana, tapi tidak memberi tahu dari UJUNG YANG MANA dia mulai — dan
+itu yang dibutuhkan orang yang berdiri di lahan sambil memilih tempat lepas
+landas. Nomornya dihitung dari 1 **di dalam file itu sendiri**, bukan nomor urut
+di seluruh rencana, karena tiap file KMZ adalah misi yang berdiri sendiri dan
+DJI Fly menomori titiknya dari 1 lagi setiap kali satu file dibuka. Label yang
+jatuh di koordinat yang sudah terpakai digeser ke atas seperti tangga: pola 3D
+bangunan memulai lintasan nadir dan miringnya di titik yang persis sama, dan
+tanpa itu yang kelihatan cuma file yang digambar terakhir.
+
 Tiap baris juga menyebut **arah lintasan yang benar-benar ada di dalam file
 itu**, dibaca balik dari titik-titiknya. Ini pertanyaan yang timbul sendiri
 begitu file dikelompokkan per peran: pola 3D bangunan dibangun dari dua
@@ -632,6 +640,24 @@ sampai overlap "pas 80%" dari trapesium penuh justru menjarangkan bagian
 dekat-tengah — satu-satunya bagian yang berguna. Hasilnya overlap efektif
 lebih tinggi dari yang diminta (79% samping / 93% depan pada -45°), dan itu
 memang yang dipakai perencana komersial.
+
+### Pola 3D punya DUA ketelitian, dan tiap angka mendarat di file berbeda
+
+Satu angka di baris Ketelitian cukup selama satu rencana berarti satu sudut
+kamera. Pola 3D bangunan tidak begitu: dia terbang satu lintasan nadir plus dua
+lintasan miring, dan sejak file dipecah per peran, kedua sudut itu mendarat di
+dua **file** yang berbeda. Yang tampil dulu cuma angka miring — yang paling
+kasar — sehingga orang yang membaca "4.14 cm/px" wajar mengira seluruh
+rencananya segitu, padahal separuh fotonya justru 2.93.
+
+Jadi untuk pola bersudut campur, barisnya sekarang menyebut keduanya dengan
+nama filenya: `nadir 2.93 · miring 4.14 cm/px`, dan catatan di bawahnya
+memisahkan keduanya — file nadir yang jadi skala dan ukuran peta, file miring
+yang 4.14 cm/px di tengah frame (3.04 di tepi dekat, 10.87 di tepi jauh).
+
+Pola yang miring **saja** tetap satu angka. Di situ memang tidak ada file
+nadir, dan angka nadirnya cuma setara-setaraan yang tidak mewakili satu foto
+pun — catatannya sekarang mengatakan itu dengan lurus.
 
 ## Dua cara melihat objek
 

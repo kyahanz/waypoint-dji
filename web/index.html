@@ -585,12 +585,9 @@
             </div>
 
             <button id="btn-export" class="btn primary wide" disabled>Export KMZ</button>
-            <div class="row tight split">
-              <button id="btn-handoff" class="btn" disabled>Buka di HP</button>
-              <button id="btn-geojson" class="btn" disabled>GeoJSON</button>
-            </div>
             <p class="sub center">
-              Format KMZ belum teruji di DJI Fly — lihat TEST-CHECKLIST.md
+              Filenya belum pernah diuji terbang di DJI Fly. Buka dulu di
+              aplikasinya dan periksa jalurnya sebelum lepas landas.
             </p>
           </section>
 
@@ -719,26 +716,7 @@
       </div>
     </div>
 
-    <div id="handoff" class="modal" hidden>
-      <div class="modal-card">
-        <h3>Buka rencana ini di HP</h3>
-        <p class="sub">
-          Scan kode ini dari HP yang terhubung ke jaringan WiFi yang sama. Rencana
-          akan terbuka persis seperti di layar ini, lalu tinggal export KMZ dari
-          HP-nya.
-        </p>
-        <div id="qr" class="qr"></div>
-        <div class="url-row">
-          <input id="handoff-url" type="text" readonly />
-          <button id="btn-copy-url" class="btn">Salin</button>
-        </div>
-        <p class="sub" id="handoff-note"></p>
-        <button id="btn-close-handoff" class="btn wide">Tutup</button>
-      </div>
-    </div>
-
     <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script type="module" src="app.js"></script>
   </body>
 </html>

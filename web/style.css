@@ -1370,6 +1370,33 @@ input[type="range"]::-moz-range-thumb {
   cursor: grabbing;
 }
 
+/* Label titik mulai dan selesai tiap file KMZ. Warnanya diisi dari JS supaya
+   persis sama dengan warna garis file itu di peta dan kotak warna di daftar
+   file — tiga tempat, satu warna, supaya tidak ada yang perlu dicocokkan
+   dengan menghitung. */
+.wp-end {
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1.5px solid var(--bg);
+  color: #10131a;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  box-shadow: var(--shadow-sm);
+  pointer-events: auto;
+  cursor: default;
+}
+
+/* Titik selesai dibedakan bentuknya, bukan cuma lambangnya: di layar kecil
+   yang kena matahari, beda sudut jauh lebih cepat terbaca daripada beda
+   karakter. */
+.wp-end.selesai {
+  border-radius: 4px;
+}
+
 @media (max-width: 860px) {
   .help {
     display: none;
@@ -1466,38 +1493,6 @@ input[type="range"]::-moz-range-thumb {
   font-weight: 650;
 }
 
-.qr {
-  display: grid;
-  place-items: center;
-  padding: 14px;
-  background: #fff;
-  border-radius: 10px;
-  margin: 14px 0;
-  min-height: 60px;
-}
-
-.qr img,
-.qr canvas {
-  display: block;
-}
-
-.url-row {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.url-row input {
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-  font-size: 11.5px;
-  padding: 7px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--panel-2);
-  color: var(--muted);
-}
 
 /* ---------- Bottom sheet (layar sempit) ---------- */
 

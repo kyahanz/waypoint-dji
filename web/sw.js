@@ -1,7 +1,7 @@
 // Service worker: membuat aplikasi dan tile peta tetap bisa dipakai tanpa
 // sinyal. Dipasang dari app.js, hanya jalan di konteks aman (https/localhost).
 
-const SHELL = 'wpdji-shell-v24';
+const SHELL = 'wpdji-shell-v25';
 const TILES = 'wpdji-tiles-v1';
 const DATA = 'wpdji-data-v1';
 
@@ -40,7 +40,6 @@ const SHELL_FILES = [
   './vendor/fonts/poppins-600-latin-ext.woff2',
   './vendor/fonts/poppins-700-latin.woff2',
   './vendor/fonts/poppins-700-latin-ext.woff2',
-  'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
 ];
 
 const TILE_HOSTS = [

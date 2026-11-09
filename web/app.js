@@ -261,6 +261,13 @@ let editor = null;
 let homeMarker = null;
 let missionEditor = null;
 
+// Penanda titik mulai dan selesai tiap file KMZ. Dibuat sebagai elemen DOM,
+// bukan layer teks MapLibre, karena style peta ini berbasis raster dan tidak
+// punya glyphs — layer `symbol` dengan `text-field` tidak akan menggambar
+// apa-apa di atasnya. Jumlahnya paling banyak dua kali jumlah file, jadi
+// marker DOM masih jauh lebih murah daripada memasang sumber glyph sendiri.
+let fileEndMarkers = [];
+
 // Peta siap dipasangi sumber dan layer begitu style-nya termuat. Sengaja
 // tidak menunggu event 'load', karena 'load' baru menyala setelah render
 // pertama — dan render tidak pernah terjadi di tab latar atau pane yang
@@ -482,8 +489,6 @@ const els = {
   clear: $('btn-clear'),
   demo: $('btn-demo'),
   export: $('btn-export'),
-  geojson: $('btn-geojson'),
-  handoff: $('btn-handoff'),
   redo: $('btn-redo'),
   autoAngle: $('btn-auto-angle'),
   drone: $('drone'),
@@ -590,10 +595,6 @@ const els = {
   sheetHandle: $('sheet-handle'),
   sheetSummary: $('sheet-summary'),
   toasts: $('toasts'),
-  modal: $('handoff'),
-  qr: $('qr'),
-  handoffUrl: $('handoff-url'),
-  handoffNote: $('handoff-note'),
 };
 
 // ---------- Toast ----------
@@ -631,10 +632,8 @@ els.clear.onclick = () => {
 };
 els.demo.onclick = loadDemoArea;
 els.export.onclick = exportKmz;
-els.geojson.onclick = exportGeoJson;
 els.autoAngle.onclick = applyLongestEdgeAngle;
 els.save.onclick = onSave;
-els.handoff.onclick = openHandoff;
 els.resetHome.onclick = () => {
   state.homePinned = false;
   render();
@@ -660,19 +659,6 @@ els.toggleHome.onclick = () => {
       : 'Penanda ditampilkan lagi.',
     'ok'
   );
-};
-$('btn-close-handoff').onclick = () => (els.modal.hidden = true);
-els.modal.onclick = (e) => {
-  if (e.target === els.modal) els.modal.hidden = true;
-};
-$('btn-copy-url').onclick = async () => {
-  try {
-    await navigator.clipboard.writeText(els.handoffUrl.value);
-    toast('Link disalin.', 'ok');
-  } catch {
-    els.handoffUrl.select();
-    toast('Tidak bisa menyalin otomatis — tekan Ctrl+C.', 'err');
-  }
 };
 $('btn-theme').onclick = () => {
   const next = THEMES[(THEMES.findIndex((t) => t.id === themeId) + 1) % THEMES.length];
@@ -2250,6 +2236,7 @@ function render() {
     map.getSource('route')?.setData(EMPTY);
     map.getSource('wp')?.setData(EMPTY);
     map.getSource('buffer')?.setData(EMPTY);
+    syncFileEndMarkers(null, null);
     els.area.hidden = true;
     els.flown.hidden = true;
     renderTerrainStatus(null);
@@ -2264,8 +2251,6 @@ function render() {
     els.resumeReadout.hidden = true;
     els.legend.hidden = true;
     els.export.disabled = true;
-    els.geojson.disabled = true;
-    els.handoff.disabled = true;
     els.save.disabled = true;
     els.sheetSummary.textContent = n >= 3 ? 'Menghitung…' : 'Gambar area survei';
     syncUrl();
@@ -2278,8 +2263,6 @@ function render() {
   $('num-2').classList.add('done');
   $('num-3').classList.add('done');
   els.export.disabled = false;
-  els.geojson.disabled = false;
-  els.handoff.disabled = false;
   els.save.disabled = false;
 
   // Garis putus-putus abu: batas area yang benar-benar diterbangi.
@@ -2433,12 +2416,33 @@ function updateDerived(plan) {
   const sg = surfaceGsd(state.profile.camera, state.altitudeM, pitchForGsd);
   const isOblique = state.pattern !== 'orbit' && sg.tiltDeg > 5;
 
-  els.gsdDerived.textContent = `${(isOblique ? sg.centerCm : gsd).toFixed(2)} cm/px`;
+  // Pola yang BENAR-BENAR membawa dua sudut kamera (3D bangunan: nadir plus
+  // dua lintasan miring) punya dua ketelitian, dan sejak file dipecah per
+  // peran, dua angka itu mendarat di dua FILE yang berbeda. Menampilkan satu
+  // angka memaksa orang menebak angka itu milik file yang mana — dan karena
+  // yang tampil adalah angka miring (yang paling kasar), tebakan yang wajar
+  // justru salah untuk separuh fotonya.
+  //
+  // Pola yang miring SAJA tetap satu angka: di situ tidak ada file nadir, dan
+  // angka nadir cuma setara-setaraan yang tidak mewakili satu foto pun.
+  const duaSudut = !!PATTERNS[state.pattern]?.mixedGimbal;
+  els.gsdDerived.textContent = !isOblique
+    ? `${gsd.toFixed(2)} cm/px`
+    : duaSudut
+      ? `nadir ${gsd.toFixed(2)} · miring ${sg.centerCm.toFixed(2)} cm/px`
+      : `${sg.centerCm.toFixed(2)} cm/px`;
+
   els.gsdObliqueNote.hidden = !isOblique;
-  if (isOblique) {
+  if (isOblique && duaSudut) {
+    els.gsdObliqueNote.textContent =
+      `Pola ini terbang dua sudut kamera, dan tiap sudut jadi filenya sendiri — jadi ketelitiannya juga dua, bukan satu. ` +
+      `File nadir (kamera nunduk 90°, jarak ${state.altitudeM} m): ${gsd.toFixed(2)} cm/px, dan inilah yang jadi skala serta ukuran petanya. ` +
+      `File miring (gimbal ${pitchForGsd}°, jarak ke permukaan ${sg.slantM.toFixed(0)} m — bukan ${state.altitudeM} m): ${sg.centerCm.toFixed(2)} cm/px di tengah frame, ` +
+      `${sg.nearCm.toFixed(2)} di tepi dekat, ${sg.farCm.toFixed(2)} di tepi jauh. Yang berguna buat olah cuma bagian dekat-tengah.`;
+  } else if (isOblique) {
     els.gsdObliqueNote.textContent =
       `Kamera miring ${pitchForGsd}°, jadi jarak ke permukaan ${sg.slantM.toFixed(0)} m — bukan ${state.altitudeM} m. ` +
-      `Nadir setara ${gsd.toFixed(2)} cm/px, tapi yang mendarat di dinding ${sg.centerCm.toFixed(2)} cm/px di tengah frame ` +
+      `Nadir setara ${gsd.toFixed(2)} cm/px, tapi pola ini tidak punya satu pun foto nadir: yang mendarat di dinding ${sg.centerCm.toFixed(2)} cm/px di tengah frame ` +
       `(${sg.nearCm.toFixed(2)} di tepi dekat, ${sg.farCm.toFixed(2)} di tepi jauh). Yang berguna buat olah cuma bagian dekat-tengah.`;
   }
 
@@ -2849,6 +2853,70 @@ function syncRouteSources(plan) {
       }))
     ),
   });
+
+  syncFileEndMarkers(plan, tampil);
+}
+
+/**
+ * Di mana tiap file mulai dan selesai.
+ *
+ * Garis berwarna sudah memberi tahu file mana yang mana, tapi tidak memberi
+ * tahu dari UJUNG YANG MANA dia mulai — dan itu yang dibutuhkan orang yang
+ * berdiri di lahan sambil memilih tempat lepas landas. Dua label per file:
+ * titik 1 dan titik terakhir.
+ *
+ * Nomornya dihitung dari 1 DI DALAM FILE ITU SENDIRI, bukan nomor urut di
+ * seluruh rencana. Alasannya bukan selera: tiap file KMZ adalah misi yang
+ * berdiri sendiri, dan DJI Fly menomori titiknya dari 1 lagi setiap kali satu
+ * file dibuka. Nomor global akan jadi angka yang tidak pernah muncul di layar
+ * RC — persis jenis angka yang membuat orang mengira rencananya salah.
+ */
+function syncFileEndMarkers(plan, tampil) {
+  for (const m of fileEndMarkers) m.remove();
+  fileEndMarkers = [];
+  if (!plan || !tampil) return;
+
+  // File yang berbeda sering mulai di SUDUT PETAK YANG SAMA — pola 3D bangunan
+  // memulai lintasan nadir dan lintasan miringnya di titik yang persis sama.
+  // Tanpa penanganan, labelnya bertumpuk tepat dan yang di bawah hilang sama
+  // sekali: satu-satunya file yang kelihatan justru yang digambar terakhir.
+  // Jadi label yang jatuh di koordinat yang sudah terpakai digeser ke atas,
+  // menumpuk seperti tangga. Digeser hanya kalau memang bertabrakan, bukan
+  // selalu — label yang tidak bertabrakan tetap duduk di titiknya sendiri.
+  const terpakai = new Map();
+
+  for (const { sortie, i } of tampil) {
+    const warna = BATTERY_COLORS[i % BATTERY_COLORS.length];
+    const pasang = (w, jenis, nomor, judul) => {
+      const ll = plan.proj.toLL(w.xy);
+      const kunci = `${ll[0].toFixed(6)},${ll[1].toFixed(6)}`;
+      const tumpuk = terpakai.get(kunci) ?? 0;
+      terpakai.set(kunci, tumpuk + 1);
+
+      const el = document.createElement('div');
+      el.className = `wp-end ${jenis}`;
+      el.style.background = warna;
+      el.textContent = `#${i + 1} ${jenis === 'mulai' ? '▸' : '▪'}${nomor}`;
+      el.title = judul;
+      fileEndMarkers.push(
+        new maplibregl.Marker({
+          element: el,
+          anchor: 'bottom',
+          offset: [0, -3 - tumpuk * 17],
+        })
+          .setLngLat(ll)
+          .addTo(map)
+      );
+    };
+
+    pasang(sortie[0], 'mulai', 1, `File #${i + 1} mulai di titik 1 — dari sini drone menjepret`);
+    pasang(
+      sortie[sortie.length - 1],
+      'selesai',
+      sortie.length,
+      `File #${i + 1} selesai di titik ${sortie.length}, lalu drone pulang sendiri`
+    );
+  }
 }
 
 /** Ganti file mana yang tampil di peta, lalu gambar ulang peta dan panelnya. */
@@ -3518,47 +3586,6 @@ async function exportKmz() {
   }
 }
 
-function exportGeoJson() {
-  const plan = state.plan;
-  if (!plan) return;
-
-  const fc = {
-    type: 'FeatureCollection',
-    features: [
-      {
-        type: 'Feature',
-        properties: { kind: 'aoi', areaHa: plan.area / 10000 },
-        geometry: {
-          type: 'Polygon',
-          coordinates: [[...state.polygon, state.polygon[0]]],
-        },
-      },
-      {
-        type: 'Feature',
-        properties: { kind: 'home' },
-        geometry: { type: 'Point', coordinates: state.home },
-      },
-      ...plan.sorties.map((s, i) => ({
-        type: 'Feature',
-        properties: {
-          kind: 'route',
-          sortie: i + 1,
-          altitudeM: plan.altitude,
-          speedMs: plan.speed,
-        },
-        geometry: {
-          type: 'LineString',
-          coordinates: s.map((w) => plan.proj.toLL(w.xy)),
-        },
-      })),
-    ],
-  };
-
-  const name = (els.projName.value.trim() || 'survei').replace(/[^\w\-]+/g, '-');
-  downloadBlob(new TextEncoder().encode(JSON.stringify(fc, null, 2)), `${name}.geojson`);
-}
-
-
 // ---------- Berbagi rencana lewat URL ----------
 //
 // Seluruh rencana muat di hash URL, jadi tidak butuh server untuk membagikannya
@@ -3665,33 +3692,6 @@ function applyStateFromUrl() {
     return false;
   }
 }
-
-function openHandoff() {
-  if (!state.plan) return;
-
-  const url = `${location.origin}${location.pathname}#r=${encodeState()}`;
-  els.handoffUrl.value = url;
-  els.qr.innerHTML = '';
-
-  if (typeof QRCode === 'undefined') {
-    els.qr.innerHTML = '<p class="placeholder small">Pustaka QR gagal dimuat — salin link di bawah.</p>';
-  } else {
-    new QRCode(els.qr, {
-      text: url,
-      width: 220,
-      height: 220,
-      correctLevel: QRCode.CorrectLevel.L, // rencana besar bikin URL panjang
-    });
-  }
-
-  const local = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
-  els.handoffNote.textContent = local
-    ? 'Alamatnya masih localhost, jadi HP tidak bisa membukanya. Jalankan server dengan alamat LAN komputer ini (lihat README), lalu buka ulang dialog ini.'
-    : 'Pastikan HP terhubung ke jaringan yang sama dengan komputer ini.';
-
-  els.modal.hidden = false;
-}
-
 
 // ---------- Offline ----------
 //
