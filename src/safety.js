@@ -16,6 +16,52 @@ import { climbDemand } from './survey.js';
 
 const pct = (v) => `${Math.round(v * 100)}%`;
 
+/**
+ * Tinggi jaringan listrik di Indonesia.
+ *
+ * KENAPA ANGKA, BUKAN DETEKSI. Pernah dipertimbangkan menarik posisi kabel dan
+ * tiang dari OpenStreetMap, seperti yang sudah dilakukan untuk bangunan. Itu
+ * dibatalkan, dan bukan karena susah: cakupan OSM untuk jaringan DISTRIBUSI di
+ * Indonesia — kabel di pinggir jalan kampung dan perumahan, yang justru paling
+ * sering menjatuhkan drone — nyaris nol. Peta yang kosong karena datanya tidak
+ * ada akan terbaca sebagai "aman", dan itu lebih berbahaya daripada tidak ada
+ * peta sama sekali.
+ *
+ * Yang dipakai sebagai gantinya: angka yang memang sudah diketahui, plus
+ * perintah melihat sendiri. Drone tidak bisa melihat kabel; manusia bisa.
+ *
+ * SEBERAPA PASTI ANGKA INI. Tidak terlalu, dan itu disengaja ditulis. Sumber
+ * yang ada tidak seragam:
+ *
+ *   JTR (tegangan rendah, ke rumah)   tiang 9 m, tinggi di atas tanah ~7.5 m.
+ *                                     Satu sumber menyebut tiang TR ~7.5 m.
+ *   JTM (tegangan menengah 20 kV)     tiang 11-13 m (~9.2-11 m di atas tanah);
+ *                                     sumber lain menyebut tiang baja 12-15 m.
+ *   Tiang trafo (GTT)                 13 m — yang tertinggi di jaringan
+ *                                     distribusi.
+ *
+ * Jurnal teknik mengutip SPLN 1997 untuk panjang tiang 9/11/13 m. Produsen
+ * tiang menyebut angka yang berbeda-beda untuk peruntukan yang sama. Jadi 15 m
+ * dipakai sebagai batas praktis "sudah lewat seluruh jaringan distribusi",
+ * dengan margin di atas angka tertinggi yang pernah disebut sumber mana pun.
+ *
+ * SUTT/SUTET ADALAH KATEGORI LAIN, dan di situ saran "terbang di atasnya"
+ * TIDAK berlaku. Menaranya puluhan meter, dan yang diatur justru ruang
+ * bebasnya: untuk SUTET 500 kV, 22 m mendatar dari tapak menara untuk sirkit
+ * tunggal dan 17 m untuk sirkit ganda. Aturan yang dirujuk pun berbeda antar
+ * sumber — sebagian masih Permen ESDM 18/2015, sementara PLN menyebut Permen
+ * ESDM 13/2021 — jadi angkanya disebut sebagai rujukan kasar, bukan kepastian
+ * hukum. Yang benar di sana: hindari koridornya, jangan dilewati dari atas.
+ */
+export const JARINGAN_LISTRIK = {
+  // Batas praktis: di atas ini, seluruh jaringan distribusi sudah terlewati.
+  distribusiMaksM: 15,
+  // Di bawah ini, drone berada tepat di ketinggian kabel dan tiang.
+  tiangTertinggiM: 13,
+  // Ruang bebas mendatar dari tapak menara SUTET 500 kV.
+  sutetBebasM: { sirkitTunggal: 22, sirkitGanda: 17 },
+};
+
 export function evaluateSafety(plan, profile, o = {}) {
   const out = [];
   const lim = profile.limits;
@@ -70,7 +116,51 @@ export function evaluateSafety(plan, profile, o = {}) {
     add(
       'warn',
       'alt-low',
-      `Ketinggian ${plan.altitude.toFixed(0)} m di bawah ketinggian aman lepas landas (${lim.takeOffSecurityHeightM} m). Pohon, tiang, dan kabel ada di ketinggian ini.`
+      `Ketinggian ${plan.altitude.toFixed(0)} m di bawah ketinggian aman lepas landas (${lim.takeOffSecurityHeightM} m). Pohon dan atap ada di ketinggian ini.`
+    );
+  }
+
+  // ---- Kabel dan tiang ----
+  //
+  // Satu-satunya rintangan yang benar-benar mematikan dan TIDAK terlihat
+  // sensor drone. Tidak ada data yang bisa dipercaya untuk ini di Indonesia
+  // (lihat catatan di JARINGAN_LISTRIK), jadi yang diberikan angka dan
+  // perintah melihat — bukan peta yang menenangkan.
+  {
+    // Titik terendah yang BENAR-BENAR diperintahkan, bukan angka di slider:
+    // dengan ikut kontur, bagian lahan yang lebih tinggi membuat drone turun
+    // relatif terhadap tanah di bawahnya, dan di orbit tiap cincin punya
+    // ketinggiannya sendiri.
+    let terendah = plan.altitude;
+    if (plan.orbit?.rings?.length) {
+      terendah = Math.min(...plan.orbit.rings.map((r) => r.heightM));
+    } else if (plan.terrain?.ready && plan.terrain.minHeight !== undefined) {
+      terendah = Math.min(terendah, plan.terrain.minHeight);
+    }
+
+    const J = JARINGAN_LISTRIK;
+
+    if (terendah <= J.tiangTertinggiM) {
+      add(
+        'warn',
+        'kabel-setinggi-tiang',
+        `Titik terendah misi ini ${terendah.toFixed(0)} m — itu persis ketinggian kabel dan tiang listrik. Tiang trafo mencapai 13 m, tiang tegangan menengah 11-13 m, dan kabel ke rumah menggantung sekitar 7-9 m. Sensor rintangan drone tidak melihat kabel. Jalan kaki dulu menyusuri jalurnya dan lihat sendiri ke atas sebelum terbang.`
+      );
+    } else if (terendah < J.distribusiMaksM) {
+      add(
+        'warn',
+        'kabel-dekat-tiang',
+        `Titik terendah misi ini ${terendah.toFixed(0)} m, cuma sedikit di atas tiang listrik tertinggi (13 m). Margin setipis ini habis oleh hanyutan GPS dan angin. Kalau ketelitian masih cukup, naikkan ke ${J.distribusiMaksM} m.`
+      );
+    }
+
+    // Selalu muncul, apa pun ketinggiannya. Ini pengganti deteksi kabel yang
+    // sengaja tidak dibuat, jadi dia tidak boleh hilang justru waktu
+    // rencananya terlihat aman.
+    add(
+      'info',
+      'kabel-lihat-sendiri',
+      `Sebelum berangkat: berdiri di titik lepas landas dan lihat ke atas sepanjang jalur. Kabel listrik tidak terlihat sensor drone, tidak ada di peta, dan tidak ada di data elevasi. Di atas ${J.distribusiMaksM} m seluruh jaringan distribusi sudah terlewati — tiang tertinggi (penyangga trafo) 13 m. Yang BUKAN urusan ketinggian: SUTT dan SUTET. Menaranya puluhan meter dan yang diatur ruang bebasnya, bukan tinggi lewatnya — untuk SUTET 500 kV sekitar ${J.sutetBebasM.sirkitGanda}-${J.sutetBebasM.sirkitTunggal} m mendatar dari tapak menara. Kalau ada menara transmisi di sekitar lahan, hindari koridornya; jangan dilewati dari atas.`
     );
   }
 
@@ -252,7 +342,7 @@ export function evaluateSafety(plan, profile, o = {}) {
       add(
         'warn',
         'orbit-ring-low',
-        `Cincin terbawah ${low.heightM.toFixed(1)} m, di bawah ketinggian aman lepas landas (${floorM} m). Pastikan lingkaran selebar ${(2 * orb.radiusM).toFixed(0)} m di sekeliling tugu benar-benar kosong di ketinggian itu — termasuk pohon dan kabel.`
+        `Cincin terbawah ${low.heightM.toFixed(1)} m, di bawah ketinggian aman lepas landas (${floorM} m). Pastikan lingkaran selebar ${(2 * orb.radiusM).toFixed(0)} m di sekeliling tugu benar-benar kosong di ketinggian itu, termasuk pohon.`
       );
     }
 

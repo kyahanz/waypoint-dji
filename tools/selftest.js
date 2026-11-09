@@ -25,7 +25,7 @@ import {
   makeProjector,
   splitByBattery,
 } from '../src/survey.js';
-import { evaluateSafety } from '../src/safety.js';
+import { evaluateSafety, JARINGAN_LISTRIK } from '../src/safety.js';
 import { buildTemplateKml, buildWaylinesWpml, MISSION_DEFAULTS } from '../src/wpml.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -846,6 +846,61 @@ console.log('\nGerbang keselamatan: pola miring & 3D bangunan');
     textOf(miring, 'photo-mode-manual').includes(miring.params.surfaceGsd.toFixed(2)),
     'perkiraan ruang kartu menyebut GSD permukaan, bukan GSD nadir'
   );
+}
+
+
+// --------------------------------------------- gerbang: kabel dan tiang
+
+console.log('\nGerbang keselamatan: kabel dan tiang listrik');
+{
+  const p5 = resolveProfile(registry, { droneId: 'mini5pro' });
+  const at = (over) => evaluateSafety({ ...fakePlan(), ...over }, p5).findings.map((f) => f.code);
+
+  // Pengganti deteksi kabel yang sengaja tidak dibuat. Kalau dia hilang justru
+  // waktu rencananya terlihat aman, fitur ini kehilangan seluruh gunanya.
+  ok(at({ altitude: 80 }).includes('kabel-lihat-sendiri'), 'perintah melihat sendiri muncul meski terbang tinggi');
+  ok(at({ altitude: 10 }).includes('kabel-lihat-sendiri'), 'dan tetap muncul waktu terbang rendah');
+
+  ok(
+    at({ altitude: 12 }).includes('kabel-setinggi-tiang'),
+    'terbang 12 m diperingatkan: itu ketinggian tiang'
+  );
+  ok(
+    at({ altitude: 14 }).includes('kabel-dekat-tiang'),
+    'terbang 14 m diperingatkan: marginnya terlalu tipis'
+  );
+  ok(
+    !at({ altitude: 20 }).includes('kabel-setinggi-tiang') &&
+      !at({ altitude: 20 }).includes('kabel-dekat-tiang'),
+    'di 20 m tidak ada peringatan tiang lagi'
+  );
+  ok(
+    JARINGAN_LISTRIK.distribusiMaksM > JARINGAN_LISTRIK.tiangTertinggiM,
+    'batas praktis ada di atas tiang tertinggi, bukan sama dengan'
+  );
+
+  // Yang dinilai harus titik TERENDAH yang diperintahkan, bukan angka slider.
+  // Ikut kontur menurunkan drone relatif terhadap tanah di bagian lahan yang
+  // lebih tinggi, dan di orbit tiap cincin punya ketinggiannya sendiri.
+  ok(
+    at({
+      altitude: 60,
+      terrain: { on: true, ready: true, minHeight: 11, maxHeight: 60 },
+    }).includes('kabel-setinggi-tiang'),
+    'ikut kontur: yang dinilai titik terendah, bukan ketinggian rencana'
+  );
+
+  const orb = generateOrbit(p5.camera, [0, 0], { radiusM: 18, objectHeightM: 20 });
+  ok(
+    at({ altitude: 36, orbit: orb, grid: orb, pattern: 'orbit' }).includes('kabel-setinggi-tiang'),
+    'orbit: yang dinilai cincin terendah, bukan cincin tertinggi',
+    `cincin bawah ${orb.rings[0].heightM.toFixed(1)} m`
+  );
+
+  // SUTT/SUTET bukan soal ketinggian lewat, dan itu harus terbaca jelas.
+  const teks = evaluateSafety(fakePlan(), p5).findings.find((f) => f.code === 'kabel-lihat-sendiri').text;
+  ok(teks.includes('SUTET'), 'menara transmisi disebut sebagai kasus yang berbeda');
+  ok(teks.includes('mendatar'), 'dan solusinya jarak mendatar, bukan terbang di atasnya');
 }
 
 

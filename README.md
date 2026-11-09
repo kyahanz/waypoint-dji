@@ -370,6 +370,9 @@ selalu siap ambil alih manual saat menerbangkannya.
   pemeriksa rintangan.
 - **Lanjutkan misi** — ketuk titik terakhir yang sudah dipotret, jalur dipotong
   dari situ, dan drone naik ke ketinggian aman dulu sebelum menyeberang.
+- **Peringatan kabel dan tiang** — angka tinggi jaringan listrik Indonesia,
+  plus perintah melihat sendiri. Sengaja bukan deteksi otomatis; alasannya di
+  bawah.
 - **Gerbang keselamatan** — satu pintu yang semua rencana harus lewati.
   Aplikasi tidak pernah diam-diam membetulkan angka; kalau ada yang berbahaya,
   dia bilang.
@@ -483,6 +486,53 @@ Satu hal yang drone memang tidak bisa: **kaki objek**, kira-kira 0-3 m
 terbawah. Cincin terendah pun membidik di atas itu, dan menurunkannya berarti
 mengelilingi tugu di ketinggian pohon dan kabel. Keliling bagian itu dengan
 kamera tangan, lalu gabungkan di software olah yang sama.
+
+## Kabel listrik: kenapa angka, bukan deteksi
+
+Kabel adalah satu-satunya rintangan yang benar-benar mematikan dan **tidak
+terlihat sensor drone**. Dia juga tidak ada di peta bangunan, dan tidak ada di
+data elevasi.
+
+Pernah dipertimbangkan menariknya dari OpenStreetMap, seperti yang sudah
+dilakukan untuk bangunan. Itu dibatalkan, dan bukan karena susah dikerjakan:
+cakupan OSM untuk jaringan **distribusi** di Indonesia — kabel di pinggir jalan
+kampung dan perumahan, yang justru paling sering menjatuhkan drone — nyaris
+nol. Jaringan transmisi tegangan tinggi dan menara telekomunikasi cakupannya
+lumayan, tapi bukan itu yang paling sering kena.
+
+Peta yang kosong karena datanya tidak ada akan terbaca sebagai "aman". Itu
+memindahkan kewaspadaan pengguna ke data yang tidak ada isinya — lebih
+berbahaya daripada tidak ada peta sama sekali.
+
+Jadi yang diberikan: angka yang memang sudah diketahui, dan perintah melihat
+sendiri. Drone tidak bisa melihat kabel; manusia bisa.
+
+| Jaringan | Tinggi tiang | Kabel menggantung |
+|---|---|---|
+| JTR — tegangan rendah, ke rumah | 9 m | ~7–9 m |
+| JTM — tegangan menengah 20 kV | 11–13 m | ~9–11 m |
+| Tiang trafo (GTT) | 13 m | — |
+
+**Di atas 15 m, seluruh jaringan distribusi sudah terlewati.** Angka itu dipakai
+sebagai batas praktis, dengan margin di atas angka tertinggi yang pernah
+disebut sumber mana pun.
+
+Seberapa pasti? Tidak terlalu, dan itu ikut ditulis di gerbangnya. Sumber tidak
+seragam: jurnal teknik mengutip SPLN 1997 untuk panjang tiang 9/11/13 m, satu
+portal berita menyebut tiang TR ~7.5 m dan TM ~10.8 m, sementara produsen tiang
+baja menyebut JTM 12–15 m.
+
+**SUTT dan SUTET kategori lain, dan di situ "terbang di atasnya" bukan
+jawabannya.** Menaranya puluhan meter, dan yang diatur justru ruang bebasnya:
+untuk SUTET 500 kV sekitar 22 m mendatar dari tapak menara untuk sirkit tunggal
+dan 17 m untuk sirkit ganda. Aturan yang dirujuk pun berbeda antar sumber —
+sebagian masih Permen ESDM 18/2015, sementara PLN menyebut Permen ESDM 13/2021.
+Kalau ada menara transmisi di sekitar lahan: hindari koridornya.
+
+Gerbangnya menilai titik **terendah** yang benar-benar diperintahkan, bukan
+angka di slider — dengan ikut kontur drone turun relatif terhadap tanah di
+bagian lahan yang lebih tinggi, dan di orbit tiap cincin punya ketinggiannya
+sendiri.
 
 ## Dua mode
 
