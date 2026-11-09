@@ -205,8 +205,8 @@
               </div>
               <input id="alt" type="range" min="20" max="120" step="1" value="100" />
               <p class="sub">
-                GSD <strong id="gsd-derived">—</strong> · makin rendah makin
-                detail, tapi makin lama
+                Ketelitian <strong id="gsd-derived">—</strong> (GSD) · makin
+                rendah makin detail, tapi makin lama
               </p>
               <p class="sub" id="gsd-oblique-note" hidden></p>
             </div>
@@ -286,7 +286,7 @@
               </div>
               <p class="sub">
                 Ketelitian di dinding <strong id="orbit-gsd">—</strong>. Radius
-                menentukan GSD seperti ketinggian menentukannya di peta datar —
+                yang menentukannya di sini, seperti ketinggian di pola lain —
                 tapi yang dihitung jarak miring ke dinding, bukan jarak mendatar.
               </p>
 
@@ -359,7 +359,7 @@
             <div class="field" id="field-buffer">
               <div class="field-head">
                 <label for="buffer">Buffer tepi</label>
-                <output id="buffer-out">1.0× jalur</output>
+                <output id="buffer-out">1.0× jarak jalur</output>
               </div>
               <input id="buffer" type="range" min="0" max="3" step="0.5" value="1" />
               <p class="sub">
@@ -403,17 +403,23 @@
 
               <div class="field">
                 <div class="field-head">
-                  <label for="angle">Arah terbang (°, 0 = otomatis)</label>
+                  <label for="angle">Arah terbang (°)</label>
                   <output id="angle-out">otomatis</output>
                 </div>
                 <input id="angle" type="number" min="0" max="359" step="1" value="0" />
+                <label class="switch-row" for="angle-auto">
+                  <input id="angle-auto" type="checkbox" checked />
+                  <span class="switch-body">
+                    <span class="switch-label">Arah otomatis</span>
+                    <span class="switch-note" id="angle-note">
+                      Mengikuti sisi terpanjang lahan, jadi jalurnya paling
+                      sedikit. Ikut berubah kalau lahannya digambar ulang.
+                    </span>
+                  </span>
+                </label>
                 <div class="row tight">
-                  <button class="btn link" id="btn-auto-angle">Ikuti sisi terpanjang</button>
+                  <button class="btn link" id="btn-auto-angle">Kunci ke sisi terpanjang</button>
                 </div>
-                <p class="sub">
-                  0 berarti aplikasi memilih arah jalur paling sedikit, mengikuti
-                  sisi terpanjang lahan.
-                </p>
               </div>
 
               <div class="field">
@@ -634,9 +640,9 @@
         </div>
 
         <div id="view-switch" class="floating">
-          <button class="chip active" data-view="2d" title="Peta datar">2D</button>
-          <button class="chip" data-view="3d" title="Medan timbul">3D</button>
-          <button class="chip" data-view="3dobj" title="Medan + bangunan">Objek</button>
+          <button class="chip active" data-view="2d" title="Peta tanpa kemiringan">2D</button>
+          <button class="chip" data-view="3d" title="Medan timbul dari data elevasi">Medan</button>
+          <button class="chip" data-view="3dobj" title="Medan + bangunan dari OpenStreetMap">Bangunan</button>
         </div>
 
         <div id="legend" class="floating legend" hidden></div>

@@ -573,6 +573,8 @@ const els = {
   frontOut: $('front-out'),
   sideOut: $('side-out'),
   angleOut: $('angle-out'),
+  angleAuto: $('angle-auto'),
+  angleNote: $('angle-note'),
   area: $('area-readout'),
   areaVal: $('area-val'),
   homeReadout: $('home-readout'),
@@ -1042,6 +1044,27 @@ els.patternSeg.querySelectorAll('[data-pattern]').forEach((btn) => {
 
 els.angle.addEventListener('input', () => {
   state.advanced.angleDeg = Number(els.angle.value) || 0;
+  // Mengetik sudut berarti tidak otomatis lagi. Tanpa ini, saklar bilang
+  // "otomatis" sementara angka yang diketik yang dipakai.
+  if (state.advanced.angleDeg) els.angleAuto.checked = false;
+  render();
+});
+
+els.angleAuto.addEventListener('change', () => {
+  if (els.angleAuto.checked) {
+    state.advanced.angleDeg = 0;
+    els.angle.value = '0';
+  } else if (!state.advanced.angleDeg) {
+    // Dilepas dari otomatis tanpa angka: isi dengan arah yang sedang dipakai,
+    // supaya titik awalnya jelas alih-alih melompat ke 0.
+    // 0 tidak bisa disimpan sebagai arah manual (0 berarti otomatis), tapi 180
+    // menghasilkan jalur yang sama persis — cuma arah mulainya terbalik. Jadi
+    // arah yang sedang dipakai tetap dipertahankan, bukan melompat ke angka
+    // lain. Trik yang sama sudah dipakai applyLongestEdgeAngle().
+    const dipakai = state.plan?.advanced?.angleDeg ?? 0;
+    state.advanced.angleDeg = dipakai || 180;
+    els.angle.value = String(state.advanced.angleDeg);
+  }
   render();
 });
 
@@ -2202,11 +2225,17 @@ function render() {
 function updateDerived(plan) {
   els.frontOut.textContent = `${els.front.value}%`;
   els.sideOut.textContent = `${els.side.value}%`;
+  const arahOtomatis = !state.advanced.angleDeg;
+  els.angleAuto.checked = arahOtomatis;
+  els.angle.disabled = arahOtomatis;
   els.angleOut.textContent = state.advanced.angleDeg
     ? `${state.advanced.angleDeg}°`
     : plan
       ? `otomatis · ${plan.advanced.angleDeg}°`
       : 'otomatis';
+  els.angleNote.textContent = arahOtomatis
+    ? 'Mengikuti sisi terpanjang lahan, jadi jalurnya paling sedikit. Ikut berubah kalau lahannya digambar ulang.'
+    : `Diatur manual di ${state.advanced.angleDeg}°. Arah 0° dan 180° menghasilkan jalur yang sama, cuma arah mulainya terbalik.`;
   // Pola yang mencampur sudut gimbal memegang nilainya sendiri per lintasan.
   // Slider-nya dimatikan, bukan dibiarkan terlihat berfungsi padahal angkanya
   // tidak pernah sampai ke file.
@@ -2242,7 +2271,7 @@ function updateDerived(plan) {
   els.rthHeightOut.textContent = `${state.advanced.rthHeightM ?? SAFE_ADVANCED.rthHeightM} m`;
 
   const mult = Number(els.buffer.value);
-  els.bufferOut.textContent = mult === 0 ? 'mati' : `${mult.toFixed(1)}× jalur`;
+  els.bufferOut.textContent = mult === 0 ? 'mati' : `${mult.toFixed(1)}× jarak jalur`;
 
   const o = state.orbit;
   els.objHeightOut.textContent = `${o.objectHeightM} m`;
@@ -2310,6 +2339,10 @@ function updateDerived(plan) {
   }
 
   const meters = mult === 0 ? 'tepat di batas' : `${(mult * p.sideSpacing).toFixed(0)} m`;
+
+  // Kelipatan saja tidak terbaca tanpa tahu jarak jalurnya berapa — dan jarak
+  // jalur ikut berubah tiap kali ketinggian atau overlap digeser.
+  if (mult !== 0) els.bufferOut.textContent = `${mult.toFixed(1)}× jarak jalur · ${meters}`;
   const cost = plan?.bufferCost;
   els.bufferM.textContent =
     cost && cost.photos > 0
