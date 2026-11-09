@@ -515,13 +515,13 @@ const els = {
   orbitMaxPitch: $('orbit-maxpitch'),
   orbitMaxPitchOut: $('orbit-maxpitch-out'),
   orbitCap: $('orbit-cap'),
-  orbitHeadingSeg: $('orbit-heading-seg'),
-  orbitHeadingHint: $('orbit-heading-hint'),
+  orbitPoi: $('orbit-poi'),
   orbitRingsTable: $('orbit-rings-table'),
   orbitGsd: $('orbit-gsd'),
   fieldAlt: $('field-alt'),
   fieldOverlap: $('field-overlap'),
   fieldBuffer: $('field-buffer'),
+  fieldMode: $('field-mode'),
   patternCost: $('pattern-cost'),
   patternCostVal: $('pattern-cost-val'),
   gimbal: $('gimbal'),
@@ -871,17 +871,13 @@ function wireOrbitInputs() {
     state.orbit.cap = els.orbitCap.checked;
     render();
   };
-  els.orbitHeadingSeg.querySelectorAll('[data-heading]').forEach((btn) => {
-    btn.onclick = () => {
-      els.orbitHeadingSeg
-        .querySelectorAll('[data-heading]')
-        .forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.orbit.headingMode = btn.dataset.heading;
-      els.orbitHeadingHint.textContent = ORBIT_HEADING_HINT[state.orbit.headingMode];
-      render();
-    };
-  });
+  // Saklar, bukan dua tombol setara: yang satu bawaan dan yang satu jalan
+  // keluar. Nilai yang disimpan tetap nama mode-nya, supaya project dan link
+  // lama tidak perlu dimigrasi.
+  els.orbitPoi.onchange = () => {
+    state.orbit.headingMode = els.orbitPoi.checked ? 'towardPOI' : 'smoothTransition';
+    render();
+  };
 }
 wireOrbitInputs();
 
@@ -894,10 +890,7 @@ function syncOrbitInputs() {
   els.orbitStep.value = String(o.stepDeg);
   els.orbitMaxPitch.value = String(o.maxPitchDeg);
   els.orbitCap.checked = !!o.cap;
-  els.orbitHeadingSeg.querySelectorAll('[data-heading]').forEach((b) => {
-    b.classList.toggle('active', b.dataset.heading === o.headingMode);
-  });
-  els.orbitHeadingHint.textContent = ORBIT_HEADING_HINT[o.headingMode];
+  els.orbitPoi.checked = o.headingMode === 'towardPOI';
   syncPatternFields();
 }
 
@@ -996,13 +989,6 @@ const PATTERN_HINT = {
     'Mengelilingi satu objek tegak di beberapa tingkat ketinggian, kamera selalu menghadap ke dalam. Untuk tugu, menara, patung — benda yang sempit tapi tinggi, yang isinya ada di dinding, bukan di tanah.',
 };
 
-const ORBIT_HEADING_HINT = {
-  smoothTransition:
-    'Sudut hadap dihitung di sini dan ditulis di tiap titik — drone tidak perlu paham konsep titik pusat. Belum ada contoh file nyata untuk dua-duanya; kalau kamera tidak menghadap ke dalam, coba yang satunya.',
-  towardPOI:
-    'Satu titik pusat ditulis di file, drone yang menghitung sendiri arah hadapnya. Lebih rapi, tapi bergantung pada DJI Fly benar-benar membaca tag itu — dan itu belum terbukti.',
-};
-
 /**
  * Field mana yang berlaku untuk pola mana.
  *
@@ -1017,6 +1003,10 @@ function syncPatternFields() {
   els.fieldAlt.hidden = orbit;
   els.fieldOverlap.hidden = orbit;
   els.fieldBuffer.hidden = orbit;
+  // Orbit memaksa berhenti sejenak di buildOrbitPlan — pada jarak sekitar 3 m
+  // antar foto, melintas terus berarti kamera tidak sempat menjepret. Tombol
+  // modenya tetap bisa diklik tapi tidak mengubah apa pun, jadi disembunyikan.
+  els.fieldMode.hidden = orbit;
 }
 
 els.patternSeg.querySelectorAll('[data-pattern]').forEach((btn) => {
@@ -1149,15 +1139,50 @@ const MODE_HINT = {
   stopAndShoot:
     'Drone berhenti sebentar di tiap titik sebelum menjepret. Foto paling tajam, dan ini satu-satunya bentuk yang cocok dengan contoh file yang kita punya.',
   continuous:
-    'Drone melintas tanpa berhenti, menjepret sambil jalan. Lebih cepat dan hemat baterai — tapi belum ada contoh nyata yang bentuknya begini, jadi belum tentu diterima DJI Fly.',
+    'Drone melintas tanpa berhenti, menjepret sambil jalan. Belum ada contoh nyata yang bentuknya begini, jadi belum tentu diterima DJI Fly.',
 };
+
+/**
+ * Keterangan mode jeda, dengan ongkos mode satunya dalam angka.
+ *
+ * "Lebih cepat" itu benar tapi tidak bisa dipakai memutuskan — apalagi karena
+ * yang ditukar adalah bentuk file yang belum terbukti diterima. Ternyata
+ * selisihnya besar: 43-59% tergantung luas lahan. Angka sebesar itu pantas
+ * muncul di sebelah tombolnya, bukan disimpulkan sendiri oleh pengguna.
+ */
+function modeHintText(plan) {
+  const dasar = MODE_HINT[state.mode];
+  const alt = plan?.modeAlt;
+  if (!alt || !alt.currentS) return dasar;
+
+  // Penghematan selalu dihitung terhadap yang LEBIH LAMBAT, supaya angkanya
+  // sama persis dari mode mana pun dilihat. Dihitung terbalik, 551 detik jadi
+  // 272 detik terbaca "hemat 102%" — angka yang mustahil dan langsung
+  // menghilangkan kepercayaan pada seluruh panel.
+  const cepat = Math.min(alt.currentS, alt.durationS);
+  const lambat = Math.max(alt.currentS, alt.durationS);
+  const hemat = 1 - cepat / lambat;
+
+  // Di bawah 5% tidak ada yang perlu ditimbang; menyebutnya malah jadi derau.
+  if (hemat < 0.05) return `${dasar} Mode satunya praktis sama cepatnya di lahan ini.`;
+
+  const persen = Math.round(hemat * 100);
+
+  // Sengaja TIDAK menyebut durasi mutlak mode satunya. Angka pembanding ini
+  // diukur tanpa transit supaya selisihnya murni soal mode, sementara "Total
+  // waktu" di ringkasan termasuk transit — menuliskannya di sini membuat dua
+  // angka yang tidak cocok waktu pengguna benar-benar pindah mode.
+  if (state.mode === 'stopAndShoot') {
+    return `${dasar} Tanpa jeda memangkas sekitar ${persen}% waktu terbang, tapi bentuk filenya belum pernah terbukti diterima.`;
+  }
+  return `${dasar} Imbalannya sekitar ${persen}% waktu terbang dibanding berhenti sejenak, yang bentuknya sudah terbukti.`;
+}
 
 modeSegButtons().forEach((btn) => {
   btn.onclick = () => {
     modeSegButtons().forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     state.mode = btn.dataset.mode;
-    els.modeHint.textContent = MODE_HINT[state.mode];
     render();
   };
 });
@@ -1865,6 +1890,40 @@ function buildPlan() {
 
   const hoverPerPhoto = stopAtEach ? HOVER_SEC : 0;
 
+  // Berapa sebenarnya ongkos atau untungnya mode satunya.
+  //
+  // "Lebih cepat" di keterangan mode itu benar tapi tidak bisa dipakai
+  // memutuskan — apalagi karena mode tanpa jeda menukar kecepatan dengan
+  // bentuk file yang belum terbukti diterima. Tukar-tambah tanpa angka bukan
+  // tukar-tambah, cuma firasat. Jadi durasi mode satunya ikut dihitung,
+  // persis seperti bufferCost menghitung versi tanpa buffer sebagai pembanding.
+  //
+  // Dipakai waypoint yang sama untuk keduanya: sejak perintah jepret-per-jarak
+  // dibuang, bedanya dua mode memang cuma ada-tidaknya hoverTime dan batas
+  // kecepatannya — bukan jumlah titiknya.
+  const modeAltSpeed = stopAtEach
+    ? Math.min(params.recommendedSpeed, lim.maxSpeedMs)
+    : Math.min(lim.maxSpeedMs, lim.maxSpeedMs);
+  const modeAlt = {
+    mode: stopAtEach ? 'continuous' : 'stopAndShoot',
+    speed: modeAltSpeed,
+    durationS: missionDuration(grid.waypoints, {
+      speed: modeAltSpeed,
+      accel,
+      stopAtEach: !stopAtEach,
+      hoverPerPhotoSec: stopAtEach ? 0 : HOVER_SEC,
+    }),
+    // Mode yang sedang dipakai, diukur dengan cara yang sama persis — tanpa
+    // transit — supaya selisihnya murni soal modenya, bukan soal jarak ke
+    // titik awal.
+    currentS: missionDuration(grid.waypoints, {
+      speed,
+      accel,
+      stopAtEach,
+      hoverPerPhotoSec: hoverPerPhoto,
+    }),
+  };
+
   // Kecepatan yang BENAR-BENAR tercapai. Di mode berhenti sejenak, ruas antar
   // titik terlalu pendek untuk mencapai kecepatan jelajah — drone mempercepat
   // sampai setengah jalan lalu mengerem. Tanpa angka ini, layar menampilkan
@@ -1984,6 +2043,7 @@ function buildPlan() {
     autoSpeed,
     stopAtEach,
     speed,
+    modeAlt,
     legMedianM,
     peakSpeedMs,
     accel,
@@ -2225,6 +2285,8 @@ function render() {
 function updateDerived(plan) {
   els.frontOut.textContent = `${els.front.value}%`;
   els.sideOut.textContent = `${els.side.value}%`;
+  els.modeHint.textContent = modeHintText(plan);
+
   const arahOtomatis = !state.advanced.angleDeg;
   els.angleAuto.checked = arahOtomatis;
   els.angle.disabled = arahOtomatis;

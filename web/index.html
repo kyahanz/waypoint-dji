@@ -338,16 +338,25 @@
 
               <div class="field">
                 <label class="block-label">Cara kamera menghadap objek</label>
-                <div class="seg" id="orbit-heading-seg">
-                  <button class="seg-btn active" data-heading="smoothTransition">Sudut per titik</button>
-                  <button class="seg-btn" data-heading="towardPOI">Titik pusat</button>
-                </div>
-                <p class="sub" id="orbit-heading-hint">
-                  Sudut hadap dihitung di sini dan ditulis di tiap titik — drone
-                  tidak perlu paham konsep titik pusat. Belum ada contoh file
-                  nyata untuk dua-duanya; kalau kamera tidak menghadap ke dalam,
-                  coba yang satunya.
+                <p class="sub">
+                  Bawaannya: sudut hadap dihitung di sini dan ditulis di tiap
+                  titik, jadi drone tinggal memutar ke angka itu — tidak perlu
+                  paham konsep titik pusat sama sekali.
                 </p>
+                <label class="switch-row" for="orbit-poi">
+                  <input id="orbit-poi" type="checkbox" />
+                  <span class="switch-body">
+                    <span class="switch-label">Pakai titik pusat (towardPOI)</span>
+                    <span class="switch-note">
+                      Nyalakan ini <strong>kalau</strong> drone mengelilingi
+                      objek tapi kameranya tidak menghadap ke dalam. Bentuk ini
+                      menyerahkan hitungan arah hadap ke drone. Dua-duanya belum
+                      pernah terlihat di file yang terbukti diterima, jadi ini
+                      memang jalan keluar untuk dicoba — bukan pilihan kedua
+                      yang setara.
+                    </span>
+                  </span>
+                </label>
               </div>
 
               <div class="field">
@@ -385,7 +394,7 @@
               </div>
             </div>
 
-            <div class="field">
+            <div class="field" id="field-mode">
               <label class="block-label">Jeda di tiap titik</label>
               <div class="seg" id="mode-seg">
                 <button class="seg-btn active" data-mode="stopAndShoot">Berhenti sejenak</button>
