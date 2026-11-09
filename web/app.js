@@ -19,6 +19,7 @@ import {
   medianLegM,
   resumeIndexFor,
   splitByRole,
+  splitByBattery,
   sortieSummary,
   maxDistanceFrom,
   altitudeFromGsd,
@@ -47,6 +48,7 @@ import {
   obstaclesNearPath,
 } from './view3d.js';
 import { buildKmz, downloadBlob } from './kmz.js';
+import { createZipAsync } from './zip-browser.js';
 import { fetchElevations, cachedElevation, missingCoords, reliefOf } from '../src/terrain.js';
 import { createPolygonEditor } from './draw.js';
 import {
@@ -65,6 +67,11 @@ import {
 
 const CENTER = [107.11993938381485, -6.2549323363466];
 const BATTERY_COLORS = ['#4da3ff', '#55c57a', '#f0b429', '#f27272', '#b98cf5', '#52d3d8'];
+
+// Mulai berapa file export dibungkus jadi satu zip, bukan dikirim satu-satu.
+// Lima karena di situlah browser mulai menanyai unduhan beruntun, dan empat
+// masih nyaman diambil satu per satu dari folder Unduhan.
+const AMBANG_ZIP = 5;
 const EMPTY = { type: 'FeatureCollection', features: [] };
 
 // Setelan lanjutan yang aman. Ini bukan sekadar nilai awal — tombol
@@ -113,6 +120,9 @@ const state = {
   // tidak mengubah apa pun yang diexport.
   fileHidden: new Set(),
   fileCount: 0,
+  // 'peran' = nadir dan miring jadi file sendiri-sendiri (bawaan).
+  // 'gabung' = satu file sejauh batas waypoint dan baterai mengizinkan.
+  fileSplit: 'peran',
   resume: null, // { index, lngLat }
   resumePicking: false,
   viewMode: '2d',
@@ -594,6 +604,7 @@ const els = {
   sheet: $('panel'),
   sheetHandle: $('sheet-handle'),
   sheetSummary: $('sheet-summary'),
+  splitHint: $('split-hint'),
   toasts: $('toasts'),
 };
 
@@ -1209,6 +1220,59 @@ modeSegButtons().forEach((btn) => {
   };
 });
 
+/**
+ * Pisah per peran, atau gabung sebisanya.
+ *
+ * Pemisahan per peran itu pilihan tentang PEKERJAAN, bukan tentang batas
+ * teknis: nadir dan miring muat bersama dalam satu file selama jumlah
+ * waypoint dan jatah baterainya cukup — tiap titik membawa sudut gimbalnya
+ * sendiri, jadi mencampurnya sah. Yang didapat dari memisahkan adalah file
+ * yang tiap-tiapnya satu pekerjaan jelas dan bisa diulang sendiri kalau
+ * gagal; yang dibayar adalah satu lepas landas tambahan.
+ *
+ * Di lahan kecil ongkos itu terasa konyol: dua penerbangan lima menit untuk
+ * pekerjaan yang muat sekali jalan. Jadi pilihannya diserahkan, bukan
+ * diputuskan diam-diam — dan "gabung" tetap tunduk pada batas 200 waypoint
+ * dan jatah baterai, karena itu batas drone, bukan selera.
+ */
+const splitSegButtons = () => $('split-seg').querySelectorAll('.seg-btn');
+
+/**
+ * Bagi jalur jadi file, menurut pilihan pengguna.
+ *
+ * Satu pintu untuk dua mode supaya kedua pembangun rencana — grid dan orbit —
+ * tidak masing-masing menafsirkan pilihan ini.
+ *
+ * Di mode 'gabung', peran tiap file dibaca ulang dari titik-titiknya: file
+ * yang isinya satu peran tetap diberi nama perannya, file yang mencampur
+ * ditandai `mixed` supaya panelnya bisa mengatakan apa yang dicampur —
+ * dan TIDAK diberi akhiran nama file, karena "campur" bukan nama pekerjaan.
+ */
+function bagiFile(waypoints, o) {
+  if (state.fileSplit !== 'gabung') return splitByRole(waypoints, o);
+
+  const sorties = splitByBattery(waypoints, o);
+  const meta = sorties.map((s, i) => {
+    const peran = [...new Set(s.map((w) => o.roleOfPass?.[w.pass] ?? null))];
+    return {
+      role: peran.length === 1 ? peran[0] : null,
+      mixed: peran.length > 1,
+      part: i,
+      parts: sorties.length,
+    };
+  });
+  return { sorties, meta };
+}
+
+splitSegButtons().forEach((btn) => {
+  btn.onclick = () => {
+    splitSegButtons().forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.fileSplit = btn.dataset.split;
+    render();
+  };
+});
+
 // Basemap
 document.querySelectorAll('[data-base]').forEach((chip) => {
   chip.onclick = () => {
@@ -1761,7 +1825,7 @@ function buildOrbitPlan() {
   const maxDist = maxDistanceFrom(homeXY, grid.waypoints);
   const transitReserveSec = (2 * maxDist) / speed + 60;
 
-  const { sorties, meta: sortieMeta } = splitByRole(grid.waypoints, {
+  const { sorties, meta: sortieMeta } = bagiFile(grid.waypoints, {
     speed,
     accel,
     stopAtEach,
@@ -2000,7 +2064,7 @@ function buildPlan() {
     (grid.passes ?? []).map((x) => [x.index, x.role ?? null])
   );
 
-  const { sorties, meta: sortieMeta } = splitByRole(grid.waypoints, {
+  const { sorties, meta: sortieMeta } = bagiFile(grid.waypoints, {
     speed,
     accel,
     stopAtEach,
@@ -2244,6 +2308,7 @@ function render() {
     els.stats.className = 'stats empty';
     els.stats.innerHTML =
       '<p class="placeholder">Gambar area dulu untuk melihat rencana terbang.</p>';
+    renderSplitUi(null);
     els.sorties.innerHTML = '';
     els.warnings.innerHTML = '';
     els.gate.hidden = true;
@@ -2321,6 +2386,7 @@ function render() {
 
   updateDerived(plan);
   renderStats(plan);
+  renderSplitUi(plan);
   renderSorties(plan);
   renderLegend(plan);
   renderWarnings(checkWarnings(plan));
@@ -2799,6 +2865,44 @@ const PERAN_POLOS = {
   desc: 'Isinya sama persis jenisnya, cuma dipotong supaya tiap file muat di batas DJI dan di satu baterai. Potongannya menyambung — tidak ada petak yang terlewat selama semua file diterbangkan.',
 };
 
+const PERAN_CAMPUR = {
+  label: 'Nadir + miring dalam satu file',
+  desc: 'Satu penerbangan membawa kedua sudut kamera. Tiap titik membawa sudut gimbalnya sendiri, jadi mencampurnya sah dan DJI Fly tidak protes. Bedanya di lapangan: kalau penerbangan ini gagal di tengah, yang diulang kedua pekerjaannya sekaligus.',
+};
+
+/**
+ * Tombol pilihan pembagian file, dan akibat nyata dari pilihannya.
+ *
+ * Kalimatnya tidak menjelaskan modenya secara umum, melainkan mengatakan apa
+ * yang terjadi PADA RENCANA INI. "Gabung sebisanya" di lahan kecil berarti
+ * satu file; di lahan luas dia tetap jadi banyak file karena batas 200
+ * waypoint dan jatah baterai bukan sesuatu yang bisa dipilih. Tanpa kalimat
+ * itu, orang yang menekan "gabung" lalu tetap melihat lima file akan mengira
+ * tombolnya tidak berfungsi.
+ */
+function renderSplitUi(plan) {
+  splitSegButtons().forEach((b) =>
+    b.classList.toggle('active', b.dataset.split === state.fileSplit)
+  );
+
+  const n = plan?.sorties.length ?? 0;
+  const lim = state.profile?.limits ?? {};
+  const adaPeran = (plan?.sortieMeta ?? []).some((m) => m?.role);
+  const bisaDipisah = adaPeran || (plan?.sortieMeta ?? []).some((m) => m?.mixed);
+
+  if (state.fileSplit === 'gabung') {
+    els.splitHint.textContent =
+      n <= 1
+        ? 'Semuanya muat dalam satu file dan satu penerbangan. Kalau gagal di tengah, yang diulang seluruh pekerjaannya.'
+        : `Tetap ${n} file — bukan karena perannya dipisah, tapi karena batas ${lim.maxWaypoints} waypoint per file dan jatah baterai ${lim.usableFlightMin} menit. Dua batas itu dari drone dan DJI Fly, bukan pilihan.`;
+    return;
+  }
+
+  els.splitHint.textContent = bisaDipisah
+    ? 'Nadir dan miring jadi file sendiri-sendiri. Tiap file satu pekerjaan yang jelas, dan kalau satu gagal cukup ulangi yang itu — ongkosnya satu lepas landas tambahan.'
+    : 'Pola ini cuma punya satu jenis pekerjaan, jadi tidak ada peran yang bisa dipisah. Pembagiannya murni mengikuti batas waypoint dan baterai.';
+}
+
 /**
  * Arah lintasan yang benar-benar ada di dalam satu file.
  *
@@ -3019,10 +3123,13 @@ function renderSorties(plan) {
   // Kelompokkan file menurut peran, mengikuti urutan terbang.
   const grup = [];
   plan.summaries.forEach((s, i) => {
-    const role = plan.sortieMeta?.[i]?.role ?? null;
+    const m = plan.sortieMeta?.[i];
+    // File yang mencampur nadir dan miring tidak punya peran tunggal, tapi dia
+    // juga bukan "tanpa peran" — jadi dia kelompoknya sendiri.
+    const kunci = m?.mixed ? 'campur' : (m?.role ?? null);
     let g = grup[grup.length - 1];
-    if (!g || g.role !== role) {
-      g = { role, items: [] };
+    if (!g || g.kunci !== kunci) {
+      g = { kunci, role: m?.role ?? null, mixed: !!m?.mixed, items: [] };
       grup.push(g);
     }
     g.items.push({ s, i });
@@ -3054,7 +3161,11 @@ function renderSorties(plan) {
     <div class="files">
       <div class="files-head">
         <span class="fcount">${plan.summaries.length}</span>
-        <span class="ftitle">file KMZ<small>Semuanya terunduh sekaligus saat kamu menekan Export.</small></span>
+        <span class="ftitle">file KMZ<small>${
+          plan.summaries.length >= AMBANG_ZIP
+            ? 'Sebanyak ini tidak dikirim satu-satu — Export membungkusnya jadi satu file .zip. Ekstrak dulu di HP.'
+            : 'Semuanya terunduh sekaligus saat kamu menekan Export.'
+        }</small></span>
       </div>
 
       <div class="files-rule">
@@ -3085,7 +3196,9 @@ function renderSorties(plan) {
 
       ${grup
         .map((g) => {
-          const info = (g.role && PERAN_INFO[g.role]) || PERAN_POLOS;
+          const info = g.mixed
+            ? PERAN_CAMPUR
+            : (g.role && PERAN_INFO[g.role]) || PERAN_POLOS;
           const foto = g.items.reduce((n, x) => n + x.s.photos, 0);
           return `
             <div class="fgroup">
@@ -3342,6 +3455,7 @@ function onSave() {
     orbit: { ...state.orbit },
     advanced: { ...state.advanced },
     terrain: state.terrain,
+    fileSplit: state.fileSplit,
     front: Number(els.front.value),
     side: Number(els.side.value),
     buffer: Number(els.buffer.value),
@@ -3416,6 +3530,7 @@ function openProject(id) {
   state.altitudeM = p.altitudeM ?? clampAltitude(altitudeFromGsd(state.profile.camera, p.gsdTarget ?? p.gsd ?? 2));
   state.speedMs = p.speedMs ?? state.speedMs;
   state.terrain = !!p.terrain;
+  state.fileSplit = p.fileSplit ?? 'peran';
   els.terrain.checked = state.terrain;
   state.resume = null;
 
@@ -3563,6 +3678,29 @@ async function exportKmz() {
       return { bytes, name: namaFileKmz(plan, i) };
     }));
 
+    // Di atas ambang ini, mengirim file satu per satu bukan lagi pilihan yang
+    // masuk akal: browser memblokir atau menanyai unduhan beruntun, dan share
+    // sheet dengan belasan lampiran umumnya ditolak diam-diam. Lahan 144 ha
+    // pola 3D menghasilkan 42 file — itu 42 kali tanya-izin, lalu 42 file
+    // tercecer di folder Unduhan.
+    //
+    // Jadi di atas ambang, semuanya dibungkus jadi SATU zip. Ongkosnya satu
+    // langkah ekstra (ekstrak di HP), dan itu jauh lebih murah daripada
+    // unduhan yang separuhnya hilang tanpa ketahuan.
+    if (files.length >= AMBANG_ZIP) {
+      const namaZip = `${namaFileKmz(plan, 0).replace(/_1dari\d+.*\.kmz$/, '')}_${files.length}file.zip`;
+      const zip = await createZipAsync(
+        files.map((f) => ({ name: f.name, data: f.bytes }))
+      );
+      downloadBlob(zip, namaZip);
+      toast(
+        `${files.length} file KMZ dibungkus jadi satu zip. Ekstrak dulu di HP, lalu pindahkan semua .kmz-nya ke folder DJI Fly.`,
+        'ok',
+        8000
+      );
+      return;
+    }
+
     if (canShareFiles()) {
       try {
         await navigator.share({
@@ -3628,6 +3766,7 @@ function encodeState() {
     ob: state.pattern === 'orbit' ? state.orbit : null,
     sp: state.speedAuto ? null : state.speedMs,
     tf: state.terrain ? 1 : 0,
+    fs: state.fileSplit,
     adv: state.advanced,
     v: SCHEMA_VERSION,
   };
@@ -3678,6 +3817,7 @@ function applyStateFromUrl() {
     state.pattern = d.pt ?? 'single';
     state.orbit = { ...state.orbit, ...(d.ob ?? {}) };
     state.terrain = !!d.tf;
+    state.fileSplit = d.fs ?? 'peran';
     els.terrain.checked = state.terrain;
     state.advanced = { ...SAFE_ADVANCED, ...(d.adv ?? {}) };
     syncProfile();

@@ -31,6 +31,7 @@ import {
   offsetPolygon,
   polygonArea,
   selfIntersects,
+  centroid,
 } from '../src/survey.js';
 import { evaluateSafety, JARINGAN_LISTRIK } from '../src/safety.js';
 import { buildTemplateKml, buildWaylinesWpml, MISSION_DEFAULTS } from '../src/wpml.js';
@@ -1237,6 +1238,22 @@ console.log('\nBentuk lahan');
   ok(!selfIntersects(segiDuaBelas), 'poligon 12 titik tidak dianggap menyilang');
   ok(!selfIntersects([[0, 0], [100, 0], [50, 80]]), 'segitiga tidak dianggap menyilang');
   ok(selfIntersects(dasi), 'dasi kupu-kupu ketahuan menyilang');
+  // Titik tengah: rata-rata titik sudut jatuh DI LUAR lahan bentuk L, titik
+  // berat luasnya tidak. Di aplikasi ini titik itu posisi awal penanda lepas
+  // landas, jadi "di luar lahan" bukan ketidaktelitian — itu tempat yang tidak
+  // mungkin dipakai orang berdiri.
+  {
+    const c = centroid(huruf_L);
+    const diDalamL = (p) => (p[0] <= 100 && p[1] <= 40) || (p[0] <= 40 && p[1] <= 100);
+    const rataSudut = [
+      huruf_L.reduce((s2, q) => s2 + q[0], 0) / huruf_L.length,
+      huruf_L.reduce((s2, q) => s2 + q[1], 0) / huruf_L.length,
+    ];
+    ok(diDalamL(c), 'titik tengah huruf L jatuh di dalam lahannya', c.map((v) => v.toFixed(1)).join(', '));
+    ok(!diDalamL(rataSudut), 'sementara rata-rata titik sudut jatuh di luar', rataSudut.map((v) => v.toFixed(1)).join(', '));
+    const k = centroid(kotak);
+    ok(near(k[0], 50, 1e-9) && near(k[1], 50, 1e-9), 'dan di bujursangkar tetap tepat di tengah');
+  }
   ok(
     polygonArea(dasi) < 1 && polygonArea(kotak) > 9999,
     'dan itu memang kasus yang luasnya jadi nol',

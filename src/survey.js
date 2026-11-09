@@ -70,12 +70,44 @@ export function selfIntersects(xy) {
   return false;
 }
 
+/**
+ * Titik tengah poligon — titik BERAT LUASNYA, bukan rata-rata titik sudut.
+ *
+ * Bedanya tidak terlihat di bujursangkar dan langsung terlihat di lahan
+ * bentuk L: rata-rata titik sudut tertarik ke sisi yang titik sudutnya lebih
+ * rapat, dan di bentuk cekung hasilnya bisa jatuh DI LUAR lahan. Di aplikasi
+ * ini titik itu dipakai sebagai posisi awal penanda lepas landas, jadi
+ * "di luar lahan" berarti seluruh hitungan transit berangkat dari tempat yang
+ * tidak mungkin dipakai orang berdiri.
+ *
+ * Kalau luasnya nol — poligon menyilang, atau semua titik segaris — rumus
+ * titik berat ikut nol dan hasilnya tak tentu. Untuk itu dikembalikan
+ * rata-rata titik sudut: bukan jawaban yang benar, tapi jawaban yang ada di
+ * sekitar gambarnya, dan bentuk seperti itu sudah ditahan gerbang keselamatan
+ * lewat selfIntersects().
+ */
 export function centroid(coords) {
   const n = coords.length;
-  return [
+  const rataSudut = () => [
     coords.reduce((s, c) => s + c[0], 0) / n,
     coords.reduce((s, c) => s + c[1], 0) / n,
   ];
+  if (n < 3) return rataSudut();
+
+  let a2 = 0; // dua kali luas bertanda
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < n; i++) {
+    const [x1, y1] = coords[i];
+    const [x2, y2] = coords[(i + 1) % n];
+    const silang = x1 * y2 - x2 * y1;
+    a2 += silang;
+    cx += (x1 + x2) * silang;
+    cy += (y1 + y2) * silang;
+  }
+
+  if (Math.abs(a2) < 1e-12) return rataSudut();
+  return [cx / (3 * a2), cy / (3 * a2)];
 }
 
 // ---------- Fotogrametri ----------

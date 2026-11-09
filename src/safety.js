@@ -280,6 +280,50 @@ export function evaluateSafety(plan, profile, o = {}) {
     );
   }
 
+  // ---- Ketinggian vs ukuran lahan ----
+  //
+  // Pemeriksaan ini lahir dari satu pertanyaan yang wajar: "lahan 1950 m²,
+  // ketinggian 70 m, pola 3D — kok cuma 52 foto, 5 menit?" Angkanya benar.
+  // Yang salah ketinggiannya: pada 70 m satu frame menutupi 105 x 79 m,
+  // sementara lahannya 44 x 44 m. Satu jepretan saja sudah memuat seluruh
+  // lahan, jadi tidak ada yang bisa dilakukan foto ke-52 selain mengulang
+  // yang sama dari posisi yang nyaris sama.
+  //
+  // Ini bukan soal efisiensi, melainkan soal hasil: model 3D dibangun dari
+  // PERBEDAAN sudut pandang antar foto. Kalau semua foto memuat seluruh
+  // lahan dari ketinggian yang sama, perbedaannya tipis dan rekonstruksinya
+  // ikut tipis — sementara layar tetap melaporkan "52 foto" seolah cukup.
+  {
+    const fp = plan.params.footprint;
+    const sisi = Math.sqrt(plan.area ?? 0);
+    if (fp?.w > 0 && sisi > 0 && plan.pattern !== 'orbit' && fp.w >= sisi) {
+      // Jejak foto lurus sebanding dengan ketinggian, jadi ketinggian yang
+      // membuat lebar jejak jadi separuh lebar lahan tinggal dihitung lurus.
+      const saran = Math.max(20, Math.round(((plan.altitude * (sisi / 2)) / fp.w) / 5) * 5);
+      add(
+        'warn',
+        'terlalu-tinggi-untuk-lahan',
+        `Di ${plan.altitude.toFixed(0)} m, satu foto sudah menutupi ${fp.w.toFixed(0)} x ${fp.h.toFixed(0)} m — sementara lahannya cuma sekitar ${sisi.toFixed(0)} x ${sisi.toFixed(0)} m. Jadi tiap jepretan memuat seluruh lahan, dan foto berikutnya nyaris mengulang yang sebelumnya. Jumlah fotonya memang jadi sedikit, dan itu bukan kabar baik: model 3D dibangun dari beda sudut pandang antar foto, bukan dari banyaknya piksel. Untuk lahan sesempit ini coba turun ke sekitar ${saran} m.`
+      );
+    }
+  }
+
+  // ---- Buffer tepi yang ongkosnya melebihi lahannya ----
+  //
+  // Buffer diukur dalam KELIPATAN JARAK JALUR, dan jarak jalur tidak tahu
+  // lahannya seberapa. Di sawah 10 ha, satu jarak jalur itu pinggiran tipis;
+  // di petak 1950 m², satu jarak jalur (31 m) hampir selebar lahannya sendiri
+  // — jadi default 1.0x bisa melipatgandakan yang diterbangkan. Angkanya
+  // sudah tampil di layar, tapi tampil bukan berarti terbaca.
+  if (plan.bufferM > 0 && plan.area > 0 && plan.gridArea / plan.area >= 1.8) {
+    const lipat = plan.gridArea / plan.area;
+    add(
+      'warn',
+      'buffer-kemahalan',
+      `Buffer tepi membuat yang diterbangkan jadi ${lipat.toFixed(1)}x luas lahannya (${(plan.gridArea / 10000).toFixed(2)} ha dari ${(plan.area / 10000).toFixed(2)} ha)${plan.bufferCost?.photos ? `, berarti +${plan.bufferCost.photos} foto` : ''}. Di lahan kecil satu jarak jalur hampir selebar lahannya sendiri. Turunkan buffer ke 0.5x kalau tepi lahan tidak harus benar-benar tertutup.`
+    );
+  }
+
   if (plan.pattern === 'cross' && plan.gimbalPitch === -90) {
     add(
       'info',

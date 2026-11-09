@@ -230,7 +230,11 @@ Yang sudah jalan:
   jumlah waypoint, jumlah baterai
 
 **Keluaran**
-- Export KMZ, satu file per baterai
+- Export KMZ, satu file per baterai — bisa dipilih **pisah per peran** (nadir
+  dan miring jadi file sendiri) atau **gabung sebisanya** (satu file sejauh
+  batas 200 waypoint dan jatah baterai mengizinkan)
+- Lima file atau lebih dibungkus jadi satu `.zip`, karena unduhan beruntun
+  sebanyak itu diblokir browser
 - Seluruh rencana tersimpan di hash URL — refresh dan tombol back tidak
   menghilangkan pekerjaan, dan menyalin alamatnya sama dengan membagikan
   rencananya
@@ -525,6 +529,28 @@ depan karena itu urutan terbang.
 Foto nadir dan foto miring tetap digabung di **software olah**, bukan di file
 misi: semua foto dari semua file masuk satu project.
 
+#### Pisah per peran itu pilihan, bukan batas teknis
+
+Nadir dan miring sebenarnya **muat bersama dalam satu file** selama jumlah
+waypoint dan jatah baterainya cukup — tiap titik membawa sudut gimbalnya
+sendiri, jadi mencampurnya sah dan DJI Fly tidak protes. Yang didapat dari
+memisahkan adalah file yang tiap-tiapnya satu pekerjaan jelas dan bisa diulang
+sendiri kalau gagal; yang dibayar satu lepas landas tambahan.
+
+Di lahan kecil ongkos itu terasa konyol: dua penerbangan lima menit untuk
+pekerjaan yang muat sekali jalan. Jadi pilihannya diserahkan ke pengguna lewat
+**Pembagian file KMZ** — `Pisah per peran` (bawaan) atau `Gabung sebisanya` —
+dan "gabung" tetap tunduk pada batas 200 waypoint dan jatah baterai, karena itu
+batas drone, bukan selera. Kalau sesudah digabung filenya tetap banyak,
+panelnya mengatakan BATAS MANA yang menahannya, supaya tombolnya tidak terlihat
+seperti tidak berfungsi.
+
+Di atas **lima file**, Export tidak lagi mengirimnya satu per satu melainkan
+membungkus semuanya jadi satu `.zip`. Browser memblokir atau menanyai unduhan
+beruntun sebanyak itu, dan lahan 144 ha pola 3D menghasilkan 42 file — 42 kali
+tanya-izin, lalu 42 file tercecer di folder Unduhan. Ongkos zip cuma satu
+langkah ekstrak di HP.
+
 #### Panelnya harus ikut menjelaskan, bukan cuma menghitung
 
 Pemecahan yang benar tetap terasa seperti kekacauan kalau layarnya cuma
@@ -593,6 +619,42 @@ Masih ada pola **Miring saja** untuk kasus nadirnya sudah dipunyai dari misi
 lain, tapi tidak ditawarkan di layar — gerbang keselamatannya mengingatkan
 bahwa tanpa nadir, modelnya berdiri tapi atapnya meleleh dan ukurannya
 mengambang.
+
+### Lahan kecil, ketinggian besar: angkanya benar, rencananya tidak
+
+Pertanyaan yang memunculkan pemeriksaan ini: *lahan 1950 m², ketinggian 70 m,
+pola 3D — kok cuma 63 foto, 7 menit?* Aritmetikanya benar. Yang salah
+ketinggiannya.
+
+Pada 70 m dengan Mini 5 Pro (wide, 12 MP), satu frame menutupi **105 × 79 m**,
+sementara lahannya cuma **44 × 44 m**. Jadi satu jepretan saja sudah memuat
+seluruh lahan, dan foto berikutnya nyaris mengulang yang sebelumnya dari posisi
+yang nyaris sama. Fotonya sedikit bukan karena hitungannya hemat, tapi karena
+tidak ada lagi yang bisa dilihat.
+
+Dan sedikitnya foto di sini bukan kabar baik: model 3D dibangun dari **beda
+sudut pandang antar foto**, bukan dari banyaknya piksel per foto. Di lahan
+sesempit itu, turun ke ~20–25 m memberi GSD 0.7–0.9 cm/px dan ratusan foto
+dengan geometri yang benar-benar berbeda satu sama lain.
+
+| Ketinggian | GSD | Jejak satu foto | Foto | Waktu |
+|---|---|---|---|---|
+| 70 m | 2.56 cm/px | 105 × 79 m | 63 | ~8 menit |
+| 50 m | 1.83 cm/px | 75 × 56 m | 96 | ~11 menit |
+| 35 m | 1.28 cm/px | 53 × 39 m | 150 | ~15 menit |
+| 25 m | 0.92 cm/px | 38 × 28 m | 216 | ~19 menit |
+
+Aplikasi sekarang mengatakan ini sendiri: begitu lebar jejak foto melebihi
+lebar lahannya, muncul peringatan yang menyebut kedua angkanya dan menyarankan
+ketinggian yang membuat satu frame kira-kira separuh lebar lahan.
+
+Masih di keluarga yang sama: **buffer tepi diukur dalam kelipatan jarak
+jalur**, dan jarak jalur tidak tahu lahannya seberapa. Di sawah 10 ha satu
+jarak jalur itu pinggiran tipis; di petak 1950 m² satu jarak jalur (31 m)
+hampir selebar lahannya sendiri, jadi default 1.0× membuat yang diterbangkan
+jadi **5.9× luas lahannya**. Angkanya sudah lama tampil di layar, tapi tampil
+bukan berarti terbaca — sekarang ada peringatan begitu yang diterbangkan
+melewati 1.8× luas lahan.
 
 ### Berapa lama sebenarnya
 
