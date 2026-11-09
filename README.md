@@ -242,22 +242,29 @@ lepas landas jadi penting di medan miring, dan aplikasi memperingatkan dua
 kasus gagal: perintah ketinggian menembus batas 120 m, dan perintah ketinggian
 negatif (lahan lebih rendah dari tempat lepas landas).
 
-### Peta offline
+### Offline
 
-Service worker menyimpan berkas aplikasi, tile peta, dan jawaban API elevasi.
-Tombol **Unduh area** mengambil tile zoom 13–19 yang menutupi area terbang,
-dibatasi 4 permintaan sekaligus karena penyedia tile gratis melarang unduhan
-massal. Area 6 ha butuh ~150 tile (~5 MB).
+Service worker menyimpan berkas aplikasi, tile peta, dan jawaban API elevasi —
+**sambil peta digeser biasa**, tanpa ada yang perlu ditekan. Sudah diuji dengan
+server dimatikan: halaman dimuat ulang dari nol, citra satelit tetap tampil,
+dan rencana terbang tetap terhitung.
 
-Sudah diuji dengan server dimatikan: halaman dimuat ulang dari nol, citra
-satelit tetap tampil, dan rencana terbang tetap terhitung.
+Pengunduh tile massal **dihapus**. Dulu ada bagian panel "Peta offline" dengan
+tombol Unduh area, hitungan tile, dan status cache. Setelah sekian lama, tile
+tersimpan tetap 0: satu bagian panel penuh untuk fitur yang tidak pernah
+dipakai, sementara bagian yang berguna — tile yang tersimpan sendiri sambil
+dipakai — berjalan tanpa UI sama sekali.
+
+Gantinya: cache dibatasi 1500 tile dan 500 respons elevasi, yang paling lama
+dibuang lebih dulu. Batas itu perlu justru karena tombol "Hapus cache" ikut
+hilang — tanpa batas, cache tumbuh terus tanpa ada yang bisa menghentikannya.
 
 **Batasan penting:** service worker hanya berjalan di konteks aman — `https`
 atau `localhost`. Membuka prototipe lewat alamat LAN (`http://192.168.x.x`)
-untuk fitur "Buka di HP" berarti peta offline **tidak aktif** di sana, dan
-aplikasi mengatakannya terang-terangan. Supaya keduanya jalan bersamaan di HP,
-prototipe perlu disajikan lewat https: deploy ke hosting mana pun yang
-memberi sertifikat, atau pakai terowongan seperti `cloudflared tunnel`.
+untuk fitur "Buka di HP" berarti tidak ada cache offline di sana. Supaya
+keduanya jalan bersamaan di HP, prototipe perlu disajikan lewat https: deploy
+ke hosting mana pun yang memberi sertifikat, atau pakai terowongan seperti
+`cloudflared tunnel`.
 
 Belum ada: GCP, upload foto.
 
@@ -297,7 +304,7 @@ dari CDN, karena sebagian host (termasuk Claude Artifacts) memblokir
 stylesheet lintas situs lewat CSP.
 
 Hosting ber-https penting bukan cuma untuk keamanan: service worker — dan
-karenanya peta offline — tidak jalan di `http://` selain `localhost`.
+karenanya cache offline — tidak jalan di `http://` selain `localhost`.
 
 ## Struktur
 
@@ -315,7 +322,6 @@ web/app.js        Orkestrasi: peta, panel, perencanaan, export
 web/draw.js       Penyuntingan poligon (tambah/geser/sisip/hapus titik)
 web/store.js      Simpan project di browser + pencarian lokasi
 web/kmz.js        Pembungkus KMZ untuk browser
-web/offline.js    Perhitungan & pengunduhan tile offline
 web/sw.js         Service worker: cache aplikasi, tile, dan data elevasi
 web/vendor/       Aset pihak ketiga yang disalin lokal (CSS MapLibre)
 build.js          Menyusun dist/ untuk hosting statis
@@ -368,8 +374,9 @@ selalu siap ambil alih manual saat menerbangkannya.
   atas kemampuan drone.
 - **Peta 2D / 3D / objek** — medan timbul dari DEM, dan bangunan OSM sebagai
   pemeriksa rintangan.
-- **Lanjutkan misi** — ketuk titik terakhir yang sudah dipotret, jalur dipotong
-  dari situ, dan drone naik ke ketinggian aman dulu sebelum menyeberang.
+- **Lanjutkan misi** — dari EXIF foto terakhir, atau ketuk titiknya di peta.
+  Jalur dipotong dari situ, mundur satu foto supaya tidak ada petak yang
+  bolong, dan drone naik ke ketinggian aman dulu sebelum menyeberang.
 - **Peringatan kabel dan tiang** — angka tinggi jaringan listrik Indonesia,
   plus perintah melihat sendiri. Sengaja bukan deteksi otomatis; alasannya di
   bawah.

@@ -525,7 +525,6 @@
             </div>
             <div class="row tight split">
               <button id="btn-resume-pick" class="btn">Pilih di peta</button>
-              <button id="btn-resume-gps" class="btn ghost">Pakai lokasi saya</button>
             </div>
             <div class="readout" id="resume-readout" hidden>
               <span id="resume-status">—</span><strong id="resume-val">—</strong>
@@ -576,39 +575,6 @@
             <p class="sub center">
               Format KMZ belum teruji di DJI Fly — lihat TEST-CHECKLIST.md
             </p>
-          </section>
-
-          <section class="step">
-            <div class="step-head">
-              <span class="num">⬇</span>
-              <h2>Peta offline</h2>
-            </div>
-            <p class="hint">
-              Unduh tile area ini selagi ada sinyal, supaya peta tetap muncul
-              di lapangan.
-            </p>
-            <div id="offline-unsupported" class="note warn" hidden>
-              <span class="ic">!</span><span id="offline-why"></span>
-            </div>
-            <div id="offline-body" hidden>
-              <div class="readout">
-                <span>Perlu diunduh</span><strong id="tile-count">—</strong>
-              </div>
-              <div class="readout">
-                <span>Sudah tersimpan</span><strong id="tile-cached">—</strong>
-              </div>
-              <div class="progress" id="dl-progress" hidden>
-                <div class="bar" id="dl-bar"></div>
-              </div>
-              <div class="row tight split">
-                <button id="btn-download" class="btn" disabled>Unduh area</button>
-                <button id="btn-clear-tiles" class="btn ghost">Hapus cache</button>
-              </div>
-              <p class="sub">
-                Zoom 13–19. Penyedia tile gratis melarang unduhan massal, jadi
-                ambil seperlunya saja.
-              </p>
-            </div>
           </section>
 
           <section class="step">

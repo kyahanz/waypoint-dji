@@ -1,7 +1,7 @@
 // Service worker: membuat aplikasi dan tile peta tetap bisa dipakai tanpa
 // sinyal. Dipasang dari app.js, hanya jalan di konteks aman (https/localhost).
 
-const SHELL = 'wpdji-shell-v16';
+const SHELL = 'wpdji-shell-v17';
 const TILES = 'wpdji-tiles-v1';
 const DATA = 'wpdji-data-v1';
 
@@ -19,7 +19,6 @@ const SHELL_FILES = [
   './mission-editor.js',
   './zip-browser.js',
   './view3d.js',
-  './offline.js',
   '../src/survey.js',
   '../src/geo.js',
   '../src/wpml.js',
@@ -72,6 +71,27 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+/**
+ * Batas jumlah entri per cache, dibuang yang paling lama masuk.
+ *
+ * Perlu sejak pengunduh tile dihapus: dulu ada tombol "Hapus cache" di panel,
+ * dan itu satu-satunya cara mengosongkan cache yang tidak punya batas sama
+ * sekali. Menghapus tombolnya tanpa memberi batas berarti cache tumbuh terus
+ * tanpa ada yang bisa menghentikannya.
+ *
+ * Cache API mengembalikan kunci dalam urutan masuk, jadi memotong dari depan
+ * membuang yang paling lama.
+ */
+async function trimCache(cache, maxEntries) {
+  const keys = await cache.keys();
+  const lebih = keys.length - maxEntries;
+  for (let i = 0; i < lebih; i++) await cache.delete(keys[i]);
+}
+
+// Tile ~15-25 KB: 1500 entri sekitar 30 MB, cukup untuk beberapa lahan.
+// Respons elevasi jauh lebih kecil, tapi tetap diberi batas.
+const CACHE_LIMIT = { [TILES]: 1500, [DATA]: 500 };
+
 async function cacheFirst(req, cacheName) {
   const cache = await caches.open(cacheName);
   const hit = await cache.match(req);
@@ -80,7 +100,11 @@ async function cacheFirst(req, cacheName) {
     const res = await fetch(req);
     // Respons opaque (no-cors) tidak bisa diperiksa statusnya; simpan saja,
     // karena menolaknya berarti tile tidak pernah tersimpan sama sekali.
-    if (res.ok || res.type === 'opaque') cache.put(req, res.clone());
+    if (res.ok || res.type === 'opaque') {
+      await cache.put(req, res.clone());
+      const batas = CACHE_LIMIT[cacheName];
+      if (batas) await trimCache(cache, batas);
+    }
     return res;
   } catch (err) {
     const stale = await cache.match(req, { ignoreSearch: false });

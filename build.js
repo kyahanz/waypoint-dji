@@ -23,9 +23,7 @@ const WEB_FILES = [
   'exif.js',
   'mission-editor.js',
   'zip-browser.js',
-  'view3d.js',
-  'offline.js',
-  'sw.js',
+  'view3d.js',  'sw.js',
   'manifest.webmanifest',
   'icon.svg',
 ];

@@ -48,14 +48,6 @@ import {
 } from './view3d.js';
 import { buildKmz, downloadBlob } from './kmz.js';
 import { fetchElevations, cachedElevation, missingCoords, reliefOf } from '../src/terrain.js';
-import {
-  tileUrls,
-  countTiles,
-  downloadTiles,
-  cacheStatus,
-  clearTiles,
-  offlineSupported,
-} from './offline.js';
 import { createPolygonEditor } from './draw.js';
 import {
   listProjects,
@@ -539,7 +531,6 @@ const els = {
   gateTitle: $('gate-title'),
   gateAck: $('gate-ack'),
   resumePick: $('btn-resume-pick'),
-  resumeGps: $('btn-resume-gps'),
   resumePhoto: $('resume-photo'),
   resumePhotoLabel: $('resume-photo-label'),
   resumePhotoNote: $('resume-photo-note'),
@@ -559,16 +550,7 @@ const els = {
   terrainRelief: $('terrain-relief'),
   flown: $('flown-readout'),
   flownVal: $('flown-val'),
-  offlineBody: $('offline-body'),
-  offlineUnsupported: $('offline-unsupported'),
-  offlineWhy: $('offline-why'),
   offlineBadge: $('offline-badge'),
-  tileCount: $('tile-count'),
-  tileCached: $('tile-cached'),
-  dlProgress: $('dl-progress'),
-  dlBar: $('dl-bar'),
-  download: $('btn-download'),
-  clearTiles: $('btn-clear-tiles'),
   bufferOut: $('buffer-out'),
   bufferM: $('buffer-m'),
   frontOut: $('front-out'),
@@ -1457,6 +1439,29 @@ els.viewSwitch.querySelectorAll('[data-view]').forEach((chip) => {
  * sukarela dan membanjirinya dengan permintaan tiap geseran slider adalah cara
  * paling cepat untuk diblokir.
  */
+
+/**
+ * Bbox area terbang, dilebarkan sedikit supaya tepi layar tidak kosong.
+ *
+ * Dulu tinggal bersama kode pengunduh tile dan ikut terhapus bersamanya,
+ * padahal pemakai sebenarnya ada dua — dan yang satunya, pengambilan data
+ * bangunan di bawah ini, tetap hidup.
+ */
+function planBounds(plan) {
+  const lls = plan.gridPoly.map((p) => plan.proj.toLL(p));
+  if (state.home) lls.push(state.home);
+  const lngs = lls.map((c) => c[0]);
+  const lats = lls.map((c) => c[1]);
+  const padLng = (Math.max(...lngs) - Math.min(...lngs)) * 0.15 + 0.001;
+  const padLat = (Math.max(...lats) - Math.min(...lats)) * 0.15 + 0.001;
+  return {
+    west: Math.min(...lngs) - padLng,
+    east: Math.max(...lngs) + padLng,
+    south: Math.min(...lats) - padLat,
+    north: Math.max(...lats) + padLat,
+  };
+}
+
 async function loadBuildingsForPlan() {
   const plan = state.plan;
   if (!plan) return toast('Gambar areanya dulu.', 'err');
@@ -2174,7 +2179,7 @@ function render() {
     els.area.hidden = true;
     els.flown.hidden = true;
     renderTerrainStatus(null);
-    updateTileEstimate(null);
+
     els.stats.className = 'stats empty';
     els.stats.innerHTML =
       '<p class="placeholder">Gambar area dulu untuk melihat rencana terbang.</p>';
@@ -2254,7 +2259,6 @@ function render() {
 
   renderTerrainStatus(plan);
   ensureTerrain(plan);
-  updateTileEstimate(plan);
 
   // Rintangan dihitung sebelum pemeriksaan keselamatan, karena salah satu
   // pemeriksaannya memang tentang itu.
@@ -2751,32 +2755,6 @@ els.resumeClear.onclick = () => {
   state.resumePicking = false;
   map.getCanvas().style.cursor = '';
   render();
-};
-
-els.resumeGps.onclick = () => {
-  if (!navigator.geolocation) return toast('Browser ini tidak punya GPS.', 'err');
-  if (!state.plan) return toast('Gambar areanya dulu.', 'err');
-
-  els.resumeGps.classList.add('busy');
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      els.resumeGps.classList.remove('busy');
-      // Lokasi KAMU, bukan lokasi drone. Berguna karena biasanya kamu berdiri
-      // dekat tempat drone berhenti — tapi itu tetap perkiraan, dan titiknya
-      // di-snap ke waypoint terdekat, jadi hasilnya tetap koordinat rencana.
-      setResumePoint([pos.coords.longitude, pos.coords.latitude]);
-      toast(
-        `Dipakai lokasi kamu (akurasi ±${pos.coords.accuracy.toFixed(0)} m). Cek titiknya di peta — itu posisi kamu, bukan posisi drone.`,
-        'info',
-        7000
-      );
-    },
-    () => {
-      els.resumeGps.classList.remove('busy');
-      toast('Tidak bisa membaca lokasi.', 'err');
-    },
-    { enableHighAccuracy: true, timeout: 10000 }
-  );
 };
 
 function setResumePoint(lngLat, extra = {}) {
@@ -3353,123 +3331,24 @@ function openHandoff() {
 }
 
 
-// ---------- Peta offline ----------
+// ---------- Offline ----------
+//
+// Yang DIHAPUS dari sini: pengunduh tile massal ("Unduh area", hitungan tile,
+// status cache, tombol hapus cache). Setelah sekian lama dipakai, tile
+// tersimpan tetap 0 — fiturnya memakan satu bagian panel penuh tanpa pernah
+// dipakai, dan penyedia tile gratis memang melarang unduhan massal.
+//
+// Yang TETAP: service worker-nya sendiri. Dia menyimpan tile sambil peta
+// digeser biasa, bukan cuma saat tombol unduh ditekan, dan menyimpan data
+// elevasi yang membuat ikuti-kontur tetap jalan tanpa sinyal. Itu bagian yang
+// berguna, dan gratis — tidak ada yang perlu ditekan.
 
-const ZOOM_MIN = 13;
-const ZOOM_MAX = 19;
-const TILE_LIMIT = 3000;
-
-let downloading = false;
-
-function initOffline() {
-  if (!offlineSupported()) {
-    els.offlineUnsupported.hidden = false;
-    // Urutan penting: di origin tidak aman, navigator.serviceWorker memang
-    // tidak ada sama sekali — kalau itu diperiksa duluan, pesannya jadi
-    // menyalahkan browser padahal penyebabnya alamat halaman.
-    els.offlineWhy.textContent = !window.isSecureContext
-      ? `Peta offline butuh koneksi aman. Halaman ini dibuka lewat ${location.protocol}//${location.hostname}, sementara browser hanya mengizinkan service worker di https atau localhost. Buka lewat localhost, atau deploy ke hosting ber-https.`
-      : 'Browser ini tidak mendukung service worker, jadi peta offline tidak bisa dipakai.';
-    return;
-  }
-
-  els.offlineBody.hidden = false;
-  navigator.serviceWorker.register('sw.js').catch((err) => {
-    els.offlineBody.hidden = true;
-    els.offlineUnsupported.hidden = false;
-    els.offlineWhy.textContent = `Service worker gagal dipasang: ${err.message}`;
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
+  navigator.serviceWorker.register('sw.js').catch(() => {
+    // Gagal mendaftar bukan kegagalan yang perlu ditunjukkan: aplikasinya tetap
+    // jalan penuh, cuma tidak punya salinan offline.
   });
-
-  els.download.onclick = startDownload;
-  els.clearTiles.onclick = async () => {
-    await clearTiles();
-    toast('Cache tile dihapus.', 'ok');
-    refreshCacheStatus();
-  };
-
-  refreshCacheStatus();
-}
-
-async function refreshCacheStatus() {
-  const st = await cacheStatus();
-  if (!st) return;
-  const mb = st.bytes != null ? ` · ${(st.bytes / 1048576).toFixed(1)} MB` : '';
-  els.tileCached.textContent = `${st.tiles} tile${mb}`;
-}
-
-/** Bbox area terbang, dilebarkan sedikit supaya tepi layar tidak kosong. */
-function planBounds(plan) {
-  const lls = plan.gridPoly.map((p) => plan.proj.toLL(p));
-  if (state.home) lls.push(state.home);
-  const lngs = lls.map((c) => c[0]);
-  const lats = lls.map((c) => c[1]);
-  const padLng = (Math.max(...lngs) - Math.min(...lngs)) * 0.15 + 0.001;
-  const padLat = (Math.max(...lats) - Math.min(...lats)) * 0.15 + 0.001;
-  return {
-    west: Math.min(...lngs) - padLng,
-    east: Math.max(...lngs) + padLng,
-    south: Math.min(...lats) - padLat,
-    north: Math.max(...lats) + padLat,
-  };
-}
-
-function updateTileEstimate(plan) {
-  if (els.offlineBody.hidden) return;
-
-  if (!plan) {
-    els.tileCount.textContent = '—';
-    els.download.disabled = true;
-    return;
-  }
-
-  const n = countTiles(planBounds(plan), ZOOM_MIN, ZOOM_MAX);
-  const tooMany = n > TILE_LIMIT;
-  els.tileCount.textContent = tooMany
-    ? `${n} tile — terlalu banyak`
-    : `${n} tile (~${((n * 25) / 1024).toFixed(1)} MB)`;
-  els.download.disabled = downloading || tooMany;
-}
-
-async function startDownload() {
-  const plan = state.plan;
-  if (!plan || downloading) return;
-
-  const spec = baseKind === 'street' ? STREET : IMAGERY[activeImagery()];
-  const key = baseKind === 'street' ? '' : (settings.keys?.[activeImagery()] ?? '');
-  const template = spec.tiles(key)[0];
-
-  const urls = tileUrls(planBounds(plan), ZOOM_MIN, Math.min(ZOOM_MAX, spec.maxzoom), template);
-  if (!urls.length) return;
-
-  downloading = true;
-  els.download.disabled = true;
-  els.dlProgress.hidden = false;
-  const label = els.download.textContent;
-
-  try {
-    const { failed } = await downloadTiles(urls, {
-      onProgress: (done, total) => {
-        els.dlBar.style.width = `${(done / total) * 100}%`;
-        els.download.textContent = `${done}/${total}`;
-      },
-    });
-    toast(
-      failed
-        ? `${urls.length - failed} tile tersimpan, ${failed} gagal.`
-        : `${urls.length} tile tersimpan. Area ini siap dipakai tanpa sinyal.`,
-      failed ? 'err' : 'ok',
-      6000
-    );
-  } catch (err) {
-    toast(`Unduhan terhenti: ${err.message}`, 'err');
-  } finally {
-    downloading = false;
-    els.download.textContent = label;
-    els.dlProgress.hidden = true;
-    els.dlBar.style.width = '0';
-    updateTileEstimate(state.plan);
-    refreshCacheStatus();
-  }
 }
 
 function syncOnlineBadge() {
@@ -3479,4 +3358,4 @@ function syncOnlineBadge() {
 window.addEventListener('online', syncOnlineBadge);
 window.addEventListener('offline', syncOnlineBadge);
 syncOnlineBadge();
-initOffline();
+registerServiceWorker();
