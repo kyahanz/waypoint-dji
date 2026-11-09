@@ -1288,5 +1288,80 @@ console.log('\nBentuk lahan');
   }
 }
 
+// ------------------------------------- ketinggian terhadap bangunannya
+//
+// Saran yang pernah SALAH di aplikasi ini: "lahan 44 x 44 m, turun saja ke
+// 20 m". Kalau di lahan itu berdiri bangunan 20 m, itu berarti melintas nol
+// meter di atas atapnya. Lebar lahan tidak tahu apa-apa soal tinggi bangunan,
+// jadi saran yang cuma berdasar lebar lahan bisa mengarahkan drone menabrak.
+
+console.log('\nKetinggian terhadap bangunan');
+{
+  const p5 = resolveProfile(registry, { droneId: 'mini5pro' });
+  const sisi = Math.sqrt(1950);
+  const dasar = (altitudeM, objectHeightM) => {
+    const prm = computeSurveyParams(p5.camera, {
+      altitudeM,
+      frontOverlap: 0.8,
+      sideOverlap: 0.7,
+      minIntervalSec: p5.camera.minIntervalSec,
+    });
+    return {
+      altitude: altitudeM,
+      objectHeightM,
+      area: 1950,
+      gridArea: 1950,
+      bufferM: 0,
+      speed: 10,
+      accel: 2.5,
+      stopAtEach: true,
+      sorties: [[{ xy: [0, 0] }]],
+      summaries: [],
+      grid: { waypoints: [{ xy: [0, 0], height: altitudeM }], photos: 1 },
+      params: { ...prm, gsd: gsdFromAltitude(p5.camera, altitudeM) },
+      advanced: {},
+      pattern: 'building3d',
+      polyXY: [[0, 0], [sisi, 0], [sisi, sisi], [0, sisi]],
+    };
+  };
+
+  const kode = (plan) => evaluateSafety(plan, p5).findings.map((f) => f.code);
+
+  ok(
+    kode(dasar(20, 20)).includes('terlalu-dekat-objek'),
+    'terbang 20 m di atas bangunan 20 m ditahan'
+  );
+  ok(
+    !kode(dasar(40, 20)).includes('terlalu-dekat-objek'),
+    'dan 40 m di atas bangunan yang sama tidak ditahan'
+  );
+  ok(
+    !kode(dasar(70, 0)).includes('terlalu-dekat-objek'),
+    'lahan tanpa bangunan tidak pernah kena pemeriksaan ini'
+  );
+
+  // Bangunan 20 m di lahan 44 m: pada ketinggian teraman pun satu frame masih
+  // selebar lahannya, jadi sarannya harus berhenti menyuruh turun dan mulai
+  // menyuruh pindah pola.
+  {
+    const t = evaluateSafety(dasar(70, 20), p5).findings.find(
+      (f) => f.code === 'terlalu-tinggi-untuk-lahan'
+    );
+    ok(!!t, 'jejak foto yang melebihi lahan tetap diperingatkan');
+    ok(
+      /ORBIT/.test(t?.text ?? ''),
+      'dan di lahan sesempit itu sarannya pindah pola ke orbit, bukan turun'
+    );
+
+    const tanpaObjek = evaluateSafety(dasar(70, 0), p5).findings.find(
+      (f) => f.code === 'terlalu-tinggi-untuk-lahan'
+    );
+    ok(
+      !/ORBIT/.test(tanpaObjek?.text ?? '') && /turun ke sekitar/.test(tanpaObjek?.text ?? ''),
+      'tanpa bangunan, sarannya tetap menurunkan ketinggian'
+    );
+  }
+}
+
 console.log(failed ? `\n${failed} pemeriksaan GAGAL\n` : '\nSemua pemeriksaan lolos\n');
 process.exit(failed ? 1 : 0);

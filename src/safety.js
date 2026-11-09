@@ -296,14 +296,52 @@ export function evaluateSafety(plan, profile, o = {}) {
   {
     const fp = plan.params.footprint;
     const sisi = Math.sqrt(plan.area ?? 0);
+    const objek = plan.objectHeightM ?? 0;
+
+    // Lantai ketinggian yang ditentukan BANGUNANNYA, bukan lahannya.
+    //
+    // Ini pelajaran dari saran yang pernah salah di aplikasi ini sendiri:
+    // "lahan 44 x 44 m, turun saja ke 20 m". Kalau di lahan itu berdiri
+    // bangunan 20 m, terbang di 20 m berarti melintas NOL meter di atas
+    // atapnya. Lebar lahan tidak tahu apa-apa soal tinggi bangunan, jadi
+    // saran yang cuma berdasar lebar lahan bisa mengarahkan drone menabrak.
+    //
+    // Jarak aman 15 m di atas titik tertinggi: cukup untuk melesetnya GPS
+    // vertikal, hembusan angin di atas atap, dan benda tipis yang tidak masuk
+    // hitungan tinggi bangunan (antena, kabel penangkal petir).
+    const JARAK_AMAN_ATAS = 15;
+    const lantai = objek > 0 ? objek + JARAK_AMAN_ATAS : 20;
+
+    if (objek > 0 && plan.altitude < lantai) {
+      add(
+        'bad',
+        'terlalu-dekat-objek',
+        `Bangunan tertingginya ${objek} m, dan rencana ini terbang di ${plan.altitude.toFixed(0)} m — cuma ${(plan.altitude - objek).toFixed(0)} m di atas atapnya. Itu terlalu mepet untuk melesetnya GPS vertikal, hembusan angin di atas atap, dan benda tipis yang tidak terhitung sebagai tinggi bangunan: antena, kabel penangkal petir, tiang bendera. Minimal sekitar ${lantai} m, atau pakai pola Orbit kalau memang mau sedekat itu ke bangunannya.`
+      );
+    }
+
     if (fp?.w > 0 && sisi > 0 && plan.pattern !== 'orbit' && fp.w >= sisi) {
       // Jejak foto lurus sebanding dengan ketinggian, jadi ketinggian yang
-      // membuat lebar jejak jadi separuh lebar lahan tinggal dihitung lurus.
-      const saran = Math.max(20, Math.round(((plan.altitude * (sisi / 2)) / fp.w) / 5) * 5);
+      // membuat lebar jejak jadi separuh lebar lahan tinggal dihitung lurus —
+      // TAPI tidak boleh menembus lantai yang ditentukan bangunannya.
+      const dariLahan = Math.round(((plan.altitude * (sisi / 2)) / fp.w) / 5) * 5;
+      const saran = Math.max(lantai, dariLahan);
+
+      // Kalau lantainya sendiri masih menghasilkan jejak selebar lahan, grid
+      // memang bukan alatnya. Bukan "turunkan sedikit lagi" — pada ketinggian
+      // serendah apa pun yang masih aman, satu frame tetap memuat seluruh
+      // lahan. Yang mendekati bangunan dari samping tanpa melintas di atasnya
+      // adalah orbit, dan pola itu sudah ada di aplikasi ini.
+      const jejakDiLantai = (fp.w * saran) / plan.altitude;
+      const buntu = jejakDiLantai >= sisi;
+
       add(
         'warn',
         'terlalu-tinggi-untuk-lahan',
-        `Di ${plan.altitude.toFixed(0)} m, satu foto sudah menutupi ${fp.w.toFixed(0)} x ${fp.h.toFixed(0)} m — sementara lahannya cuma sekitar ${sisi.toFixed(0)} x ${sisi.toFixed(0)} m. Jadi tiap jepretan memuat seluruh lahan, dan foto berikutnya nyaris mengulang yang sebelumnya. Jumlah fotonya memang jadi sedikit, dan itu bukan kabar baik: model 3D dibangun dari beda sudut pandang antar foto, bukan dari banyaknya piksel. Untuk lahan sesempit ini coba turun ke sekitar ${saran} m.`
+        `Di ${plan.altitude.toFixed(0)} m, satu foto sudah menutupi ${fp.w.toFixed(0)} x ${fp.h.toFixed(0)} m — sementara lahannya cuma sekitar ${sisi.toFixed(0)} x ${sisi.toFixed(0)} m. Jadi tiap jepretan memuat seluruh lahan, dan foto berikutnya nyaris mengulang yang sebelumnya dari posisi yang nyaris sama. Fotonya sedikit bukan karena hitungannya hemat, melainkan karena tidak ada lagi yang bisa dilihat — dan model 3D dibangun dari beda sudut pandang antar foto, bukan dari banyaknya piksel. ` +
+          (buntu
+            ? `Menurunkan ketinggian tidak menyelesaikan ini: bangunan ${objek > 0 ? `${objek} m` : 'di lahan ini'} menuntut minimal sekitar ${saran} m, dan di ${saran} m pun satu frame masih selebar ${jejakDiLantai.toFixed(0)} m. Untuk objek tunggal di lahan sesempit ini, yang tepat pola ORBIT — drone memutarinya dari samping, bukan melintas di atasnya.`
+            : `Coba turun ke sekitar ${saran} m${objek > 0 ? ` — itu sudah termasuk ${JARAK_AMAN_ATAS} m jarak aman di atas bangunan ${objek} m` : ''}.`)
       );
     }
   }

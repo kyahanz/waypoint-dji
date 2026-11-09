@@ -123,6 +123,10 @@ const state = {
   // 'peran' = nadir dan miring jadi file sendiri-sendiri (bawaan).
   // 'gabung' = satu file sejauh batas waypoint dan baterai mengizinkan.
   fileSplit: 'peran',
+  // Tinggi bangunan tertinggi di lahan, meter dari tanah. Dipakai pola 3D
+  // untuk memeriksa ketinggian terbang terhadap objeknya — bukan cuma
+  // terhadap batas regulasi.
+  objectHeightM: 15,
   resume: null, // { index, lngLat }
   resumePicking: false,
   viewMode: '2d',
@@ -519,6 +523,9 @@ const els = {
   patternSeg: $('pattern-seg'),
   patternHint: $('pattern-hint'),
   orbitFields: $('orbit-fields'),
+  fieldObjek: $('field-objek'),
+  objekTinggi: $('objek-tinggi'),
+  objekTinggiOut: $('objek-tinggi-out'),
   objHeight: $('obj-height'),
   objHeightOut: $('obj-height-out'),
   orbitRadius: $('orbit-radius'),
@@ -987,6 +994,10 @@ const PATTERN_HINT = {
 function syncPatternFields() {
   const orbit = state.pattern === 'orbit';
   els.orbitFields.hidden = !orbit;
+  // Tinggi bangunan cuma berarti untuk pola yang memang dibuat untuk bangunan.
+  // Di peta datar tidak ada objek tegak yang jadi acuan, dan di orbit tinggi
+  // objek sudah jadi input utamanya sendiri.
+  els.fieldObjek.hidden = !PATTERNS[state.pattern]?.mixedGimbal;
   els.fieldAlt.hidden = orbit;
   els.fieldOverlap.hidden = orbit;
   els.fieldBuffer.hidden = orbit;
@@ -1094,6 +1105,11 @@ els.projName.addEventListener('input', () => {
   // adanya. Tanpa ini daftarnya memajang nama lama sampai ada hal lain yang
   // berubah — persis kebohongan yang dicegah namaFileKmz.
   if (state.plan) renderSorties(state.plan);
+});
+
+els.objekTinggi.addEventListener('input', () => {
+  state.objectHeightM = Number(els.objekTinggi.value);
+  render();
 });
 
 els.safeHeight.addEventListener('input', () => {
@@ -2159,6 +2175,9 @@ function buildPlan() {
     mode,
     pattern: state.pattern,
     patternName: PATTERNS[state.pattern]?.name ?? state.pattern,
+    // Cuma berarti untuk pola bangunan; nol di pola lain supaya pemeriksaan
+    // keselamatan tahu bedanya "lahan rata" dan "tidak diisi".
+    objectHeightM: PATTERNS[state.pattern]?.mixedGimbal ? state.objectHeightM : 0,
     gimbalPitch: state.advanced.gimbalPitch,
     advanced: {
       ...state.advanced,
@@ -2454,6 +2473,10 @@ function updateDerived(plan) {
 
   const mult = Number(els.buffer.value);
   els.bufferOut.textContent = mult === 0 ? 'mati' : `${mult.toFixed(1)}× jarak jalur`;
+
+  els.objekTinggi.value = String(state.objectHeightM);
+  els.objekTinggiOut.textContent =
+    state.objectHeightM > 0 ? `${state.objectHeightM} m` : 'tidak ada / rata tanah';
 
   const o = state.orbit;
   els.objHeightOut.textContent = `${o.objectHeightM} m`;
@@ -3456,6 +3479,7 @@ function onSave() {
     advanced: { ...state.advanced },
     terrain: state.terrain,
     fileSplit: state.fileSplit,
+    objectHeightM: state.objectHeightM,
     front: Number(els.front.value),
     side: Number(els.side.value),
     buffer: Number(els.buffer.value),
@@ -3531,6 +3555,7 @@ function openProject(id) {
   state.speedMs = p.speedMs ?? state.speedMs;
   state.terrain = !!p.terrain;
   state.fileSplit = p.fileSplit ?? 'peran';
+  state.objectHeightM = p.objectHeightM ?? 15;
   els.terrain.checked = state.terrain;
   state.resume = null;
 
@@ -3767,6 +3792,7 @@ function encodeState() {
     sp: state.speedAuto ? null : state.speedMs,
     tf: state.terrain ? 1 : 0,
     fs: state.fileSplit,
+    oh: state.objectHeightM,
     adv: state.advanced,
     v: SCHEMA_VERSION,
   };
@@ -3818,6 +3844,7 @@ function applyStateFromUrl() {
     state.orbit = { ...state.orbit, ...(d.ob ?? {}) };
     state.terrain = !!d.tf;
     state.fileSplit = d.fs ?? 'peran';
+    state.objectHeightM = d.oh ?? 15;
     els.terrain.checked = state.terrain;
     state.advanced = { ...SAFE_ADVANCED, ...(d.adv ?? {}) };
     syncProfile();

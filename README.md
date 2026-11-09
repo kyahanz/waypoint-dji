@@ -633,9 +633,7 @@ yang nyaris sama. Fotonya sedikit bukan karena hitungannya hemat, tapi karena
 tidak ada lagi yang bisa dilihat.
 
 Dan sedikitnya foto di sini bukan kabar baik: model 3D dibangun dari **beda
-sudut pandang antar foto**, bukan dari banyaknya piksel per foto. Di lahan
-sesempit itu, turun ke ~20–25 m memberi GSD 0.7–0.9 cm/px dan ratusan foto
-dengan geometri yang benar-benar berbeda satu sama lain.
+sudut pandang antar foto**, bukan dari banyaknya piksel per foto.
 
 | Ketinggian | GSD | Jejak satu foto | Foto | Waktu |
 |---|---|---|---|---|
@@ -644,9 +642,30 @@ dengan geometri yang benar-benar berbeda satu sama lain.
 | 35 m | 1.28 cm/px | 53 × 39 m | 150 | ~15 menit |
 | 25 m | 0.92 cm/px | 38 × 28 m | 216 | ~19 menit |
 
-Aplikasi sekarang mengatakan ini sendiri: begitu lebar jejak foto melebihi
-lebar lahannya, muncul peringatan yang menyebut kedua angkanya dan menyarankan
-ketinggian yang membuat satu frame kira-kira separuh lebar lahan.
+#### Tapi "turunkan saja ketinggiannya" bisa jadi saran yang mematikan
+
+Versi pertama peringatan ini cuma melihat lebar lahan, dan untuk lahan 44 m dia
+menyarankan **20 m**. Kalau di lahan itu berdiri bangunan **20 m** — dan pola
+yang dipakai memang pola BANGUNAN — itu artinya melintas **nol meter di atas
+atapnya**. Lebar lahan tidak tahu apa-apa soal tinggi bangunan, jadi saran yang
+cuma berdasar lebar lahan bisa mengarahkan drone menabrak.
+
+Maka pola 3D sekarang punya input **Tinggi bangunan tertinggi**, dan ketinggian
+terbang diperiksa terhadapnya:
+
+- **Lantai keselamatan = tinggi bangunan + 15 m.** Jarak itu untuk melesetnya
+  GPS vertikal, hembusan angin di atas atap, dan benda tipis yang tidak
+  terhitung sebagai tinggi bangunan: antena, kabel penangkal petir, tiang
+  bendera. Terbang di bawahnya jadi temuan **merah**, bukan sekadar saran.
+- **Saran penurunan ketinggian tidak pernah menembus lantai itu.**
+- Dan kalau di lantai itu pun satu frame masih selebar lahannya, sarannya
+  berhenti menyuruh turun: untuk objek tunggal di lahan sesempit itu yang tepat
+  adalah **pola Orbit** — drone memutarinya dari samping, bukan melintas di
+  atasnya.
+
+Contoh nyatanya persis kasus di atas: bangunan 20 m di lahan 44 × 44 m menuntut
+minimal ~35 m, dan di 35 m satu frame masih 53 m — lebih lebar dari lahannya.
+Grid memang bukan alatnya di situ.
 
 Masih di keluarga yang sama: **buffer tepi diukur dalam kelipatan jarak
 jalur**, dan jarak jalur tidak tahu lahannya seberapa. Di sawah 10 ha satu
