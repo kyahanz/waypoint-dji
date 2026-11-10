@@ -545,11 +545,33 @@ batas drone, bukan selera. Kalau sesudah digabung filenya tetap banyak,
 panelnya mengatakan BATAS MANA yang menahannya, supaya tombolnya tidak terlihat
 seperti tidak berfungsi.
 
-Di atas **lima file**, Export tidak lagi mengirimnya satu per satu melainkan
-membungkus semuanya jadi satu `.zip`. Browser memblokir atau menanyai unduhan
-beruntun sebanyak itu, dan lahan 144 ha pola 3D menghasilkan 42 file — 42 kali
-tanya-izin, lalu 42 file tercecer di folder Unduhan. Ongkos zip cuma satu
-langkah ekstrak di HP.
+**Bungkus jadi satu `.zip`** adalah urusan yang BERBEDA, dan menyamakannya
+sempat membingungkan: "Pembagian file KMZ" menentukan berapa **misi** yang
+dibuat (tiap file = satu penerbangan = satu baterai), sementara zip cuma
+menentukan **cara mengunduhnya**. Membungkus sepuluh file jadi satu zip tetap
+sepuluh penerbangan.
+
+Centangnya ada di panel daftar file, dan bawaannya mengikuti jumlah file: mulai
+**lima file** dia menyala sendiri, karena di situ browser mulai memblokir atau
+menanyai unduhan beruntun — lahan 144 ha pola 3D menghasilkan 42 file, dan itu
+42 kali tanya-izin lalu 42 file tercecer di folder Unduhan. Di bawah lima,
+unduhan satu-satu masih nyaman dan tidak menambah langkah ekstrak. Tapi bawaan
+bukan aturan: centangnya bisa dinyalakan untuk dua file sekalipun.
+
+#### "Gabung sebisanya" tetap tunduk pada batas 200 waypoint
+
+Pertanyaan yang wajar: *sudah pilih gabung, kenapa masih terunduh dua file?*
+Karena "sebisanya" itu harfiah. Lahan 1950 m² dengan kerapatan miring 2x punya
+**217 waypoint**, sementara DJI Fly cuma menerima 200 per file — jadi satu file
+memang tidak mungkin, berapa pun yang dipilih di situ. Panelnya menyebutkan
+batas mana yang menahannya, bukan diam saja.
+
+Dan pembagian itu harus **RATA**. Versi pertama "gabung" memakai splitByBattery
+apa adanya, yang rakus: 217 titik jadi **200 + 17** — file kedua berisi tujuh
+belas foto, satu siklus baterai penuh untuk terbang ke lokasi, menjepret
+tujuh belas kali, lalu pulang. Logika pembagian rata yang sudah dipakai jalur
+per-peran sekarang dipakai keduanya lewat `splitMerata()`: 217 jadi
+**109 + 108**.
 
 #### Panelnya harus ikut menjelaskan, bukan cuma menghitung
 

@@ -19,7 +19,7 @@ import {
   medianLegM,
   resumeIndexFor,
   splitByRole,
-  splitByBattery,
+  splitMerata,
   sortieSummary,
   maxDistanceFrom,
   altitudeFromGsd,
@@ -72,6 +72,17 @@ const BATTERY_COLORS = ['#4da3ff', '#55c57a', '#f0b429', '#f27272', '#b98cf5', '
 // Lima karena di situlah browser mulai menanyai unduhan beruntun, dan empat
 // masih nyaman diambil satu per satu dari folder Unduhan.
 const AMBANG_ZIP = 5;
+
+/**
+ * Apakah export rencana ini dibungkus jadi satu zip?
+ *
+ * Bawaannya mengikuti jumlah file, bukan selera: di bawah lima file unduhan
+ * satu-satu masih nyaman dan tidak menambah langkah ekstrak; di atasnya
+ * browser mulai memblokir unduhan beruntun. Tapi bawaan bukan aturan — yang
+ * mengunduh ke HP lewat jaringan seadanya sering lebih suka satu file berapa
+ * pun jumlahnya, dan itu haknya.
+ */
+const pakaiZip = (jumlahFile) => state.zipBundle ?? jumlahFile >= AMBANG_ZIP;
 const EMPTY = { type: 'FeatureCollection', features: [] };
 
 // Setelan lanjutan yang aman. Ini bukan sekadar nilai awal — tombol
@@ -120,6 +131,11 @@ const state = {
   // tidak mengubah apa pun yang diexport.
   fileHidden: new Set(),
   fileCount: 0,
+  // null = ikut jumlah file (bungkus mulai AMBANG_ZIP), true/false = pilihan
+  // pengguna untuk rencana ini. Disetel ulang kalau jumlah filenya berubah,
+  // karena pilihan "jangan dibungkus" yang masuk akal untuk dua file belum
+  // tentu masuk akal untuk dua belas.
+  zipBundle: null,
   // 'peran' = nadir dan miring jadi file sendiri-sendiri (bawaan).
   // 'gabung' = satu file sejauh batas waypoint dan baterai mengizinkan.
   fileSplit: 'peran',
@@ -1082,6 +1098,13 @@ els.gimbal.addEventListener('input', () => {
  * hal terakhir yang boleh dilakukan panel ini.
  */
 els.sorties.addEventListener('change', (e) => {
+  const zip = e.target.closest('input[data-zip]');
+  if (zip) {
+    state.zipBundle = zip.checked;
+    if (state.plan) renderSorties(state.plan);
+    return;
+  }
+
   const cb = e.target.closest('input[data-file]');
   if (!cb) return;
   const i = Number(cb.dataset.file);
@@ -1279,7 +1302,7 @@ const splitSegButtons = () => $('split-seg').querySelectorAll('.seg-btn');
 function bagiFile(waypoints, o) {
   if (state.fileSplit !== 'gabung') return splitByRole(waypoints, o);
 
-  const sorties = splitByBattery(waypoints, o);
+  const sorties = splitMerata(waypoints, o);
   const meta = sorties.map((s, i) => {
     const peran = [...new Set(s.map((w) => o.roleOfPass?.[w.pass] ?? null))];
     return {
@@ -2387,6 +2410,7 @@ function render() {
   if (state.fileCount !== plan.sorties.length) {
     state.fileCount = plan.sorties.length;
     state.fileHidden.clear();
+    state.zipBundle = null;
   }
 
   syncRouteSources(plan);
@@ -3212,11 +3236,18 @@ function renderSorties(plan) {
       <div class="files-head">
         <span class="fcount">${plan.summaries.length}</span>
         <span class="ftitle">file KMZ<small>${
-          plan.summaries.length >= AMBANG_ZIP
-            ? 'Sebanyak ini tidak dikirim satu-satu — Export membungkusnya jadi satu file .zip. Ekstrak dulu di HP.'
-            : 'Semuanya terunduh sekaligus saat kamu menekan Export.'
+          pakaiZip(plan.summaries.length)
+            ? 'Export membungkus semuanya jadi satu file .zip. Ekstrak dulu di HP, lalu pindahkan .kmz-nya ke folder DJI Fly.'
+            : 'Semuanya terunduh satu per satu saat kamu menekan Export.'
         }</small></span>
       </div>
+
+      <label class="files-zip">
+        <input type="checkbox" data-zip ${pakaiZip(plan.summaries.length) ? 'checked' : ''} />
+        <span>Bungkus ${plan.summaries.length} file jadi satu <b>.zip</b>
+          <small>Satu unduhan, bukan ${plan.summaries.length}. Ongkosnya satu langkah ekstrak di HP.</small>
+        </span>
+      </label>
 
       <div class="files-rule">
         <b>1 file = 1 penerbangan = 1 baterai.</b>
@@ -3741,7 +3772,7 @@ async function exportKmz() {
     // Jadi di atas ambang, semuanya dibungkus jadi SATU zip. Ongkosnya satu
     // langkah ekstra (ekstrak di HP), dan itu jauh lebih murah daripada
     // unduhan yang separuhnya hilang tanpa ketahuan.
-    if (files.length >= AMBANG_ZIP) {
+    if (files.length > 1 && pakaiZip(files.length)) {
       const namaZip = `${namaFileKmz(plan, 0).replace(/_1dari\d+.*\.kmz$/, '')}_${files.length}file.zip`;
       const zip = await createZipAsync(
         files.map((f) => ({ name: f.name, data: f.bytes }))

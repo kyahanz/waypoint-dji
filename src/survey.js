@@ -875,6 +875,23 @@ export function splitByBattery(waypoints, o) {
   return sorties;
 }
 
+/**
+ * Pecah jalur sesuai baterai dan batas waypoint, TANPA menyisakan file kerdil.
+ *
+ * splitByBattery itu rakus: dia mengisi sampai batas lalu memulai file baru,
+ * jadi 217 titik dengan batas 200 jadi 200 + 17. File kedua itu satu siklus
+ * baterai penuh untuk terbang ke lokasi, menjepret tujuh belas kali, lalu
+ * pulang.
+ *
+ * Begitu ternyata butuh lebih dari satu file, isinya dibagi RATA: 217 jadi
+ * 109 + 108. Aman terhadap jatah baterai karena tiap bagian rata selalu <=
+ * bagian pertama hasil pembagian rakus, dan bagian itu sudah terbukti muat.
+ */
+export function splitMerata(waypoints, o) {
+  const rakus = splitByBattery(waypoints, o);
+  return rakus.length > 1 ? bagiRata(waypoints, rakus.length) : rakus;
+}
+
 /** Bagi daftar jadi n potongan sama besar, selisih maksimal satu elemen. */
 function bagiRata(arr, n) {
   const out = [];
@@ -959,8 +976,7 @@ export function splitByRole(waypoints, o) {
     // dibagi rata: 215 jadi 108 + 107. Aman terhadap jatah baterai karena tiap
     // bagian rata selalu <= bagian pertama hasil pembagian rakus, dan bagian
     // itu sudah muat.
-    const rakus = splitByBattery(g.waypoints, o);
-    const parts = rakus.length > 1 ? bagiRata(g.waypoints, rakus.length) : rakus;
+    const parts = splitMerata(g.waypoints, o);
     parts.forEach((part, i) => {
       sorties.push(part);
       meta.push({ role: g.role, part: i, parts: parts.length });
