@@ -69,6 +69,43 @@ export function evaluateSafety(plan, profile, o = {}) {
 
   const add = (level, code, text) => out.push({ level, code, text });
 
+  // ---- Batas yang ditimpa sendiri oleh pengguna ----
+  //
+  // Dua batas di aplikasi ini boleh ditimpa, dan keduanya dengan alasan yang
+  // sah: angka 200 waypoint memang tidak pernah diuji, dan jatah baterai 22
+  // menit memang konservatif untuk baterai yang pemiliknya hafal betul. Yang
+  // tidak boleh adalah angka itu naik lalu seluruh layar berbicara seolah
+  // angka baru itu spesifikasi drone.
+  //
+  // Jadi begitu ditimpa, yang dikatakan bukan "kamu salah" melainkan APA YANG
+  // DILEPAS — dan untuk baterai, di titik mana pelepasan itu berhenti jadi
+  // cadangan dan mulai jadi taruhan.
+  {
+    const bawaan = o.limitsBawaan;
+    if (bawaan) {
+      if (lim.usableFlightMin > bawaan.usableFlightMin) {
+        const nominal = bawaan.nominalFlightMin ?? bawaan.usableFlightMin;
+        const lewatNominal = lim.usableFlightMin > nominal;
+        add(
+          lewatNominal ? 'bad' : 'warn',
+          'baterai-ditimpa',
+          `Jatah baterai dinaikkan ke ${lim.usableFlightMin} menit dari ${bawaan.usableFlightMin} menit bawaan. Yang dilepas itu CADANGAN, bukan kapasitas baru: angka bawaan sudah memotong jatah untuk angin lawan, cuaca dingin, dan baterai yang kapasitasnya menyusut seiring umur. ` +
+            (lewatNominal
+              ? `Dan ${lim.usableFlightMin} menit melewati ${nominal} menit daya tahan nominal ${profile.name} — itu angka hover tanpa angin di baterai baru, bukan angka terbang bermanuver sambil berhenti-jepret. Di jatah ini drone bisa kehabisan baterai sebelum misinya selesai, dan yang terjadi berikutnya ditentukan setelan RTH, bukan oleh rencana ini.`
+              : `Pakai angka ini cuma kalau kamu hafal baterai ini di lahan ini. Begitu misinya jadi lebih panjang dari baterainya, drone akan pulang sendiri di tengah jalan — dan file berikutnya tidak tahu sampai mana yang sudah terpotret.`)
+        );
+      }
+
+      if (lim.maxWaypoints > bawaan.maxWaypoints) {
+        add(
+          'warn',
+          'waypoint-ditimpa',
+          `Batas waypoint dinaikkan ke ${lim.maxWaypoints} dari ${bawaan.maxWaypoints}. Angka bawaan itu sendiri belum pernah diuji — file asli DJI Fly yang kami bongkar cuma 12 titik, dan generator lain yang terbukti terimpor 60 — jadi menaikkannya bukan melanggar apa pun yang diketahui. Tapi kalau DJI Fly menolak filenya, inilah tersangka pertamanya. Uji dengan SATU file dulu sebelum berangkat ke lahan.`
+        );
+      }
+    }
+  }
+
   // ---- Bentuk lahannya sendiri ----
   //
   // Didahulukan dari semua pemeriksaan lain karena kalau yang ini menyala,

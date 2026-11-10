@@ -538,6 +538,34 @@
                 </p>
               </div>
 
+              <div class="field">
+                <div class="field-head">
+                  <label for="lim-baterai">Jatah baterai per penerbangan</label>
+                  <output id="lim-baterai-out">22 m</output>
+                </div>
+                <input id="lim-baterai" type="range" min="10" max="40" step="1" value="22" />
+                <p class="sub" id="lim-baterai-sub">
+                  Angka bawaan sudah dipotong cadangan untuk angin, cuaca dingin,
+                  dan baterai yang menua. Naikkan hanya kalau kamu hafal baterai
+                  ini di lahan ini — yang dilepas adalah cadangan itu, bukan
+                  kapasitas baru.
+                </p>
+              </div>
+
+              <div class="field">
+                <div class="field-head">
+                  <label for="lim-waypoint">Batas waypoint per file</label>
+                  <output id="lim-waypoint-out">200</output>
+                </div>
+                <input id="lim-waypoint" type="range" min="50" max="1000" step="10" value="200" />
+                <p class="sub" id="lim-waypoint-sub">
+                  Angka 200 belum pernah diuji — file asli DJI Fly yang kami
+                  bongkar cuma 12 titik, buatan generator lain 60. Naikkan kalau
+                  kamu mau mencobanya sendiri; kalau DJI Fly menolak filenya,
+                  inilah tersangka pertamanya.
+                </p>
+              </div>
+
               <button id="btn-reset-adv" class="btn ghost wide">
                 Kembalikan ke setelan aman
               </button>

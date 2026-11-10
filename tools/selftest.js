@@ -1432,5 +1432,82 @@ console.log('\nKetinggian terhadap bangunan');
   }
 }
 
+// ------------------------------------------- batas yang ditimpa pengguna
+//
+// Keduanya boleh ditimpa, dan keduanya harus kelihatan begitu ditimpa.
+// Yang membedakan tingkatnya: file ditolak DJI Fly cuma membuang perjalanan,
+// sementara baterai habis di udara membuang dronenya.
+
+console.log('\nBatas yang ditimpa pengguna');
+{
+  const p5 = resolveProfile(registry, { droneId: 'mini5pro' });
+  const bawaan = p5.limits;
+  const sisi = 100;
+  const rencana = (limits) => ({
+    altitude: 80,
+    objectHeightM: 0,
+    area: 10000,
+    gridArea: 10000,
+    bufferM: 0,
+    speed: 10,
+    accel: 2.5,
+    stopAtEach: true,
+    sorties: [[{ xy: [0, 0] }]],
+    summaries: [],
+    grid: { waypoints: [{ xy: [0, 0], height: 80 }], photos: 1 },
+    params: { maxSpeedBlur: 99, maxSpeedInterval: 99, gsd: 2.93, sideSpacing: 36, footprint: { w: 1, h: 1 } },
+    advanced: {},
+    pattern: 'single',
+    polyXY: [[0, 0], [sisi, 0], [sisi, sisi], [0, sisi]],
+    _limits: limits,
+  });
+  const nilai = (limits) => {
+    const plan = rencana(limits);
+    return evaluateSafety(plan, { ...p5, limits }, { limitsBawaan: bawaan });
+  };
+
+  const polos = nilai(bawaan).findings.map((f) => f.code);
+  ok(
+    !polos.includes('baterai-ditimpa') && !polos.includes('waypoint-ditimpa'),
+    'tanpa menimpa apa pun, tidak ada temuan soal batas'
+  );
+
+  const bateraiNaik = nilai({ ...bawaan, usableFlightMin: 30 }).findings.find(
+    (f) => f.code === 'baterai-ditimpa'
+  );
+  ok(bateraiNaik?.level === 'warn', 'jatah baterai 30 menit jadi peringatan kuning');
+  ok(
+    /CADANGAN/.test(bateraiNaik?.text ?? ''),
+    'dan dikatakan yang dilepas itu cadangan, bukan kapasitas baru'
+  );
+
+  const lewatNominal = nilai({ ...bawaan, usableFlightMin: 40 }).findings.find(
+    (f) => f.code === 'baterai-ditimpa'
+  );
+  ok(
+    lewatNominal?.level === 'bad',
+    'di atas daya tahan nominal jadi merah — export ditahan sampai dicentang',
+    `nominal ${bawaan.nominalFlightMin} menit`
+  );
+
+  const wpNaik = nilai({ ...bawaan, maxWaypoints: 300 }).findings.find(
+    (f) => f.code === 'waypoint-ditimpa'
+  );
+  ok(wpNaik?.level === 'warn', 'batas waypoint dinaikkan jadi peringatan kuning');
+  ok(
+    /SATU file dulu/.test(wpNaik?.text ?? ''),
+    'dan disuruh menguji satu file dulu sebelum berangkat ke lahan'
+  );
+
+  // Menurunkan batas tidak pernah jadi temuan: itu arah yang lebih aman.
+  const turun = nilai({ ...bawaan, usableFlightMin: 15, maxWaypoints: 100 }).findings.map(
+    (f) => f.code
+  );
+  ok(
+    !turun.includes('baterai-ditimpa') && !turun.includes('waypoint-ditimpa'),
+    'menurunkan batas tidak pernah diperingatkan'
+  );
+}
+
 console.log(failed ? `\n${failed} pemeriksaan GAGAL\n` : '\nSemua pemeriksaan lolos\n');
 process.exit(failed ? 1 : 0);

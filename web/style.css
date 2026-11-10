@@ -914,6 +914,13 @@ input[type="range"]::-moz-range-thumb {
   color: var(--muted);
 }
 
+/* Penjelasan di bawah batas yang sedang ditimpa. Bukan merah menyala —
+   keputusannya sah — tapi cukup berbeda supaya tidak terbaca seperti teks
+   bantuan biasa yang boleh dilewati. */
+.sub.danger-text {
+  color: var(--danger-text);
+}
+
 .files-zip {
   display: flex;
   align-items: flex-start;

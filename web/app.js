@@ -97,7 +97,39 @@ const SAFE_ADVANCED = {
   // jadi 20 m tanpa ada yang meminta — lihat catatan di updateDerived.
   rthHeightM: 100,
   angleDeg: 0, // 0 = otomatis, ikut sisi terpanjang
+  // null = pakai angka dari profil drone. Keduanya BATAS, dan menaikkannya
+  // adalah keputusan pengguna yang harus kelihatan — bukan setelan diam-diam.
+  // Lihat limitsEfektif().
+  maxWaypointsOverride: null,
+  usableFlightMinOverride: null,
 };
+
+/**
+ * Batas yang benar-benar dipakai rencana ini: angka profil, kecuali pengguna
+ * menimpanya sendiri.
+ *
+ * Dua-duanya ditimpa dengan alasan yang sah dan berbeda.
+ *
+ * Batas waypoint: angka 200 itu beredar di komunitas dan TIDAK pernah diuji —
+ * file asli DJI Fly yang kita punya cuma 12 titik, yang kompetitor 60. Jadi
+ * satu-satunya cara tahu adalah membuat file di atasnya lalu mencoba
+ * mengimpornya. Aplikasi yang memaksakan tebakannya sendiri membuat uji itu
+ * mustahil.
+ *
+ * Jatah baterai: 22 menit itu angka aman untuk baterai sehat di cuaca baik,
+ * sudah dipotong cadangan. Yang hafal baterainya sendiri — pernah terbang 30
+ * menit di lahan yang sama — berhak memakai angkanya sendiri. Yang tidak boleh
+ * terjadi adalah angka itu naik tanpa ada yang mengatakan apa yang dilepas.
+ */
+function limitsEfektif(profile) {
+  const lim = profile.limits;
+  const adv = state.advanced;
+  return {
+    ...lim,
+    maxWaypoints: adv.maxWaypointsOverride ?? lim.maxWaypoints,
+    usableFlightMin: adv.usableFlightMinOverride ?? lim.usableFlightMin,
+  };
+}
 
 const state = {
   registry: null,
@@ -576,6 +608,12 @@ const els = {
   safeHeight: $('safe-height'),
   rthHeight: $('rth-height'),
   rthHeightOut: $('rth-height-out'),
+  limBaterai: $('lim-baterai'),
+  limBateraiOut: $('lim-baterai-out'),
+  limBateraiSub: $('lim-baterai-sub'),
+  limWaypoint: $('lim-waypoint'),
+  limWaypointOut: $('lim-waypoint-out'),
+  limWaypointSub: $('lim-waypoint-sub'),
   safeHeightOut: $('safe-height-out'),
   resetAdv: $('btn-reset-adv'),
   gate: $('gate'),
@@ -1152,6 +1190,30 @@ els.safeHeight.addEventListener('input', () => {
   render();
 });
 
+// Menyimpan null kalau nilainya sama dengan angka profil, bukan menyimpan
+// angkanya. Dengan begitu mengganti drone tetap membawa batas drone itu,
+// dan yang tercatat sebagai 'ditimpa' memang benar-benar ditimpa.
+const setLimit = (kunci, nilai, bawaan) => {
+  state.advanced[kunci] = nilai === bawaan ? null : nilai;
+  render();
+};
+
+els.limBaterai.addEventListener('input', () => {
+  setLimit(
+    'usableFlightMinOverride',
+    Number(els.limBaterai.value),
+    state.profile?.limits.usableFlightMin
+  );
+});
+
+els.limWaypoint.addEventListener('input', () => {
+  setLimit(
+    'maxWaypointsOverride',
+    Number(els.limWaypoint.value),
+    state.profile?.limits.maxWaypoints
+  );
+});
+
 els.rthHeight.addEventListener('input', () => {
   state.advanced.rthHeightM = Number(els.rthHeight.value);
   render();
@@ -1174,7 +1236,10 @@ els.resetAdv.onclick = () => {
   };
   syncAdvancedInputs();
   render();
-  toast('Setelan lanjutan dikembalikan: RTH saat sinyal hilang, RTH setelah selesai.', 'ok');
+  toast(
+    'Setelan lanjutan dikembalikan, termasuk batas baterai dan waypoint yang tadi ditimpa.',
+    'ok'
+  );
 };
 
 function syncAdvancedInputs() {
@@ -1183,6 +1248,9 @@ function syncAdvancedInputs() {
   els.gimbal.value = String(a.gimbalPitch);
   els.safeHeight.value = String(a.safeHeightM);
   els.rthHeight.value = String(a.rthHeightM ?? SAFE_ADVANCED.rthHeightM);
+  const bawaan = state.profile?.limits ?? {};
+  els.limBaterai.value = String(a.usableFlightMinOverride ?? bawaan.usableFlightMin ?? 22);
+  els.limWaypoint.value = String(a.maxWaypointsOverride ?? bawaan.maxWaypoints ?? 200);
   els.rcLost.value = a.rcLostAction;
   els.finish.value = a.finishAction;
 }
@@ -1823,7 +1891,7 @@ function buildOrbitPlan() {
   const polyXY = polygon.map(proj.toXY);
   const homeXY = proj.toXY(home ?? polygon[0]);
   const area = polygonArea(polyXY);
-  const lim = profile.limits;
+  const lim = limitsEfektif(profile);
 
   // Titik tengah poligon jadi titik asal proyeksi, jadi sumbu objeknya [0,0].
   const centerXY = [0, 0];
@@ -1958,7 +2026,7 @@ function buildPlan() {
   const homeXY = proj.toXY(home ?? polygon[0]);
   const area = polygonArea(polyXY);
 
-  const lim = profile.limits;
+  const lim = limitsEfektif(profile);
 
   // Sudut gimbal mana yang dipakai untuk melaporkan ketelitian. Yang dipilih
   // adalah yang PALING MIRING dari nadir di antara yang benar-benar dipakai,
@@ -2122,7 +2190,7 @@ function buildPlan() {
     speed,
     accel,
     stopAtEach,
-    usableFlightMin: profile.limits.usableFlightMin,
+    usableFlightMin: lim.usableFlightMin,
     hoverPerPhotoSec: hoverPerPhoto,
     transitReserveSec,
     maxWaypoints: lim.maxWaypoints,
@@ -2246,7 +2314,14 @@ function buildPlan() {
 function checkWarnings(plan) {
   // Semua pemeriksaan tinggal di src/safety.js supaya tidak ada yang lolos
   // diam-diam, dan supaya CLI bisa memakai pemeriksaan yang sama persis.
-  const result = evaluateSafety(plan, state.profile, { obstacles: plan.obstacles });
+  // Profil dikirim dengan batas EFEKTIF, supaya pemeriksaan keselamatan
+  // menilai rencana yang sebenarnya dibuat — bukan rencana versi batas bawaan
+  // yang sudah tidak dipakai begitu pengguna menimpanya.
+  const result = evaluateSafety(
+    plan,
+    { ...state.profile, limits: limitsEfektif(state.profile) },
+    { obstacles: plan.obstacles, limitsBawaan: state.profile.limits }
+  );
   state.safety = result;
   return result.findings;
 }
@@ -2509,6 +2584,29 @@ function updateDerived(plan) {
   els.safeHeight.disabled = false;
   els.safeHeightOut.textContent = `${state.advanced.safeHeightM} m`;
   els.rthHeightOut.textContent = `${state.advanced.rthHeightM ?? SAFE_ADVANCED.rthHeightM} m`;
+
+  // Dua batas yang bisa ditimpa. Yang ditampilkan bukan cuma angkanya,
+  // melainkan apakah angka itu MILIK DRONE atau milik pengguna — karena
+  // begitu ditimpa, semua hitungan di bawahnya berdiri di atas keputusan
+  // orang, bukan di atas spesifikasi.
+  {
+    const bawaan = state.profile?.limits ?? {};
+    const adv = state.advanced;
+
+    const bat = adv.usableFlightMinOverride ?? bawaan.usableFlightMin ?? 22;
+    els.limBateraiOut.textContent =
+      adv.usableFlightMinOverride == null
+        ? `${bat} m`
+        : `${bat} m · ditimpa (bawaan ${bawaan.usableFlightMin})`;
+    els.limBateraiSub.classList.toggle('danger-text', bat > (bawaan.usableFlightMin ?? 22));
+
+    const wp = adv.maxWaypointsOverride ?? bawaan.maxWaypoints ?? 200;
+    els.limWaypointOut.textContent =
+      adv.maxWaypointsOverride == null
+        ? `${wp}`
+        : `${wp} · ditimpa (bawaan ${bawaan.maxWaypoints})`;
+    els.limWaypointSub.classList.toggle('danger-text', wp > (bawaan.maxWaypoints ?? 200));
+  }
 
   const mult = Number(els.buffer.value);
   els.bufferOut.textContent = mult === 0 ? 'mati' : `${mult.toFixed(1)}× jarak jalur`;

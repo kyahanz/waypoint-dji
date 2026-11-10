@@ -377,6 +377,10 @@ Spec WPML dipublikasikan DJI untuk lini Enterprise. Implementasi di DJI Fly
   pecah jadi 109 + 108 meski batas waypointnya dicabut sama sekali. Yang
   benar-benar bergantung pada angka ini mode **tanpa jeda**, yang bisa memuat
   seribu titik lebih dalam satu baterai.
+  Karena itu tebakan, **angkanya bisa diubah** di Pengaturan lanjutan: aplikasi
+  yang memaksakan tebakannya sendiri membuat pengujiannya mustahil. Menaikkannya
+  memunculkan peringatan yang menyuruh menguji satu file dulu sebelum berangkat
+  ke lahan.
 - `droneEnumValue` / `payloadEnumValue` untuk Mini 5 Pro — sekarang diisi `68`, asal tebak
 - Versi namespace WPML yang dipakai DJI Fly — kita pakai `1.0.6`
 - Nama & struktur path di dalam arsip (`wpmz/template.kml`)
@@ -567,6 +571,35 @@ menanyai unduhan beruntun — lahan 144 ha pola 3D menghasilkan 42 file, dan itu
 42 kali tanya-izin lalu 42 file tercecer di folder Unduhan. Di bawah lima,
 unduhan satu-satu masih nyaman dan tidak menambah langkah ekstrak. Tapi bawaan
 bukan aturan: centangnya bisa dinyalakan untuk dua file sekalipun.
+
+#### Dua batas itu bisa ditimpa, dan keduanya mengaku saat ditimpa
+
+Keduanya punya alasan sah untuk dinaikkan, dan alasannya berbeda.
+
+**Batas waypoint** memang tidak pernah diuji (lihat "Yang masih tebakan"), jadi
+satu-satunya cara tahu adalah membuat file di atasnya lalu mencoba mengimpornya.
+Menaikkannya memunculkan peringatan **kuning**: kalau DJI Fly menolak filenya,
+inilah tersangka pertamanya — uji satu file dulu sebelum berangkat.
+
+**Jatah baterai** 22 menit itu angka aman untuk baterai sehat di cuaca baik,
+sudah dipotong cadangan untuk angin lawan, cuaca dingin, dan baterai yang
+kapasitasnya menyusut seiring umur. Yang hafal baterainya sendiri — pernah
+terbang 30 menit di lahan yang sama — berhak memakai angkanya. Yang dikatakan
+peringatannya bukan "kamu salah", melainkan **apa yang dilepas**:
+
+| Jatah yang dipakai | Tingkat |
+|---|---|
+| sampai 22 menit (bawaan) | — |
+| 23–36 menit (sampai daya tahan nominal) | kuning, "yang dilepas itu cadangan" |
+| di atas 36 menit | **merah**, export ditahan sampai dicentang |
+
+Batas merahnya daya tahan **nominal** drone, dan itu bukan angka sembarangan:
+36 menit itu hover tanpa angin dengan baterai baru, bukan terbang bermanuver
+sambil berhenti-jepret. Di atasnya, drone bisa kehabisan baterai sebelum
+misinya selesai — dan yang terjadi berikutnya ditentukan setelan RTH, bukan
+oleh rencana ini.
+
+Menurunkan kedua batas tidak pernah diperingatkan: itu arah yang lebih aman.
 
 #### "Gabung sebisanya" tetap tunduk pada batas 200 waypoint
 
