@@ -2968,7 +2968,7 @@ function renderSplitUi(plan) {
     els.splitHint.textContent =
       n <= 1
         ? 'Semuanya muat dalam satu file dan satu penerbangan. Kalau gagal di tengah, yang diulang seluruh pekerjaannya.'
-        : `Tetap ${n} file — bukan karena perannya dipisah, tapi karena batas ${lim.maxWaypoints} waypoint per file dan jatah baterai ${lim.usableFlightMin} menit. Dua batas itu dari drone dan DJI Fly, bukan pilihan.`;
+        : `Tetap ${n} file — bukan karena perannya dipisah, tapi karena jatah baterai ${lim.usableFlightMin} menit dan perkiraan batas ${lim.maxWaypoints} waypoint per file. Di mode berhenti sejenak biasanya baterainya yang kena duluan, karena tiap foto memakan waktu berhenti.`;
     return;
   }
 
@@ -3220,7 +3220,7 @@ function renderSorties(plan) {
   }
   if (totalWp > maxWp) {
     alasan.push(
-      `Rencana ini butuh <b>${totalWp} waypoint</b>, sementara DJI cuma menerima <b>${maxWp} per file</b>. Tiap foto butuh satu waypoint, jadi batas inilah yang biasanya kena duluan.`
+      `Rencana ini butuh <b>${totalWp} waypoint</b>, sementara batas yang kami pakai <b>${maxWp} per file</b> — angka itu <b>belum diuji</b> di perangkat, jadi diperlakukan sebagai batas sampai terbukti lain. Tiap foto butuh satu waypoint.`
     );
   }
   if (jatahS > 0 && plan.duration > jatahS) {

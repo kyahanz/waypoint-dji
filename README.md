@@ -367,6 +367,16 @@ out/              Hasil generate (.kmz + versi mentah untuk di-diff)
 Spec WPML dipublikasikan DJI untuk lini Enterprise. Implementasi di DJI Fly
 (consumer) belum terkonfirmasi identik. Yang belum pasti:
 
+- **Batas 200 waypoint per file** — angka ini dipakai di seluruh aplikasi sebagai
+  batas keras, padahal **tidak ada satu pun bukti untuknya di repo ini**. File
+  asli DJI Fly yang kita bongkar punya 12 waypoint, file generator pihak ketiga
+  yang terbukti terimpor punya 60, dan buatan kita sendiri 3. Jadi yang terbukti
+  cuma "60 diterima"; 200 itu angka yang beredar di komunitas, bukan hasil uji.
+  Untungnya ini jarang mengikat sendirian: di mode berhenti sejenak, jatah
+  baterai 22 menit hampir selalu kena lebih dulu — rencana 217 waypoint tetap
+  pecah jadi 109 + 108 meski batas waypointnya dicabut sama sekali. Yang
+  benar-benar bergantung pada angka ini mode **tanpa jeda**, yang bisa memuat
+  seribu titik lebih dalam satu baterai.
 - `droneEnumValue` / `payloadEnumValue` untuk Mini 5 Pro — sekarang diisi `68`, asal tebak
 - Versi namespace WPML yang dipakai DJI Fly — kita pakai `1.0.6`
 - Nama & struktur path di dalam arsip (`wpmz/template.kml`)
