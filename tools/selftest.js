@@ -35,7 +35,12 @@ import {
   centroid,
 } from '../src/survey.js';
 import { evaluateSafety, JARINGAN_LISTRIK } from '../src/safety.js';
-import { buildTemplateKml, buildWaylinesWpml, MISSION_DEFAULTS } from '../src/wpml.js';
+import {
+  buildTemplateKml,
+  buildWaylinesWpml,
+  MISSION_DEFAULTS,
+  wpmlRangeProblems,
+} from '../src/wpml.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const registry = JSON.parse(fs.readFileSync(path.join(ROOT, 'profiles', 'drones.json'), 'utf8'));
@@ -1506,6 +1511,134 @@ console.log('\nBatas yang ditimpa pengguna');
   ok(
     !turun.includes('baterai-ditimpa') && !turun.includes('waypoint-ditimpa'),
     'menurunkan batas tidak pernah diperingatkan'
+  );
+}
+
+// ---------------------------------------------- sudut hadap & rentang WPML
+//
+// Kelompok ini menjaga satu kegagalan yang sudah pernah terjadi dan mahal:
+// file yang diimpor DJI Fly dengan mulus, jalurnya tergambar benar, lalu
+// penerbangannya gagal di lapangan. Yang salah bukan strukturnya melainkan
+// ANGKA-nya — dan struktur itulah satu-satunya yang diperiksa alat banding.
+{
+  console.log('\nSudut hadap dan rentang nilai WPML');
+
+  const pM5 = resolveProfile(registry, { droneId: 'mini5pro' });
+  const sudut = (xml) => [
+    ...new Set([...xml.matchAll(/<wpml:waypointHeadingAngle>([^<]*)</g)].map((m) => Number(m[1]))),
+  ];
+
+  // Jalur bolak-balik: arah kompasnya 90 saat berangkat dan 270 saat balik.
+  // 270 di luar rentang -180..180 yang dinyatakan WPML.
+  const bolakBalik = {
+    ...MISSION_DEFAULTS,
+    speed: 5,
+    waypoints: [
+      { lat: -6.2, lng: 107.1, height: 50, heading: 90, takePhoto: true, gimbalPitch: -90 },
+      { lat: -6.2005, lng: 107.1, height: 50, heading: 270, takePhoto: true, gimbalPitch: -90 },
+      { lat: -6.201, lng: 107.1, height: 50, heading: 270, takePhoto: true, gimbalPitch: -90 },
+    ],
+  };
+  const xmlGrid = buildWaylinesWpml(bolakBalik, pM5);
+  ok(
+    sudut(xmlGrid).every((a) => a === 0),
+    'followWayline menulis sudut hadap 0 di tiap titik, seperti kedua file acuan',
+    sudut(xmlGrid).join(', ')
+  );
+
+  // Orbit memakai sudut itu sungguhan, jadi dia tidak boleh dinolkan — cuma
+  // dibawa ke rentang yang sah: 270 kompas = -90 WPML.
+  const orbit = {
+    ...bolakBalik,
+    headingMode: 'smoothTransition',
+    waypoints: bolakBalik.waypoints.map((w) => ({ ...w, headingMode: 'smoothTransition' })),
+  };
+  const sudutOrbit = sudut(buildWaylinesWpml(orbit, pM5));
+  ok(
+    sudutOrbit.includes(-90) && !sudutOrbit.includes(270),
+    'orbit tetap memakai sudutnya, tapi 270 ditulis sebagai -90',
+    sudutOrbit.join(', ')
+  );
+  ok(
+    sudutOrbit.every((a) => a >= -180 && a <= 180),
+    'dan semua sudut orbit ada di dalam rentang -180..180'
+  );
+
+  // Kecepatan di bawah 1 m/s: dulu filenya tetap terbentuk rapi, dan itulah
+  // bahayanya.
+  const pelan = { ...bolakBalik, speed: 0.6 };
+  ok(
+    wpmlRangeProblems(pelan).some((t) => /Kecepatan misi/.test(t)),
+    'kecepatan 0.6 m/s dikenali di luar rentang 1-15 m/s'
+  );
+  let ditolak = false;
+  try {
+    buildWaylinesWpml(pelan, pM5);
+  } catch {
+    ditolak = true;
+  }
+  ok(ditolak, 'dan file-nya batal dibuat, bukan dibuat lalu gagal di lahan');
+
+  // Dua titik yang berimpit.
+  const impit = {
+    ...bolakBalik,
+    waypoints: [bolakBalik.waypoints[0], { ...bolakBalik.waypoints[0] }, bolakBalik.waypoints[2]],
+  };
+  ok(
+    wpmlRangeProblems(impit).some((t) => /berjarak/.test(t)),
+    'dua titik yang berimpit dikenali sebelum file dibuat'
+  );
+
+  // Setelan yang hilang tidak boleh jadi teks "NaN" di dalam file.
+  let nanDitolak = false;
+  try {
+    buildWaylinesWpml({ ...bolakBalik, takeOffSecurityHeight: undefined }, pM5);
+  } catch {
+    nanDitolak = true;
+  }
+  ok(nanDitolak, 'setelan yang hilang membatalkan export, bukan menulis "NaN" ke file');
+
+  // Dan pola 3D sungguhan, lewat jalur yang dipakai aplikasi.
+  const kotak = [
+    [0, 0],
+    [200, 0],
+    [200, 200],
+    [0, 200],
+  ];
+  const projUji = makeProjector(-6.2, 107.1);
+  const g3d = generatePattern(kotak, {
+    pattern: 'building3d',
+    angleDeg: 0,
+    sideSpacing: 30,
+    frontSpacing: 15,
+  });
+  const misiNyata = {
+    ...MISSION_DEFAULTS,
+    speed: 5,
+    waypoints: g3d.waypoints.map((w) => {
+      const [lng, lat] = projUji.toLL(w.xy);
+      return {
+        lat,
+        lng,
+        height: 60,
+        heading: w.heading,
+        gimbalPitch: w.gimbalPitch ?? -90,
+        takePhoto: true,
+      };
+    }),
+  };
+  ok(
+    g3d.waypoints.some((w) => w.heading > 180),
+    'generator memang menghasilkan arah kompas di atas 180',
+    `${g3d.waypoints.filter((w) => w.heading > 180).length} titik`
+  );
+  ok(
+    wpmlRangeProblems(misiNyata).length === 0,
+    'tapi misi 3D yang sudah jadi tidak menyisakan nilai di luar rentang'
+  );
+  ok(
+    sudut(buildWaylinesWpml(misiNyata, pM5)).every((a) => a === 0),
+    'dan file 3D-nya menulis sudut hadap 0 di semua titik'
   );
 }
 

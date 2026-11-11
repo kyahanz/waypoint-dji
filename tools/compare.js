@@ -71,6 +71,28 @@ const BEBAS = new Set([
   'droneSubEnumValue',
 ]);
 
+/**
+ * Rentang yang dinyatakan WPML untuk tag yang nilainya memang beda tiap misi.
+ *
+ * Tag-tag ini ada di BEBAS karena membandingkan nilainya dengan file acuan
+ * cuma menghasilkan bising. Tapi "bebas berbeda" tidak sama dengan "bebas
+ * apa saja" — dan celah itu sempat memakan korban: jalur bolak-balik menulis
+ * waypointHeadingAngle 270, di luar rentang -180..180, dan alat ini diam saja
+ * karena tag-nya kebetulan ada di daftar bebas. Filenya terimpor mulus lalu
+ * gagal saat diterbangkan.
+ */
+const RENTANG = {
+  waypointHeadingAngle: [-180, 180],
+  waypointSpeed: [1, 15],
+  autoFlightSpeed: [1, 15],
+  globalTransitionalSpeed: [1, 15],
+  gimbalPitchRotateAngle: [-120, 45],
+  waypointGimbalPitchAngle: [-120, 45],
+  takeOffSecurityHeight: [1.5, 1500],
+  globalRTHHeight: [20, 1500],
+  hoverTime: [0, 32767],
+};
+
 const A = readTags(aPath);
 const B = readTags(bPath);
 
@@ -122,6 +144,20 @@ for (const f of files) {
         `  ?  ${tag}: B memakai ${asing.map((v) => `"${v}"`).join(', ')} — A cuma ${[...aVals].map((v) => `"${v}"`).join(', ')}`
       );
       masalah++;
+    }
+  }
+
+  // Pemeriksaan rentang, untuk B saja: yang dinilai di sini bukan selisih
+  // terhadap acuan, melainkan apakah angkanya sah menurut WPML.
+  for (const [tag, bVals] of b.tags) {
+    const r = RENTANG[tag];
+    if (!r) continue;
+    for (const v of bVals) {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < r[0] || n > r[1]) {
+        console.log(`  !! ${tag}: "${v}" di luar rentang WPML ${r[0]}..${r[1]}`);
+        masalah++;
+      }
     }
   }
 

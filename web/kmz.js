@@ -16,7 +16,13 @@ import { buildTemplateKml, buildWaylinesWpml, MISSION_DEFAULTS } from '../src/wp
  * @returns {Promise<Uint8Array>}
  */
 export function buildKmz(mission, profile) {
-  const full = { ...MISSION_DEFAULTS, ...mission };
+  // Kunci yang nilainya undefined DIBUANG dulu. Sebaran objek menyalin kunci
+  // apa adanya, jadi satu setelan yang kebetulan undefined — misalnya rencana
+  // lama yang belum punya ketinggian naik-aman — menimpa nilai bawaan dengan
+  // undefined, dan yang sampai ke file adalah teks "NaN". File seperti itu
+  // tetap diimpor DJI Fly lalu gagal waktu diterbangkan.
+  const diisi = Object.fromEntries(Object.entries(mission).filter(([, v]) => v !== undefined));
+  const full = { ...MISSION_DEFAULTS, ...diisi };
   // Tanpa entri folder 'wpmz/': arsip buatan DJI Fly tidak memuatnya.
   return createZipAsync([
     { name: 'wpmz/template.kml', data: buildTemplateKml(full, profile) },

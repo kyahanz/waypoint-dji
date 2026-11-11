@@ -78,6 +78,48 @@ asing sama berbahayanya dengan tag yang hilang. Contohnya `waypointHeadingMode`
 — tag-nya cocok, tapi kita dulu mengisi `smoothTransition` sementara DJI Fly
 cuma memakai `followWayline`. Ketahuan lewat alat ini, bukan lewat tebakan.
 
+### Struktur benar, angka salah — kegagalan yang tidak kelihatan saat impor
+
+Ada kelas kegagalan kedua yang tidak terjangkau tabel di atas, dan gejalanya
+lebih membingungkan daripada file yang ditolak: **file terimpor dengan mulus,
+jalurnya tergambar benar di peta, lalu penerbangannya gagal** — misi
+tersuspend, "error flight", tanpa satu pun nama tag disebut.
+
+Sebabnya bukan tag yang hilang atau tag asing. Strukturnya sudah persis sama
+dengan file yang terbukti terbang. Yang salah **nilainya**, dan WPML punya
+rentang yang dinyatakan:
+
+| tag | rentang | yang pernah kita tulis |
+|---|---|---|
+| `waypointHeadingAngle` | −180..180 | **270** di tiap lintasan balik |
+| `waypointSpeed` / `autoFlightSpeed` | 1..15 m/s | bisa jatuh di bawah 1 lewat kecepatan otomatis |
+| `globalTransitionalSpeed` | 1..15 m/s | ikut kecepatan misi |
+| `takeOffSecurityHeight` | 1.5..1500 m | `NaN` kalau setelannya hilang |
+| `globalRTHHeight` | 20..1500 m | — |
+| `gimbalPitchRotateAngle` | −120..45 | — |
+| jarak antar titik | ≥ 0.5 m | titik berimpit di sambungan lintasan |
+
+Yang paling mahal yang pertama. Arah hadap dihitung sebagai arah kompas
+(0..360), dan jalur bolak-balik menghasilkan **270** untuk tiap lintasan
+baliknya. Pada `followWayline` angka itu bahkan tidak dipakai — drone
+menghitung arah hadapnya sendiri dari jalur — tapi tetap dibaca dan tetap
+divalidasi. Dari 294 titik rencana 3D, 84 di antaranya membawa angka di luar
+rentang. Kedua file acuan menulis **0** di setiap titik.
+
+Kenapa `npm run compare` tidak menangkapnya selama ini: dia sengaja
+mengabaikan nilai yang memang beda tiap misi — kecepatan, ketinggian, sudut
+hadap — karena membandingkannya dengan file acuan cuma menghasilkan bising.
+Justru di daftar abai itulah pelanggaran rentang bersembunyi. Sekarang
+tag-tag itu tetap tidak dibandingkan isinya, tapi **diperiksa rentangnya**.
+
+Dan pemeriksaan yang sama hidup di generator sendiri: `wpmlRangeProblems()`
+dipanggil `buildWaylinesWpml()` sebelum satu baris pun ditulis, jadi file yang
+melanggar **batal dibuat di meja** — bukan dibuat lalu gagal setelah
+perjalanan ke lahan dibayar. Nilai bukan-angka juga tidak lagi bisa menyelinap
+sebagai teks `NaN`: `num()` melemparkan error, dan `buildKmz()` membuang kunci
+yang bernilai `undefined` sebelum menimpa nilai bawaan.
+
+
 Konsekuensi praktis: **kode payload tidak menentukan apa pun** di lini
 consumer — DJI Fly tidak pernah membacanya. Yang menentukan cuma kode drone.
 Dan setelan "ketinggian aman transit" di UI dimatikan, karena angkanya tidak

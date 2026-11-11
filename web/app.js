@@ -88,6 +88,10 @@ const EMPTY = { type: 'FeatureCollection', features: [] };
 // Setelan lanjutan yang aman. Ini bukan sekadar nilai awal — tombol
 // "kembalikan ke setelan aman" memulihkan persis isi objek ini, dan dua yang
 // pertama adalah satu-satunya yang membawa drone pulang kalau ada yang salah.
+// Kecepatan terendah yang diterima WPML. Dipakai sebagai lantai di semua
+// tempat yang menghitung kecepatan sendiri.
+const MIN_WPML_SPEED = 1;
+
 const SAFE_ADVANCED = {
   rcLostAction: 'goBack',
   finishAction: 'goHome',
@@ -2051,9 +2055,14 @@ function buildPlan() {
   const stopAtEach = mode === 'stopAndShoot';
   const accel = lim.accelMs2 ?? 2.5;
 
-  const autoSpeed = Math.min(
-    stopAtEach ? lim.maxSpeedMs : params.recommendedSpeed,
-    lim.maxSpeedMs
+  // Batas bawah 1 m/s bukan selera: WPML menyatakan kecepatan dalam rentang
+  // 1-15 m/s, dan angka di bawahnya menghasilkan file yang terimpor rapi lalu
+  // gagal saat diterbangkan. Kecepatan otomatis bisa jatuh ke sana sendiri —
+  // ketinggian rendah dengan tumpang tindih tinggi membuat jarak antar foto
+  // beberapa meter saja, dan jeda jepret kamera lalu yang menentukan.
+  const autoSpeed = Math.max(
+    MIN_WPML_SPEED,
+    Math.min(stopAtEach ? lim.maxSpeedMs : params.recommendedSpeed, lim.maxSpeedMs)
   );
   // Kecepatan manual tidak dipaksa turun ke batas aman di sini — kalau
   // melewatinya, gerbang keselamatan yang bilang, bukan kode yang diam-diam
@@ -2145,8 +2154,8 @@ function buildPlan() {
   // dibuang, bedanya dua mode memang cuma ada-tidaknya hoverTime dan batas
   // kecepatannya — bukan jumlah titiknya.
   const modeAltSpeed = stopAtEach
-    ? Math.min(params.recommendedSpeed, lim.maxSpeedMs)
-    : Math.min(lim.maxSpeedMs, lim.maxSpeedMs);
+    ? Math.max(MIN_WPML_SPEED, Math.min(params.recommendedSpeed, lim.maxSpeedMs))
+    : lim.maxSpeedMs;
   const modeAlt = {
     mode: stopAtEach ? 'continuous' : 'stopAndShoot',
     speed: modeAltSpeed,
@@ -2691,7 +2700,9 @@ function updateDerived(plan) {
     minIntervalSec: state.profile.camera.minIntervalSec,
   });
 
-  const shown = plan ? plan.speed : Math.min(p.recommendedSpeed, state.profile.limits.maxSpeedMs);
+  const shown = plan
+    ? plan.speed
+    : Math.max(MIN_WPML_SPEED, Math.min(p.recommendedSpeed, state.profile.limits.maxSpeedMs));
   if (state.speedAuto) {
     state.speedMs = shown;
     els.speed.value = String(shown.toFixed(1));

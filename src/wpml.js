@@ -51,8 +51,32 @@ const esc = (s) =>
   );
 
 const num = (v, digits = 6) => {
-  const s = Number(v).toFixed(digits);
+  const n = Number(v);
+  // Angka yang tidak terhingga TIDAK boleh diam-diam jadi teks "NaN" di dalam
+  // file. DJI Fly tetap mau mengimpor file seperti itu — daftar misinya muncul,
+  // waypoint-nya tergambar — lalu penerbangannya gagal di lapangan dengan pesan
+  // yang tidak menyebut satu pun nama tag. Lebih baik export-nya batal di meja.
+  if (!Number.isFinite(n)) {
+    throw new Error(
+      `Nilai bukan angka masuk ke file misi (${v}). Export dibatalkan — file seperti ini diimpor DJI Fly tapi gagal saat diterbangkan.`
+    );
+  }
+  const s = n.toFixed(digits);
   return s.includes('.') ? s.replace(/\.?0+$/, '') || '0' : s;
+};
+
+/**
+ * Sudut kompas 0..360 -> sudut WPML -180..180.
+ *
+ * WPML menyatakan arah hadap dalam rentang [-180, 180]: 90 itu timur, -90 itu
+ * BARAT. Jalur bolak-balik menghasilkan arah 270 untuk lintasan baliknya, dan
+ * 270 bukan sekadar "cara lain menulis -90" — dia di luar rentang yang
+ * dinyatakan DJI, dan tidak pernah muncul di satu pun file yang terbukti
+ * diterbangkan.
+ */
+const toSigned180 = (deg) => {
+  const d = ((Number(deg) % 360) + 360) % 360;
+  return d > 180 ? d - 360 : d;
 };
 
 /**
@@ -239,7 +263,6 @@ function intervalActionGroup(m, lastIndex, id) {
  */
 function headingParam(wp, m, i = 0) {
   const mode = wp.headingMode ?? m.headingMode;
-  const angle = wp.heading ?? 0;
   // File buatan DJI Fly memasang 1 di titik pertama, tapi generator pihak
   // ketiga memasang 0 di semua titik — dan file kita yang meniru DJI Fly
   // justru ditolak. Jadi yang diikuti contoh yang dipakai orang memetakan.
@@ -248,6 +271,22 @@ function headingParam(wp, m, i = 0) {
   // satu-satunya yang membuat kamera menghadap objek. Kalau enable 0, sudut
   // yang susah payah dihitung itu diabaikan drone.
   const enable = mode === 'smoothTransition' ? 1 : 0;
+
+  // Sudut hanya ditulis kalau memang dipakai.
+  //
+  // Ini sumber kegagalan yang mahal, dan dia tidak kelihatan dari struktur
+  // file sama sekali: di followWayline drone menghitung sendiri arah hadapnya
+  // dari jalur, jadi angka di sini TIDAK dipakai — tapi tetap dibaca dan tetap
+  // divalidasi. Jalur bolak-balik menulis 90 di lintasan berangkat dan 270 di
+  // lintasan balik, dan 270 di luar rentang [-180, 180]. File-nya terimpor
+  // dengan mulus, waypoint-nya tergambar benar, lalu penerbangannya gagal.
+  //
+  // Dua-duanya file acuan — buatan DJI Fly sendiri dan buatan generator pihak
+  // ketiga yang memang dipakai orang memetakan — menulis 0 di SETIAP titik.
+  // Jadi itu yang ditulis di sini juga, dan sudut sungguhan cuma ditulis untuk
+  // mode yang benar-benar memakainya (orbit), sesudah dibawa ke rentang yang
+  // sah.
+  const angle = enable ? toSigned180(wp.heading ?? 0) : 0;
 
   const poi = wp.poiPoint ?? m.poi;
   const poiPoint = poi
@@ -385,7 +424,117 @@ ${wps}
 `;
 }
 
+/**
+ * Rentang nilai yang dinyatakan WPML, dan satu jarak minimum antar titik.
+ *
+ * Kenapa ini ada sebagai pemeriksaan tersendiri, bukan sekadar hati-hati saat
+ * menulis: pelanggaran rentang TIDAK terlihat waktu impor. DJI Fly menerima
+ * filenya, menggambar jalurnya di peta, dan baru gagal saat tombol terbang
+ * ditekan — dengan pesan yang tidak menyebut tag mana pun. Perjalanan ke lahan
+ * sudah terlanjur dibayar.
+ *
+ * Alat banding (`npm run compare`) tidak bisa menangkapnya: dia sengaja
+ * mengabaikan nilai yang memang beda tiap misi — kecepatan, ketinggian, sudut
+ * hadap — justru tempat pelanggaran rentang bersembunyi.
+ */
+const RANGES = {
+  speed: [1, 15],
+  heading: [-180, 180],
+  gimbalPitch: [-120, 45],
+  takeOffSecurityHeight: [1.5, 1500],
+  rthHeight: [20, 1500],
+};
+
+// DJI menolak dua titik yang nyaris berimpit. Jarak di bawah ini biasanya
+// bukan kesengajaan, melainkan jalur yang terlalu rapat atau titik kembar di
+// sambungan antar lintasan.
+const MIN_WAYPOINT_GAP_M = 0.5;
+
+const between = (v, [lo, hi]) => Number.isFinite(v) && v >= lo && v <= hi;
+
+/**
+ * @param {object} mission mission yang sudah lengkap (hasil gabung dengan MISSION_DEFAULTS)
+ * @returns {string[]} daftar pelanggaran; kosong berarti aman
+ */
+export function wpmlRangeProblems(mission) {
+  const bad = [];
+  const maxSpeed = RANGES.speed;
+
+  if (!between(Number(mission.speed), maxSpeed)) {
+    bad.push(
+      `Kecepatan misi ${mission.speed} m/s di luar rentang ${maxSpeed[0]}-${maxSpeed[1]} m/s.`
+    );
+  }
+  const transit = mission.transitionalSpeed ?? mission.speed;
+  if (!between(Number(transit), maxSpeed)) {
+    bad.push(`Kecepatan transit ${transit} m/s di luar rentang ${maxSpeed[0]}-${maxSpeed[1]} m/s.`);
+  }
+  if (!between(Number(mission.takeOffSecurityHeight), RANGES.takeOffSecurityHeight)) {
+    bad.push(
+      `Ketinggian naik-aman ${mission.takeOffSecurityHeight} m di luar rentang ${RANGES.takeOffSecurityHeight.join('-')} m.`
+    );
+  }
+  if (mission.rthHeight != null && !between(Number(mission.rthHeight), RANGES.rthHeight)) {
+    bad.push(
+      `Ketinggian pulang otomatis ${mission.rthHeight} m di luar rentang ${RANGES.rthHeight.join('-')} m.`
+    );
+  }
+
+  mission.waypoints.forEach((wp, i) => {
+    if (!Number.isFinite(Number(wp.lat)) || !Number.isFinite(Number(wp.lng))) {
+      bad.push(`Titik ${i + 1}: koordinat bukan angka.`);
+    }
+    if (!Number.isFinite(Number(wp.height))) {
+      bad.push(`Titik ${i + 1}: ketinggian bukan angka.`);
+    }
+    const sp = wp.speed ?? mission.speed;
+    if (!between(Number(sp), maxSpeed)) {
+      bad.push(`Titik ${i + 1}: kecepatan ${sp} m/s di luar rentang ${maxSpeed.join('-')} m/s.`);
+    }
+    const mode = wp.headingMode ?? mission.headingMode;
+    if (mode === 'smoothTransition' && !between(toSigned180(wp.heading ?? 0), RANGES.heading)) {
+      bad.push(`Titik ${i + 1}: sudut hadap ${wp.heading}° tidak bisa dibawa ke -180..180.`);
+    }
+    if (wp.gimbalPitch != null && !between(Number(wp.gimbalPitch), RANGES.gimbalPitch)) {
+      bad.push(
+        `Titik ${i + 1}: sudut gimbal ${wp.gimbalPitch}° di luar rentang ${RANGES.gimbalPitch.join('-')}°.`
+      );
+    }
+    if (wp.hoverTime != null && Number(wp.hoverTime) < 0) {
+      bad.push(`Titik ${i + 1}: lama jeda ${wp.hoverTime} detik negatif.`);
+    }
+  });
+
+  // Titik berimpit. Dihitung dengan perkiraan bidang datar — pada jarak
+  // setengah meter, kelengkungan bumi tidak ikut bicara.
+  for (let i = 1; i < mission.waypoints.length; i++) {
+    const a = mission.waypoints[i - 1];
+    const b = mission.waypoints[i];
+    const dLat = (Number(b.lat) - Number(a.lat)) * 111320;
+    const dLng =
+      (Number(b.lng) - Number(a.lng)) * 111320 * Math.cos((Number(a.lat) * Math.PI) / 180);
+    const dz = Number(b.height ?? 0) - Number(a.height ?? 0);
+    const d = Math.hypot(dLat, dLng, dz);
+    if (Number.isFinite(d) && d < MIN_WAYPOINT_GAP_M) {
+      bad.push(
+        `Titik ${i} dan ${i + 1} cuma berjarak ${d.toFixed(2)} m — di bawah batas ${MIN_WAYPOINT_GAP_M} m.`
+      );
+    }
+  }
+
+  return bad;
+}
+
 export function buildWaylinesWpml(mission, profile) {
+  const problems = wpmlRangeProblems(mission);
+  if (problems.length) {
+    throw new Error(
+      `File misi batal dibuat — ${problems.length} nilai di luar yang diterima DJI Fly:` +
+        problems.map((t) => `
+- ${t}`).join('')
+    );
+  }
+
   const total = mission.waypoints.length;
 
   // DJI Fly menulis 0 untuk keduanya dan menghitung sendiri saat memuat.
